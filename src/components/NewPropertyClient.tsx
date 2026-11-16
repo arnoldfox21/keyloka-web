@@ -16,6 +16,7 @@ import {
   Upload,
 } from "lucide-react";
 import { formatRupiah, resolveImageUrl, type UserProfile } from "@/lib/types";
+import { compressImageToDataUrl } from "@/lib/image-compress";
 
 interface NewPropertyClientProps {
   currentUser: UserProfile;
@@ -45,21 +46,6 @@ const DAILY_UNIT_TYPES = [
 
 const FREE_PROPERTY_QUOTA = 2;
 const EXTRA_PROPERTY_SLOT_FEE = 10000;
-
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        resolve(reader.result);
-      } else {
-        reject(new Error("Gagal membaca file gambar."));
-      }
-    };
-    reader.onerror = () => reject(new Error("Gagal membaca file gambar."));
-    reader.readAsDataURL(file);
-  });
-}
 
 export function NewPropertyClient({
   currentUser,
@@ -205,18 +191,21 @@ export function NewPropertyClient({
             `Format "${file.name}" tidak didukung. Gunakan JPG, PNG, atau WebP.`,
           );
         }
-        if (file.size > 5 * 1024 * 1024) {
-          throw new Error(`Ukuran "${file.name}" melebihi batas maksimal 5 MB.`);
+        if (file.size > 15 * 1024 * 1024) {
+          throw new Error(`Ukuran "${file.name}" melebihi batas maksimal 15 MB.`);
         }
 
-        const dataUrl = await fileToDataUrl(file);
+        const { dataUrl, mimeType } = await compressImageToDataUrl(file, {
+          maxDimension: 1600,
+          quality: 0.82,
+        });
         const res = await fetch("/api/proxy/kosts/upload-image", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             base64: dataUrl,
             filename: file.name,
-            mimeType: file.type,
+            mimeType,
           }),
         });
         const data = await res.json().catch(() => ({}));
@@ -1049,8 +1038,8 @@ export function NewPropertyClient({
               )}
               <span>
                 {uploadingImages
-                  ? "Mengunggah foto..."
-                  : "Upload Foto (JPG/PNG/WebP, maks 5MB)"}
+                  ? "Mengompres & mengunggah foto..."
+                  : "Upload Foto (otomatis dikompres ke WebP)"}
               </span>
               <input
                 type="file"
