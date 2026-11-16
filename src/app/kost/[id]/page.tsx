@@ -28,11 +28,11 @@ export async function generateMetadata({
   const { id } = await params;
   const kost = await fetchKostDetail(id);
   if (!kost) {
-    return { title: "Properti Tidak Ditemukan — HuniVio" };
+    return { title: "Properti Tidak Ditemukan — Keyloka" };
   }
   const price = getDisplayPrice(kost);
   return {
-    title: `${kost.name} (${formatRupiah(price.amount)}${price.unit}) — HuniVio`,
+    title: `${kost.name} (${formatRupiah(price.amount)}${price.unit}) — Keyloka`,
     description: `${kost.propertyCategory} ${kost.type} di ${kost.district}, ${kost.city}. ${kost.description?.slice(0, 140)}`,
   };
 }

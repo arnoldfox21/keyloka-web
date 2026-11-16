@@ -108,7 +108,7 @@ export function HomeExplorer({
             Temukan Hunian Nyaman & Booking Langsung dengan Escrow
           </h1>
           <p className="mt-2 text-sm sm:text-base text-emerald-50">
-            Dana booking aman ditahan HuniVio hingga Anda konfirmasi check-in. Kumpulkan poin di setiap transaksi.
+            Dana booking aman ditahan Keyloka hingga Anda konfirmasi check-in. Kumpulkan poin di setiap transaksi.
           </p>
         </div>
 

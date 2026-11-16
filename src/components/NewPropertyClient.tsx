@@ -47,6 +47,101 @@ const DAILY_UNIT_TYPES = [
 const FREE_PROPERTY_QUOTA = 2;
 const EXTRA_PROPERTY_SLOT_FEE = 10000;
 
+const CATEGORY_FACILITY_PRESETS: Record<
+  string,
+  { roomFacilities: string[]; publicFacilities: string[]; roomTitle: string; publicTitle: string }
+> = {
+  KONTRAKAN: {
+    roomTitle: "Fasilitas Rumah & Ruangan",
+    publicTitle: "Fasilitas Lingkungan & Akses",
+    roomFacilities: [
+      "Kamar Tidur",
+      "Ruang Tamu",
+      "Ruang Keluarga",
+      "Dapur Pribadi",
+      "Kamar Mandi",
+      "Shower",
+      "Kloset Duduk",
+      "Kloset Jongkok",
+      "AC",
+      "Water Heater",
+      "Teras / Halaman",
+      "Toren & Pompa Air",
+      "Listrik Token",
+      "PDAM / Air Sumur",
+    ],
+    publicFacilities: [
+      "Carport / Garasi",
+      "Parkir Motor",
+      "Parkir Mobil",
+      "Akses Jalan Mobil",
+      "Keamanan 24 Jam / One Gate",
+      "CCTV Lingkungan",
+      "Dekat Masjid / Mushola",
+      "Bebas Banjir",
+      "Taman",
+    ],
+  },
+  VILLA: {
+    roomTitle: "Fasilitas Villa",
+    publicTitle: "Area & Layanan Villa",
+    roomFacilities: [
+      "Private Pool",
+      "AC",
+      "WiFi",
+      "Smart TV / Karaoke",
+      "Kitchen Set Lengkap",
+      "Kulkas",
+      "Dispenser",
+      "Ruang Keluarga",
+      "Water Heater",
+      "Bathtub",
+      "Balkon / Rooftop",
+      "View Alam",
+      "Handuk & Amenities",
+    ],
+    publicFacilities: [
+      "Area BBQ",
+      "Taman Pribadi",
+      "Parkir Mobil Luas",
+      "Carport / Garasi",
+      "Sarapan (Opsional)",
+      "Penjaga / Caretaker 24 Jam",
+      "CCTV",
+      "Free Listrik & Air",
+    ],
+  },
+  HOMESTAY: {
+    roomTitle: "Fasilitas Kamar Homestay",
+    publicTitle: "Fasilitas Umum & Layanan",
+    roomFacilities: [
+      "AC",
+      "Kipas Angin",
+      "WiFi",
+      "TV",
+      "Kasur Nyaman",
+      "Kamar Mandi Dalam",
+      "Shower",
+      "Water Heater",
+      "Handuk & Perlengkapan Mandi",
+      "Meja & Kursi",
+      "Lemari",
+      "Balkon / Teras",
+    ],
+    publicFacilities: [
+      "Sarapan",
+      "Ruang Tamu Bersama",
+      "Pantry / Dapur Bersama",
+      "Dispenser / Air Mineral",
+      "Parkir Motor",
+      "Parkir Mobil",
+      "Check-in 24 Jam",
+      "Laundry",
+      "CCTV",
+    ],
+  },
+};
+
 export function NewPropertyClient({
   currentUser,
   masterFacilities,
@@ -103,6 +198,21 @@ export function NewPropertyClient({
   const [error, setError] = useState<string | null>(null);
 
   const isDailyStay = propertyCategory === "HUNIAN_HARIAN";
+  const isKontrakan = propertyCategory === "KONTRAKAN";
+
+  const activeFacilityPreset =
+    propertyCategory === "KONTRAKAN"
+      ? CATEGORY_FACILITY_PRESETS.KONTRAKAN
+      : isDailyStay
+        ? unitType.toLowerCase() === "villa"
+          ? CATEGORY_FACILITY_PRESETS.VILLA
+          : CATEGORY_FACILITY_PRESETS.HOMESTAY
+        : {
+            roomTitle: "Fasilitas Kamar",
+            publicTitle: "Fasilitas Umum",
+            roomFacilities: masterFacilities.roomFacilities,
+            publicFacilities: masterFacilities.publicFacilities,
+          };
 
   useEffect(() => {
     const q = city.trim();
@@ -276,9 +386,17 @@ export function NewPropertyClient({
 
     const parsedMonth = Math.round(Number(pricePerMonth));
     const parsedDay = Math.round(Number(pricePerDay));
+    const parsedYear = pricePerYear.trim()
+      ? Math.round(Number(pricePerYear))
+      : undefined;
     if (isDailyStay) {
       if (!Number.isFinite(parsedDay) || parsedDay <= 0) {
         setError("Harga per hari wajib diisi dengan angka lebih dari 0.");
+        return;
+      }
+    } else if (isKontrakan) {
+      if (!parsedYear || !Number.isFinite(parsedYear) || parsedYear <= 0) {
+        setError("Harga per tahun wajib diisi dengan angka lebih dari 0.");
         return;
       }
     } else if (!Number.isFinite(parsedMonth) || parsedMonth <= 0) {
@@ -296,9 +414,6 @@ export function NewPropertyClient({
     const parsedRooms = Math.max(0, Math.round(Number(availableRooms) || 1));
     const parsedBedrooms = Math.max(1, Math.round(Number(bedrooms) || 1));
     const parsedBathrooms = Math.max(1, Math.round(Number(bathrooms) || 1));
-    const parsedYear = pricePerYear.trim()
-      ? Math.round(Number(pricePerYear))
-      : undefined;
     const parsedOriginal = originalPrice.trim()
       ? Math.round(Number(originalPrice))
       : undefined;
@@ -314,13 +429,13 @@ export function NewPropertyClient({
       propertyCategory,
       ...(isDailyStay ? { unitType } : {}),
       name: name.trim(),
-      type: isDailyStay ? "Campur" : type,
+      type: isDailyStay || isKontrakan ? "Campur" : type,
       city: city.trim(),
       district: district.trim(),
       address: address.trim(),
       nearbyLandmark: nearbyLandmark.trim() || undefined,
       description: description.trim(),
-      pricePerMonth: isDailyStay ? 0 : parsedMonth,
+      pricePerMonth: isDailyStay || isKontrakan ? 0 : parsedMonth,
       ...(isDailyStay ? { pricePerDay: parsedDay } : {}),
       ...(parsedYear && Number.isFinite(parsedYear) && parsedYear > 0
         ? { pricePerYear: parsedYear }
@@ -482,7 +597,7 @@ export function NewPropertyClient({
                 ))}
               </div>
             </div>
-          ) : (
+          ) : !isKontrakan ? (
             <div className="space-y-2">
               <label className="block text-xs font-bold text-gray-700">
                 Tipe Penghuni *
@@ -504,7 +619,7 @@ export function NewPropertyClient({
                 ))}
               </div>
             </div>
-          )}
+          ) : null}
 
           <div className="space-y-1.5">
             <label
@@ -717,6 +832,25 @@ export function NewPropertyClient({
                   className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
                 />
               </div>
+            ) : isKontrakan ? (
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="prop-price-year"
+                  className="block text-xs font-bold text-gray-700"
+                >
+                  Harga per Tahun (Rp) *
+                </label>
+                <input
+                  id="prop-price-year"
+                  type="number"
+                  min={1000}
+                  required
+                  value={pricePerYear}
+                  onChange={(e) => setPricePerYear(e.target.value)}
+                  placeholder="18000000"
+                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
             ) : (
               <>
                 <div className="space-y-1.5">
@@ -865,14 +999,17 @@ export function NewPropertyClient({
             </h2>
           </div>
 
-          {/* Fasilitas Kamar */}
+          {/* Fasilitas Kamar / Unit */}
           <div className="space-y-2.5">
             <label className="block text-xs font-bold text-gray-700">
-              Fasilitas Kamar
+              {activeFacilityPreset.roomTitle}
             </label>
             <div className="flex flex-wrap gap-2">
               {Array.from(
-                new Set([...masterFacilities.roomFacilities, ...roomFacilities]),
+                new Set([
+                  ...activeFacilityPreset.roomFacilities,
+                  ...roomFacilities,
+                ]),
               ).map((fac) => {
                 const selected = roomFacilities.includes(fac);
                 return (
@@ -933,12 +1070,12 @@ export function NewPropertyClient({
           {/* Fasilitas Umum */}
           <div className="space-y-2.5">
             <label className="block text-xs font-bold text-gray-700">
-              Fasilitas Umum
+              {activeFacilityPreset.publicTitle}
             </label>
             <div className="flex flex-wrap gap-2">
               {Array.from(
                 new Set([
-                  ...masterFacilities.publicFacilities,
+                  ...activeFacilityPreset.publicFacilities,
                   ...publicFacilities,
                 ]),
               ).map((fac) => {

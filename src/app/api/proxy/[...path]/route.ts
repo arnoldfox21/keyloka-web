@@ -62,7 +62,7 @@ async function forward(
     return response;
   } catch {
     return NextResponse.json(
-      { message: "Gagal terhubung ke HuniVio API." },
+      { message: "Gagal terhubung ke Keyloka API." },
       { status: 502 },
     );
   }

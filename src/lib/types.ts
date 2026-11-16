@@ -133,15 +133,20 @@ export function resolveImageUrl(pathOrUrl?: string | null): string {
     return pathOrUrl;
   }
   const apiBase =
-    process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+    process.env.NEXT_PUBLIC_API_URL || "http://168.110.208.39/api";
   const hostBase = apiBase.replace(/\/api\/?$/, "");
   return pathOrUrl.startsWith("/") ? `${hostBase}${pathOrUrl}` : `${hostBase}/${pathOrUrl}`;
 }
 
 export function getDisplayPrice(kost: Kost): { amount: number; unit: string } {
-  const isDaily = (kost.propertyCategory || "").toUpperCase() === "HUNIAN_HARIAN";
+  const cat = (kost.propertyCategory || "").toUpperCase();
+  const isDaily = cat === "HUNIAN_HARIAN";
+  const isKontrakan = cat === "KONTRAKAN";
   if (isDaily && (kost.pricePerDay ?? 0) > 0) {
     return { amount: Number(kost.pricePerDay), unit: "/hari" };
+  }
+  if (isKontrakan && (kost.pricePerYear ?? 0) > 0) {
+    return { amount: Number(kost.pricePerYear), unit: "/tahun" };
   }
   return { amount: Number(kost.pricePerMonth || 0), unit: "/bulan" };
 }

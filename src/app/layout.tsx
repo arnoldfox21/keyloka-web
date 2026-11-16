@@ -12,7 +12,7 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "HuniVio — Cari Kost, Apartemen & Kontrakan Aman",
+  title: "Keyloka — Cari Kost, Apartemen & Kontrakan Aman",
   description:
     "Platform pencarian & booking hunian dengan pembayaran Escrow aman, survei terverifikasi, dan poin loyalti.",
 };
@@ -53,7 +53,7 @@ export default async function RootLayout({
         <main className="flex-1">{children}</main>
         <footer className="mt-12 border-t border-gray-200 bg-white py-6 text-center text-xs text-gray-500">
           <div className="mx-auto max-w-7xl px-4">
-            © {new Date().getFullYear()} HuniVio. Pembayaran langsung dilindungi Escrow HuniVio.
+            © {new Date().getFullYear()} Keyloka. Pembayaran langsung dilindungi Escrow Keyloka.
           </div>
         </footer>
       </body>

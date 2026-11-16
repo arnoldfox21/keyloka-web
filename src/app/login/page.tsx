@@ -141,7 +141,7 @@ export default function LoginPage() {
             <Building2 className="h-6 w-6" />
           </div>
           <h1 className="mt-4 text-2xl font-black text-gray-900">
-            Masuk / Daftar HuniVio
+            Masuk / Daftar Keyloka
           </h1>
           <p className="mt-1 text-sm text-gray-500">
             Masuk atau buat akun baru secara instan dengan Google, atau gunakan email Anda.

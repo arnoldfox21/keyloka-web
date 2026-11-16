@@ -68,9 +68,11 @@ export function KostDetailClient({
   } | null>(null);
 
   const price = getDisplayPrice(kost);
-  const isDaily = (kost.propertyCategory || "").toUpperCase() === "HUNIAN_HARIAN";
+  const cat = (kost.propertyCategory || "").toUpperCase();
+  const isDaily = cat === "HUNIAN_HARIAN";
+  const isYearly = cat === "KONTRAKAN" && (kost.pricePerYear ?? 0) > 0;
   const photos = (kost.images || []).map(resolveImageUrl).filter(Boolean);
-  const maxDuration = isDaily ? 30 : 12;
+  const maxDuration = isDaily ? 30 : isYearly ? 5 : 12;
 
   const baseTotal = price.amount * durationCount;
   const basePlatformFee = Math.round(baseTotal * 0.05);
@@ -430,10 +432,10 @@ export function KostDetailClient({
               <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-3.5 text-xs text-emerald-900">
                 <p className="font-bold flex items-center gap-1.5">
                   <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                  Dilindungi Escrow HuniVio
+                  Dilindungi Escrow Keyloka
                 </p>
                 <p className="mt-1 text-emerald-800">
-                  Uang sewa ditahan aman oleh HuniVio dan baru diteruskan ke pemilik setelah Anda konfirmasi check-in.
+                  Uang sewa ditahan aman oleh Keyloka dan baru diteruskan ke pemilik setelah Anda konfirmasi check-in.
                 </p>
               </div>
             )}

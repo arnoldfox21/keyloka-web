@@ -3,9 +3,9 @@ import { cookies } from "next/headers";
 export const API_BASE_URL =
   process.env.API_BASE_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:3001/api";
+  "http://168.110.208.39/api";
 
-export const SESSION_COOKIE_NAME = "hunivio_token";
+export const SESSION_COOKIE_NAME = "keyloka_token";
 
 export async function getServerToken(): Promise<string | null> {
   const cookieStore = await cookies();

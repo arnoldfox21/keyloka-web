@@ -183,7 +183,7 @@ export function Navbar({ user }: NavbarProps) {
               className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white"
             >
               <LogIn className="h-4 w-4" />
-              Masuk Akun HuniVio
+              Masuk Akun Keyloka
             </Link>
           )}
         </div>

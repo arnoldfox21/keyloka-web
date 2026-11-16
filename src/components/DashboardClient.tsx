@@ -1573,7 +1573,8 @@ export function DashboardClient({
                       {k.address}, {k.district}, {k.city} • Pemilik: {k.ownerName}
                     </p>
                     <p className="mt-1 text-sm font-bold text-emerald-700">
-                      {formatRupiah(k.pricePerMonth)}/bulan
+                      {formatRupiah(getDisplayPrice(k).amount)}
+                      {getDisplayPrice(k).unit}
                     </p>
                   </div>
                   <div className="flex gap-2">
