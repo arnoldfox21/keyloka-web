@@ -71,7 +71,7 @@ jobs:
           port: ${{ secrets.VPS_PORT || 22 }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: GITHUB_TOKEN,GITHUB_ACTOR,IMAGE_NAME,GITHUB_REF_NAME
+          envs: GITHUB_TOKEN,GITHUB_ACTOR,IMAGE_NAME,GITHUB_REF_NAME,NEXT_PUBLIC_API_URL,NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION,NEXT_PUBLIC_MIDTRANS_CLIENT_KEY,NEXT_PUBLIC_GOOGLE_CLIENT_ID
           script: |
             set -e
             RAW_DIR="${{ secrets.VPS_APP_DIR }}"
@@ -85,14 +85,20 @@ jobs:
               git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" "$APP_DIR"
             fi
             cd "$APP_DIR"
-            if [ ! -f ".env" ] && [ -f ".env.example" ]; then
-              cp .env.example .env
-            fi
             git fetch origin --tags
             if git show-ref --verify --quiet "refs/tags/${GITHUB_REF_NAME}"; then
               git checkout -f "tags/${GITHUB_REF_NAME}"
             else
               git checkout -f main && git pull origin main
+            fi
+            if [ ! -f ".env" ]; then
+              cat <<EOF > .env
+API_BASE_URL=${NEXT_PUBLIC_API_URL}
+NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION=${NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION}
+NEXT_PUBLIC_MIDTRANS_CLIENT_KEY=${NEXT_PUBLIC_MIDTRANS_CLIENT_KEY}
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+EOF
             fi
             echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
             export DOCKER_IMAGE="${IMAGE_NAME}:latest"
@@ -104,3 +110,7 @@ jobs:
           GITHUB_ACTOR: ${{ github.actor }}
           IMAGE_NAME: ${{ needs.build-and-push.outputs.image_name }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION: ${{ secrets.NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION }}
+          NEXT_PUBLIC_MIDTRANS_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY }}
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
