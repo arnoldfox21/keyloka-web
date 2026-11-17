@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Award,
   CalendarCheck,
+  ChevronDown,
   Clock,
   GitCompareArrows,
   History,
@@ -462,6 +463,17 @@ export function HomeExplorer({
         </div>
       </section>
 
+      {/* Promotional Web Banner */}
+      <section className="mt-5 overflow-hidden rounded-3xl border border-gray-200/80 bg-white shadow-sm">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="https://media.keyloka.com/web/banner-web.webp"
+          alt="Banner Keyloka"
+          className="block w-full h-auto object-cover"
+          loading="eager"
+        />
+      </section>
+
       {/* Filter Bar */}
       <section className="mt-5 flex flex-col gap-3.5 rounded-2xl border border-gray-200 bg-white p-4 shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -531,71 +543,83 @@ export function HomeExplorer({
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <select
-            value={type}
-            onChange={(e) => {
-              setType(e.target.value);
-              fetchList(1, false, { type: e.target.value });
-            }}
-            className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800"
-          >
-            {TYPES.map((t) => (
-              <option key={t} value={t}>
-                Tipe: {t}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={city}
-            onChange={(e) => {
-              const nextCity = e.target.value;
-              setCity(nextCity);
-              setDistrict("Semua Area");
-              fetchList(1, false, { city: nextCity, district: "Semua Area" });
-            }}
-            className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800"
-          >
-            <option value="Semua Kota">Semua Kota</option>
-            {filters.cities.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-
-          {districtsForCity.length > 0 && (
+          <div className="relative">
             <select
-              value={district}
+              value={type}
               onChange={(e) => {
-                setDistrict(e.target.value);
-                fetchList(1, false, { district: e.target.value });
+                setType(e.target.value);
+                fetchList(1, false, { type: e.target.value });
               }}
-              className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800"
+              className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 py-2 pl-3 pr-9 text-xs font-semibold text-gray-800 outline-none focus:border-emerald-500"
             >
-              <option value="Semua Area">Semua Area</option>
-              {districtsForCity.map((d) => (
-                <option key={d.district} value={d.district}>
-                  {d.district} ({d.count})
+              {TYPES.map((t) => (
+                <option key={t} value={t}>
+                  Tipe: {t}
                 </option>
               ))}
             </select>
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+          </div>
+
+          <div className="relative">
+            <select
+              value={city}
+              onChange={(e) => {
+                const nextCity = e.target.value;
+                setCity(nextCity);
+                setDistrict("Semua Area");
+                fetchList(1, false, { city: nextCity, district: "Semua Area" });
+              }}
+              className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 py-2 pl-3 pr-9 text-xs font-semibold text-gray-800 outline-none focus:border-emerald-500"
+            >
+              <option value="Semua Kota">Semua Kota</option>
+              {filters.cities.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+          </div>
+
+          {districtsForCity.length > 0 && (
+            <div className="relative">
+              <select
+                value={district}
+                onChange={(e) => {
+                  setDistrict(e.target.value);
+                  fetchList(1, false, { district: e.target.value });
+                }}
+                className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 py-2 pl-3 pr-9 text-xs font-semibold text-gray-800 outline-none focus:border-emerald-500"
+              >
+                <option value="Semua Area">Semua Area</option>
+                {districtsForCity.map((d) => (
+                  <option key={d.district} value={d.district}>
+                    {d.district} ({d.count})
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+            </div>
           )}
 
-          <select
-            value={sortBy}
-            onChange={(e) => {
-              setSortBy(e.target.value);
-              fetchList(1, false, { sortBy: e.target.value });
-            }}
-            className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800"
-          >
-            <option value="recommended">Urutkan: Rekomendasi</option>
-            <option value="price_asc">Harga Terendah</option>
-            <option value="price_desc">Harga Tertinggi</option>
-            <option value="rating_desc">Rating Tertinggi</option>
-            <option value="newest">Terbaru</option>
-          </select>
+          <div className="relative">
+            <select
+              value={sortBy}
+              onChange={(e) => {
+                setSortBy(e.target.value);
+                fetchList(1, false, { sortBy: e.target.value });
+              }}
+              className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 py-2 pl-3 pr-9 text-xs font-semibold text-gray-800 outline-none focus:border-emerald-500"
+            >
+              <option value="recommended">Urutkan: Rekomendasi</option>
+              <option value="price_asc">Harga Terendah</option>
+              <option value="price_desc">Harga Tertinggi</option>
+              <option value="rating_desc">Rating Tertinggi</option>
+              <option value="newest">Terbaru</option>
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+          </div>
         </div>
 
         {/* Collapsible Advanced Filters */}

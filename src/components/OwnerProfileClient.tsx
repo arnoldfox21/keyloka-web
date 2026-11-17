@@ -146,10 +146,10 @@ export function OwnerProfileClient({
             />
           )}
         </div>
-        <div className="px-6 pb-6">
-          <div className="relative -mt-12 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-            <div className="flex items-end gap-4">
-              <div className="h-24 w-24 overflow-hidden rounded-2xl border-4 border-white bg-emerald-100 shadow-md">
+        <div className="px-6 pt-3 pb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="relative -mt-12 sm:-mt-14 h-20 w-20 sm:h-24 sm:w-24 shrink-0 overflow-hidden rounded-2xl border-4 border-white bg-emerald-100 shadow-md">
                 {owner.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -163,9 +163,9 @@ export function OwnerProfileClient({
                   </div>
                 )}
               </div>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <h1 className="text-xl font-extrabold text-gray-900">{owner.name}</h1>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <h1 className="truncate text-xl font-extrabold text-gray-900">{owner.name}</h1>
                   {(owner.isVerified ||
                     ["STAFF", "ADMINISTRATOR"].includes(
                       (owner.role || "").toUpperCase(),

@@ -82,6 +82,7 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
     target: "avatar" | "cover",
   ) {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
     setUploading(target);
     setMsg(null);
@@ -100,10 +101,37 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
       const uploadedUrl = data?.url || data?.path;
       if (!res.ok || !uploadedUrl) {
         setMsg({ type: "err", text: data?.message || "Gagal mengunggah gambar." });
+        return;
+      }
+
+      if (target === "avatar") setAvatarUrl(uploadedUrl);
+      else setCoverUrl(uploadedUrl);
+
+      const patchBody =
+        target === "avatar" ? { avatarUrl: uploadedUrl } : { coverUrl: uploadedUrl };
+      const saveRes = await fetch(`/api/proxy/auth/users/${user.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patchBody),
+      });
+      const savedData = await saveRes.json().catch(() => ({}));
+      if (!saveRes.ok) {
+        setMsg({
+          type: "err",
+          text:
+            savedData?.message ||
+            "Gambar terunggah, tetapi gagal menyimpan ke profil. Klik Simpan Profil.",
+        });
       } else {
-        if (target === "avatar") setAvatarUrl(uploadedUrl);
-        else setCoverUrl(uploadedUrl);
-        setMsg({ type: "ok", text: "Gambar berhasil diunggah. Klik Simpan Profil." });
+        setUser((prev) => ({ ...prev, ...savedData, ...patchBody }));
+        setMsg({
+          type: "ok",
+          text:
+            target === "avatar"
+              ? "Foto profil berhasil diperbarui."
+              : "Foto cover berhasil diperbarui.",
+        });
+        router.refresh();
       }
     } catch {
       setMsg({ type: "err", text: "Gagal memproses gambar." });
@@ -254,7 +282,7 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
               className="h-full w-full object-cover"
             />
           )}
-          <label className="absolute right-4 bottom-4 inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-black/60 px-3 py-1.5 text-xs font-bold text-white hover:bg-black/75">
+          <label className="absolute right-4 bottom-4 z-10 inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-black/60 px-3 py-1.5 text-xs font-bold text-white hover:bg-black/75">
             <Camera className="h-3.5 w-3.5" />
             {uploading === "cover" ? "Mengunggah..." : "Ubah Cover"}
             <input
@@ -266,10 +294,10 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
           </label>
         </div>
 
-        <div className="px-6 pb-6">
-          <div className="relative -mt-12 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-            <div className="flex items-end gap-4">
-              <div className="relative h-24 w-24 overflow-hidden rounded-2xl border-4 border-white bg-emerald-100 shadow-md">
+        <div className="px-6 pt-3 pb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="relative -mt-12 sm:-mt-14 h-20 w-20 sm:h-24 sm:w-24 shrink-0 overflow-hidden rounded-2xl border-4 border-white bg-emerald-100 shadow-md">
                 {avatarUrl ? (
                   <img
                     src={resolveImageUrl(avatarUrl)}
@@ -291,9 +319,9 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
                   />
                 </label>
               </div>
-              <div className="pb-1">
+              <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <h1 className="text-xl font-extrabold text-gray-900">{user.name}</h1>
+                  <h1 className="truncate text-xl font-extrabold text-gray-900">{user.name}</h1>
                   {isVerifiedAccount && (
                     <BadgeCheck
                       className="h-5 w-5 text-emerald-600"
@@ -363,6 +391,19 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
           </div>
         </div>
       </div>
+
+      {msg && (
+        <div
+          className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold ${
+            msg.type === "ok"
+              ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+              : "bg-red-50 text-red-700 border border-red-200"
+          }`}
+        >
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <span>{msg.text}</span>
+        </div>
+      )}
 
       {/* Verifikasi Pemilik (Ajukan Survei dengan Staff) */}
       {role === "PEMILIK_KOST" && !isVerifiedAccount && (
@@ -502,19 +543,6 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
           </Link>
         )}
       </div>
-
-      {msg && (
-        <div
-          className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold ${
-            msg.type === "ok"
-              ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-              : "bg-red-50 text-red-700 border border-red-200"
-          }`}
-        >
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
-          <span>{msg.text}</span>
-        </div>
-      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Edit Profile Form */}
