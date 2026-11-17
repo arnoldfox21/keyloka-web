@@ -31,9 +31,7 @@ declare global {
   }
 }
 
-const GOOGLE_CLIENT_ID =
-  process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
-  "946056205847-vod7vueohg50qb8rr2hieee56s8d9cm8.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -65,7 +63,11 @@ export default function LoginPage() {
           setLoading(false);
           return;
         }
-        router.push("/");
+        if (data?.isNewUser || data?.user?.onboardingCompleted === false) {
+          router.push("/onboarding");
+        } else {
+          router.push("/");
+        }
         router.refresh();
       } catch {
         setError("Gagal terhubung ke server saat login Google.");
@@ -119,7 +121,11 @@ export default function LoginPage() {
         setLoading(false);
         return;
       }
-      router.push("/");
+      if (data?.user?.onboardingCompleted === false) {
+        router.push("/onboarding");
+      } else {
+        router.push("/");
+      }
       router.refresh();
     } catch {
       setError("Gagal terhubung ke server. Coba lagi.");

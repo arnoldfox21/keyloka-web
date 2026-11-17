@@ -1,11 +1,20 @@
+"use client";
+
 import Link from "next/link";
-import { MapPin, ShieldCheck, Star, Zap } from "lucide-react";
+import { Heart, MapPin, ShieldCheck, Star, Zap } from "lucide-react";
 import { formatRupiah, getDisplayPrice, resolveImageUrl, type Kost } from "@/lib/types";
 
-export function KostCard({ kost }: { kost: Kost }) {
+interface KostCardProps {
+  kost: Kost;
+  isFavorite?: boolean;
+  onToggleFavorite?: (kostId: number) => void;
+}
+
+export function KostCard({ kost, isFavorite, onToggleFavorite }: KostCardProps) {
   const thumb = resolveImageUrl(kost.images?.[0]);
   const price = getDisplayPrice(kost);
   const isBoosted = Boolean(kost.boostedUntil && kost.boostTier);
+  const fav = isFavorite ?? Boolean(kost.isFavorite);
 
   return (
     <Link
@@ -27,7 +36,7 @@ export function KostCard({ kost }: { kost: Kost }) {
           </div>
         )}
 
-        <div className="absolute left-2.5 top-2.5 flex flex-wrap gap-1.5">
+        <div className="absolute left-2.5 top-2.5 flex flex-wrap gap-1.5 pr-10">
           <span className="rounded-lg bg-white/95 px-2 py-0.5 text-[11px] font-bold text-gray-800 shadow-xs">
             {kost.type}
           </span>
@@ -45,11 +54,31 @@ export function KostCard({ kost }: { kost: Kost }) {
           )}
         </div>
 
-        {kost.discountPercent > 0 && (
-          <span className="absolute right-2.5 top-2.5 rounded-lg bg-rose-600 px-2 py-0.5 text-[11px] font-extrabold text-white shadow-xs">
-            -{kost.discountPercent}%
-          </span>
-        )}
+        <div className="absolute right-2.5 top-2.5 flex items-center gap-1.5">
+          {kost.discountPercent > 0 && (
+            <span className="rounded-lg bg-rose-600 px-2 py-0.5 text-[11px] font-extrabold text-white shadow-xs">
+              -{kost.discountPercent}%
+            </span>
+          )}
+          {onToggleFavorite && (
+            <button
+              type="button"
+              aria-label="Simpan ke Favorit"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onToggleFavorite(kost.id);
+              }}
+              className="rounded-full bg-white/90 p-1.5 text-gray-700 shadow-xs hover:bg-white transition"
+            >
+              <Heart
+                className={`h-4 w-4 ${
+                  fav ? "fill-rose-500 text-rose-500" : "text-gray-600"
+                }`}
+              />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-1 flex-col p-4">

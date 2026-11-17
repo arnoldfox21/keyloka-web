@@ -3,7 +3,19 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { Award, Building2, CalendarCheck, LayoutDashboard, LogIn, LogOut, Menu, X } from "lucide-react";
+import {
+  Award,
+  Building2,
+  CalendarCheck,
+  Heart,
+  LayoutDashboard,
+  LogIn,
+  LogOut,
+  Menu,
+  MessageCircle,
+  User,
+  X,
+} from "lucide-react";
 import type { UserProfile } from "@/lib/types";
 
 interface NavbarProps {
@@ -34,7 +46,7 @@ export function Navbar({ user }: NavbarProps) {
           </div>
           <div>
             <span className="text-lg font-extrabold tracking-tight text-gray-900">
-              Huni<span className="text-emerald-600">Vio</span>
+              Key<span className="text-emerald-600">loka</span>
             </span>
             <span className="hidden sm:inline-block ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
               Web
@@ -43,10 +55,10 @@ export function Navbar({ user }: NavbarProps) {
         </Link>
 
         {/* Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-2">
+        <nav className="hidden md:flex items-center gap-1.5">
           <Link
             href="/"
-            className={`rounded-lg px-3.5 py-2 text-sm font-semibold transition ${
+            className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
               pathname === "/"
                 ? "bg-emerald-50 text-emerald-700"
                 : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
@@ -55,22 +67,46 @@ export function Navbar({ user }: NavbarProps) {
             Jelajah Hunian
           </Link>
           {user && (
-            <Link
-              href="/bookings"
-              className={`flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold transition ${
-                pathname.startsWith("/bookings")
-                  ? "bg-emerald-50 text-emerald-700"
-                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-              }`}
-            >
-              <CalendarCheck className="h-4 w-4" />
-              Booking & Poin
-            </Link>
+            <>
+              <Link
+                href="/favorites"
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                  pathname.startsWith("/favorites")
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                }`}
+              >
+                <Heart className="h-4 w-4" />
+                Favorit
+              </Link>
+              <Link
+                href="/bookings"
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                  pathname.startsWith("/bookings")
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                }`}
+              >
+                <CalendarCheck className="h-4 w-4" />
+                Survei & Booking
+              </Link>
+              <Link
+                href="/chat"
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                  pathname.startsWith("/chat")
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                }`}
+              >
+                <MessageCircle className="h-4 w-4" />
+                Pesan
+              </Link>
+            </>
           )}
           {canAccessDashboard && (
             <Link
               href="/dashboard"
-              className={`flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold transition ${
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition ${
                 pathname.startsWith("/dashboard")
                   ? "bg-emerald-50 text-emerald-700"
                   : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
@@ -85,22 +121,32 @@ export function Navbar({ user }: NavbarProps) {
         {/* Desktop Auth */}
         <div className="hidden md:flex items-center gap-3">
           {user ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
               <Link
                 href="/bookings"
-                className="flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50/70 px-3 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition"
+                className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50/70 px-3 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition"
               >
                 <Award className="h-3.5 w-3.5 text-emerald-600" />
                 <span>{user.loyaltyLevel || "Bronze"}</span>
                 <span className="text-emerald-600">•</span>
                 <span>{user.pointsBalance ?? 0} Poin</span>
               </Link>
-              <div className="text-right">
-                <p className="text-xs font-bold text-gray-900 leading-tight">
-                  {user.name}
-                </p>
-                <p className="text-[11px] text-gray-500">{user.role}</p>
-              </div>
+              <Link
+                href="/profile"
+                className={`flex items-center gap-2 rounded-xl border px-2.5 py-1.5 transition ${
+                  pathname.startsWith("/profile")
+                    ? "border-emerald-300 bg-emerald-50/70"
+                    : "border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                <User className="h-4 w-4 text-emerald-600" />
+                <div className="text-left">
+                  <p className="text-xs font-bold text-gray-900 leading-tight max-w-[120px] truncate">
+                    {user.name}
+                  </p>
+                  <p className="text-[10px] text-gray-500">{user.role}</p>
+                </div>
+              </Link>
               <button
                 onClick={handleLogout}
                 title="Keluar"
@@ -143,14 +189,38 @@ export function Navbar({ user }: NavbarProps) {
           {user ? (
             <>
               <Link
+                href="/favorites"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-100"
+              >
+                <Heart className="h-4 w-4 text-rose-500" />
+                Favorit & Bandingkan
+              </Link>
+              <Link
                 href="/bookings"
                 onClick={() => setMobileOpen(false)}
                 className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-100"
               >
-                <span>Booking & Poin Saya</span>
+                <span>Survei, Booking & Poin</span>
                 <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
                   {user.loyaltyLevel || "Bronze"} • {user.pointsBalance ?? 0} Poin
                 </span>
+              </Link>
+              <Link
+                href="/chat"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-100"
+              >
+                <MessageCircle className="h-4 w-4 text-emerald-600" />
+                Kotak Pesan & Grup
+              </Link>
+              <Link
+                href="/profile"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-100"
+              >
+                <User className="h-4 w-4 text-emerald-600" />
+                Profil & Keamanan Akun
               </Link>
               {canAccessDashboard && (
                 <Link

@@ -1,12 +1,20 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   Calendar,
   CheckCircle2,
+  ExternalLink,
+  Flag,
+  Heart,
   MapPin,
+  Maximize2,
+  MessageCircle,
+  Reply,
+  Share2,
   ShieldCheck,
   Sparkles,
   Star,
@@ -46,12 +54,37 @@ interface KostDetailClientProps {
 
 export function KostDetailClient({
   kost,
-  reviews,
+  reviews: initialReviews,
   currentUser,
 }: KostDetailClientProps) {
   const router = useRouter();
   const [activePhoto, setActivePhoto] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(Boolean(kost.isFavorite));
+  const [reviews, setReviews] = useState<ReviewItem[]>(initialReviews);
   const [modalMode, setModalMode] = useState<"SURVEI" | "DIRECT" | null>(null);
+
+  // Review states
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [cleanliness, setCleanliness] = useState(5);
+  const [security, setSecurity] = useState(5);
+  const [accuracy, setAccuracy] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [replyingId, setReplyingId] = useState<number | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [copiedMsg, setCopiedMsg] = useState(false);
+
+  useEffect(() => {
+    try {
+      const key = "keyloka_recently_viewed";
+      const existing: Kost[] = JSON.parse(localStorage.getItem(key) || "[]");
+      const next = [kost, ...existing.filter((x) => x.id !== kost.id)].slice(0, 6);
+      localStorage.setItem(key, JSON.stringify(next));
+    } catch {
+      // ignore storage errors
+    }
+  }, [kost]);
 
   const [tenantName, setTenantName] = useState(currentUser?.name || "");
   const [tenantPhone, setTenantPhone] = useState(currentUser?.phone || "");
@@ -217,11 +250,68 @@ export function KostDetailClient({
                 <img
                   src={photos[activePhoto]}
                   alt={kost.name}
-                  className="h-full w-full object-cover"
+                  onClick={() => setLightboxOpen(true)}
+                  className="h-full w-full cursor-zoom-in object-cover"
                 />
               ) : (
                 <div className="flex h-full items-center justify-center text-sm text-gray-400">
                   Foto belum tersedia
+                </div>
+              )}
+
+              <div className="absolute right-3 top-3 flex items-center gap-2">
+                {photos.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setLightboxOpen(true)}
+                    title="Perbesar Foto"
+                    className="rounded-full bg-black/55 p-2 text-white hover:bg-black/75"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const url = window.location.href;
+                    if (navigator.share) {
+                      await navigator.share({ title: kost.name, url }).catch(() => {});
+                    } else {
+                      await navigator.clipboard.writeText(url).catch(() => {});
+                      setCopiedMsg(true);
+                      setTimeout(() => setCopiedMsg(false), 2000);
+                    }
+                  }}
+                  title="Bagikan"
+                  className="rounded-full bg-black/55 p-2 text-white hover:bg-black/75"
+                >
+                  <Share2 className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!currentUser) {
+                      router.push("/login");
+                      return;
+                    }
+                    setIsFavorite((v) => !v);
+                    await fetch(`/api/proxy/kosts/${kost.id}/favorite`, {
+                      method: "PATCH",
+                    }).catch(() => {});
+                  }}
+                  title="Simpan ke Favorit"
+                  className="rounded-full bg-white/95 p-2 text-gray-700 shadow-sm hover:bg-white"
+                >
+                  <Heart
+                    className={`h-4 w-4 ${
+                      isFavorite ? "fill-rose-500 text-rose-500" : "text-gray-600"
+                    }`}
+                  />
+                </button>
+              </div>
+              {copiedMsg && (
+                <div className="absolute bottom-3 right-3 rounded-xl bg-gray-900/85 px-3 py-1.5 text-xs font-bold text-white">
+                  Tautan disalin!
                 </div>
               )}
             </div>
@@ -277,8 +367,20 @@ export function KostDetailClient({
                 <MapPin className="h-4 w-4 shrink-0 text-emerald-600 mt-0.5" />
                 <span>
                   {kost.address}, {kost.district}, {kost.city}
+                  {kost.nearbyLandmark ? ` (Dekat ${kost.nearbyLandmark})` : ""}
                 </span>
               </p>
+              {kost.latitude && kost.longitude && (
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${kost.latitude},${kost.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Buka Lokasi di Google Maps
+                </a>
+              )}
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 border-y border-gray-100 py-4 text-center">
@@ -369,44 +471,223 @@ export function KostDetailClient({
           </div>
 
           {/* Reviews */}
-          <div className="rounded-3xl border border-gray-200 bg-white p-6">
-            <h2 className="text-lg font-extrabold text-gray-900">
-              Ulasan Penghuni ({reviews.length})
-            </h2>
+          <div className="rounded-3xl border border-gray-200 bg-white p-6 space-y-4">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-lg font-extrabold text-gray-900">
+                Ulasan Penghuni ({reviews.length})
+              </h2>
+              {currentUser && currentUser.id !== kost.ownerId && (
+                <button
+                  type="button"
+                  onClick={() => setShowReviewForm((v) => !v)}
+                  className="rounded-xl bg-emerald-50 px-3.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
+                >
+                  {showReviewForm ? "Tutup Form" : "Tulis Ulasan"}
+                </button>
+              )}
+            </div>
+
+            {showReviewForm && (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setSubmittingReview(true);
+                  try {
+                    const res = await fetch("/api/proxy/reviews", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        kostId: kost.id,
+                        ratingCleanliness: cleanliness,
+                        ratingSecurity: security,
+                        ratingAccuracy: accuracy,
+                        comment: reviewComment.trim(),
+                      }),
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (res.ok) {
+                      setReviews((prev) => [data, ...prev]);
+                      setReviewComment("");
+                      setShowReviewForm(false);
+                    }
+                  } finally {
+                    setSubmittingReview(false);
+                  }
+                }}
+                className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 space-y-3"
+              >
+                <div className="grid grid-cols-3 gap-3 text-xs">
+                  <label className="font-bold text-gray-700">
+                    Kebersihan (1-5)
+                    <input
+                      type="number"
+                      min={1}
+                      max={5}
+                      value={cleanliness}
+                      onChange={(e) => setCleanliness(Number(e.target.value))}
+                      className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.5"
+                    />
+                  </label>
+                  <label className="font-bold text-gray-700">
+                    Keamanan (1-5)
+                    <input
+                      type="number"
+                      min={1}
+                      max={5}
+                      value={security}
+                      onChange={(e) => setSecurity(Number(e.target.value))}
+                      className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.5"
+                    />
+                  </label>
+                  <label className="font-bold text-gray-700">
+                    Akurasi Foto (1-5)
+                    <input
+                      type="number"
+                      min={1}
+                      max={5}
+                      value={accuracy}
+                      onChange={(e) => setAccuracy(Number(e.target.value))}
+                      className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.5"
+                    />
+                  </label>
+                </div>
+                <textarea
+                  rows={3}
+                  required
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  placeholder="Bagikan pengalaman Anda selama tinggal atau survei di properti ini..."
+                  className="w-full rounded-xl border border-gray-300 bg-white p-3 text-sm outline-none focus:border-emerald-500"
+                />
+                <button
+                  type="submit"
+                  disabled={submittingReview}
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  {submittingReview ? "Mengirim..." : "Kirim Ulasan"}
+                </button>
+              </form>
+            )}
+
             {reviews.length === 0 ? (
-              <p className="mt-3 text-sm text-gray-500">
+              <p className="text-sm text-gray-500">
                 Belum ada ulasan untuk properti ini.
               </p>
             ) : (
-              <div className="mt-4 space-y-4">
-                {reviews.map((rev) => (
-                  <div
-                    key={rev.id}
-                    className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-gray-500" />
-                        <span className="text-sm font-bold text-gray-900">
-                          {rev.userName}
-                        </span>
+              <div className="space-y-4">
+                {reviews.map((rev) => {
+                  const canReply =
+                    currentUser &&
+                    (currentUser.id === kost.ownerId ||
+                      currentUser.role === "STAFF" ||
+                      currentUser.role === "ADMINISTRATOR");
+                  return (
+                    <div
+                      key={rev.id}
+                      className="rounded-2xl border border-gray-100 bg-gray-50/70 p-4"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-gray-500" />
+                          <span className="text-sm font-bold text-gray-900">
+                            {rev.userName}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-600">
+                            <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                            {Number(rev.overallRating).toFixed(1)}
+                          </span>
+                          {currentUser && currentUser.id !== rev.userId && (
+                            <button
+                              type="button"
+                              title="Laporkan ulasan"
+                              onClick={async () => {
+                                const reason = window.prompt(
+                                  "Alasan melaporkan ulasan ini:",
+                                  "Tidak pantas / spam",
+                                );
+                                if (!reason) return;
+                                await fetch(`/api/proxy/reviews/${rev.id}/report`, {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ reason }),
+                                });
+                                alert("Laporan ulasan terkirim.");
+                              }}
+                              className="text-gray-400 hover:text-red-500"
+                            >
+                              <Flag className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-600">
-                        <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                        {Number(rev.overallRating).toFixed(1)}
-                      </span>
+                      <p className="mt-2 text-sm text-gray-700">{rev.comment}</p>
+                      {rev.ownerReply && (
+                        <div className="mt-2 rounded-xl bg-white p-3 border border-gray-200 text-xs text-gray-600">
+                          <span className="font-bold text-emerald-700">
+                            Balasan Pemilik:{" "}
+                          </span>
+                          {rev.ownerReply}
+                        </div>
+                      )}
+                      {canReply && !rev.ownerReply && (
+                        <div className="mt-2">
+                          {replyingId === rev.id ? (
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={replyText}
+                                onChange={(e) => setReplyText(e.target.value)}
+                                placeholder="Tulis balasan pemilik..."
+                                className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs"
+                              />
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!replyText.trim()) return;
+                                  const res = await fetch(
+                                    `/api/proxy/reviews/${rev.id}/reply`,
+                                    {
+                                      method: "PATCH",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({
+                                        ownerReply: replyText.trim(),
+                                      }),
+                                    },
+                                  );
+                                  if (res.ok) {
+                                    setReviews((prev) =>
+                                      prev.map((item) =>
+                                        item.id === rev.id
+                                          ? { ...item, ownerReply: replyText.trim() }
+                                          : item,
+                                      ),
+                                    );
+                                    setReplyingId(null);
+                                    setReplyText("");
+                                  }
+                                }}
+                                className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"
+                              >
+                                Kirim
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setReplyingId(rev.id)}
+                              className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:underline"
+                            >
+                              <Reply className="h-3 w-3" />
+                              Balas Ulasan
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <p className="mt-2 text-sm text-gray-700">{rev.comment}</p>
-                    {rev.ownerReply && (
-                      <div className="mt-2 rounded-xl bg-white p-3 border border-gray-200 text-xs text-gray-600">
-                        <span className="font-bold text-emerald-700">
-                          Balasan Pemilik:{" "}
-                        </span>
-                        {rev.ownerReply}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -424,7 +705,13 @@ export function KostDetailClient({
                 </span>
               </p>
               <p className="mt-1 text-xs text-gray-500">
-                Pengelola: <span className="font-bold">{kost.ownerName}</span>
+                Pengelola:{" "}
+                <Link
+                  href={`/owner/${kost.ownerId}`}
+                  className="font-bold text-emerald-700 hover:underline"
+                >
+                  {kost.ownerName}
+                </Link>
               </p>
             </div>
 
@@ -441,6 +728,19 @@ export function KostDetailClient({
             )}
 
             <div className="space-y-2.5">
+              {currentUser?.id !== kost.ownerId && (
+                <Link
+                  href={
+                    currentUser
+                      ? `/chat?kostId=${kost.id}&peerId=${kost.ownerId}`
+                      : "/login"
+                  }
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-300 bg-white py-2.5 text-sm font-bold text-gray-800 hover:bg-gray-50 transition"
+                >
+                  <MessageCircle className="h-4 w-4 text-emerald-600" />
+                  Tanya Pemilik (Chat)
+                </Link>
+              )}
               {currentUser?.id === kost.ownerId ? (
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-3.5 text-center text-xs font-bold text-gray-600">
                   Ini adalah properti milik Anda.
@@ -645,6 +945,29 @@ export function KostDetailClient({
               </button>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Lightbox Fullscreen Image Viewer */}
+      {lightboxOpen && photos[activePhoto] && (
+        <div
+          onClick={() => setLightboxOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+        >
+          <button
+            type="button"
+            onClick={() => setLightboxOpen(false)}
+            className="absolute right-4 top-4 rounded-full bg-white/15 p-2.5 text-white hover:bg-white/25"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={photos[activePhoto]}
+            alt={kost.name}
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[88vh] max-w-full rounded-2xl object-contain"
+          />
         </div>
       )}
     </div>

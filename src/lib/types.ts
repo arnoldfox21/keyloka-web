@@ -11,6 +11,7 @@ export interface Kost {
   pricePerMonth: number;
   pricePerDay?: number | null;
   pricePerYear?: number | null;
+  depositAmount?: number | null;
   originalPrice?: number | null;
   discountPercent: number;
   rating: number;
@@ -18,10 +19,17 @@ export interface Kost {
   availableRooms: number;
   roomSize: string;
   unitType?: string;
+  furnishing?: string;
+  floorLevel?: number | null;
+  buildingArea?: number | null;
+  landArea?: number | null;
   bedrooms: number;
   bathrooms: number;
+  hasCarport?: boolean;
   isVerified: boolean;
   electricityIncluded: boolean;
+  isSinggahsini?: boolean;
+  isInstantBooking?: boolean;
   allowDirectBooking: boolean;
   roomFacilities: string[];
   publicFacilities: string[];
@@ -30,28 +38,67 @@ export interface Kost {
   ownerId: number;
   ownerName: string;
   ownerPhone?: string;
+  showOwnerWhatsapp?: boolean;
   nearbyLandmark?: string;
   latitude?: number | null;
   longitude?: number | null;
+  isFavorite?: boolean;
+  approvalStatus?: string;
+  rejectionReason?: string;
   boostedUntil?: string | null;
   boostTier?: string;
 }
 
+export interface MapPoint {
+  id: number;
+  name: string;
+  propertyCategory: string;
+  type: string;
+  city: string;
+  district: string;
+  pricePerMonth: number;
+  pricePerDay?: number | null;
+  pricePerYear?: number | null;
+  rating: number;
+  availableRooms: number;
+  latitude: number;
+  longitude: number;
+  images?: string[];
+  allowDirectBooking?: boolean;
+  boostedUntil?: string | null;
+}
+
 export interface UserProfile {
   id: number;
+  googleId?: string | null;
   name: string;
   email: string;
   phone: string;
   role: string;
   avatarUrl: string;
+  username?: string;
+  bio?: string;
+  city?: string;
+  coverUrl?: string;
+  showWhatsapp?: boolean;
+  isBanned?: boolean;
+  bannedAt?: string | null;
+  onboardingCompleted?: boolean;
+  preferredCategory?: string | null;
+  hasPassword?: boolean;
+  creditBalance?: number;
+  payoutBalance?: number;
   pointsBalance?: number;
   totalPointsEarned?: number;
   loyaltyLevel?: string;
+  lastLoginAt?: string | null;
+  createdAt?: string;
 }
 
 export interface Booking {
   id: number;
   kostId: number;
+  userId?: number;
   kost?: Kost | null;
   tenantName: string;
   tenantPhone: string;
@@ -59,6 +106,7 @@ export interface Booking {
   bookingType: string;
   surveyDateTime?: string;
   status: string;
+  notes?: string;
   durationCount: number;
   durationUnit: string;
   totalAmount: number;
@@ -119,6 +167,124 @@ export interface KostFilters {
   }>;
 }
 
+export interface WalletTransaction {
+  id: number;
+  amount: number;
+  type: string;
+  description: string;
+  status?: string;
+  referenceId?: string | null;
+  createdAt: string;
+}
+
+export interface WalletSummary {
+  creditBalance: number;
+  payoutBalance: number;
+  transactions: WalletTransaction[];
+}
+
+export interface BoostPackageOption {
+  tier: string;
+  label?: string;
+  durationDays: number;
+  price: number;
+  description?: string;
+}
+
+export interface WalletPricing {
+  propertySlotFee?: number;
+  freePropertyLimit?: number;
+  boostPackages: BoostPackageOption[];
+}
+
+export interface ChatMessage {
+  id: number;
+  kostId: number;
+  senderId: number;
+  senderName: string;
+  senderAvatar?: string;
+  receiverId: number;
+  message: string;
+  status: string;
+  createdAt: string;
+  unreadCount?: number;
+  kost?: Kost | null;
+  peerUser?: {
+    id: number;
+    name: string;
+    avatarUrl?: string;
+    role?: string;
+  } | null;
+}
+
+export interface KostGroupRoom {
+  kostId: number;
+  kostName: string;
+  kostImage?: string;
+  memberCount?: number;
+  lastMessage?: string;
+  lastMessageAt?: string;
+  unreadCount?: number;
+  isAdmin?: boolean;
+}
+
+export interface KostGroupMember {
+  userId: number;
+  name: string;
+  avatarUrl?: string;
+  role?: string;
+  isAdmin?: boolean;
+  joinedAt?: string;
+}
+
+export interface KostGroupMessage {
+  id: number;
+  kostId: number;
+  senderId: number;
+  senderName: string;
+  senderAvatar?: string;
+  message: string;
+  createdAt: string;
+}
+
+export interface KostGroupDetail {
+  kostId: number;
+  kostName: string;
+  kostImage?: string;
+  ownerId: number;
+  settings: {
+    pinnedAnnouncement?: string | null;
+    adminOnly?: boolean;
+  };
+  members: KostGroupMember[];
+  messages: KostGroupMessage[];
+}
+
+export interface OwnerPost {
+  id: number;
+  ownerId: number;
+  ownerName?: string;
+  ownerAvatar?: string;
+  kostId?: number | null;
+  kostName?: string | null;
+  content: string;
+  imageUrl?: string | null;
+  likeCount: number;
+  commentCount: number;
+  isLiked?: boolean;
+  createdAt: string;
+}
+
+export interface OwnerPostComment {
+  id: number;
+  postId: number;
+  userId: number;
+  userName: string;
+  userAvatar?: string;
+  comment: string;
+  createdAt: string;
+}
+
 export function formatRupiah(value: number): string {
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
@@ -129,16 +295,28 @@ export function formatRupiah(value: number): string {
 
 export function resolveImageUrl(pathOrUrl?: string | null): string {
   if (!pathOrUrl) return "";
-  if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) {
+  if (
+    pathOrUrl.startsWith("http://") ||
+    pathOrUrl.startsWith("https://") ||
+    pathOrUrl.startsWith("data:")
+  ) {
     return pathOrUrl;
   }
-  const apiBase =
-    process.env.NEXT_PUBLIC_API_URL || "http://168.110.208.39/api";
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "";
+  if (!apiBase) {
+    return pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`;
+  }
   const hostBase = apiBase.replace(/\/api\/?$/, "");
   return pathOrUrl.startsWith("/") ? `${hostBase}${pathOrUrl}` : `${hostBase}/${pathOrUrl}`;
 }
 
-export function getDisplayPrice(kost: Kost): { amount: number; unit: string } {
+export function getSocketBaseUrl(): string {
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "";
+  if (!apiBase) return "";
+  return apiBase.replace(/\/api\/?$/, "");
+}
+
+export function getDisplayPrice(kost: Pick<Kost, "propertyCategory" | "pricePerDay" | "pricePerYear" | "pricePerMonth">): { amount: number; unit: string } {
   const cat = (kost.propertyCategory || "").toUpperCase();
   const isDaily = cat === "HUNIAN_HARIAN";
   const isKontrakan = cat === "KONTRAKAN";

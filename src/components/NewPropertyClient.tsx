@@ -15,8 +15,9 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { formatRupiah, resolveImageUrl, type UserProfile } from "@/lib/types";
+import { formatRupiah, resolveImageUrl, type Kost, type UserProfile } from "@/lib/types";
 import { compressImageToDataUrl } from "@/lib/image-compress";
+import { KostLocationPicker } from "./KostLocationPicker";
 
 interface NewPropertyClientProps {
   currentUser: UserProfile;
@@ -26,6 +27,7 @@ interface NewPropertyClientProps {
   };
   existingPropertyCount: number;
   creditBalance: number;
+  initialKost?: Kost;
 }
 
 const PROPERTY_CATEGORIES = [
@@ -147,52 +149,90 @@ export function NewPropertyClient({
   masterFacilities,
   existingPropertyCount,
   creditBalance,
+  initialKost,
 }: NewPropertyClientProps) {
   const router = useRouter();
+  const isEditMode = Boolean(initialKost);
   const role = (currentUser.role || "").toUpperCase();
   const isAutoApproved = role === "STAFF" || role === "ADMINISTRATOR";
-  const needsSlotFee = !isAutoApproved && existingPropertyCount >= FREE_PROPERTY_QUOTA;
+  const needsSlotFee = !isEditMode && !isAutoApproved && existingPropertyCount >= FREE_PROPERTY_QUOTA;
 
-  const [propertyCategory, setPropertyCategory] = useState<string>("KOST");
-  const [unitType, setUnitType] = useState<string>("Homestay");
-  const [type, setType] = useState<string>("Campur");
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const [propertyCategory, setPropertyCategory] = useState<string>(
+    initialKost?.propertyCategory || "KOST",
+  );
+  const [unitType, setUnitType] = useState<string>(
+    initialKost?.unitType || "Homestay",
+  );
+  const [type, setType] = useState<string>(initialKost?.type || "Campur");
+  const [name, setName] = useState(initialKost?.name || "");
+  const [description, setDescription] = useState(initialKost?.description || "");
 
-  const [city, setCity] = useState("");
-  const [district, setDistrict] = useState("");
-  const [address, setAddress] = useState("");
-  const [nearbyLandmark, setNearbyLandmark] = useState("");
-  const [latitude, setLatitude] = useState("");
-  const [longitude, setLongitude] = useState("");
+  const [city, setCity] = useState(initialKost?.city || "");
+  const [district, setDistrict] = useState(initialKost?.district || "");
+  const [address, setAddress] = useState(initialKost?.address || "");
+  const [nearbyLandmark, setNearbyLandmark] = useState(
+    initialKost?.nearbyLandmark || "",
+  );
+  const [latitude, setLatitude] = useState(
+    initialKost?.latitude != null ? String(initialKost.latitude) : "",
+  );
+  const [longitude, setLongitude] = useState(
+    initialKost?.longitude != null ? String(initialKost.longitude) : "",
+  );
 
   const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
   const [districtSuggestions, setDistrictSuggestions] = useState<string[]>([]);
 
-  const [pricePerMonth, setPricePerMonth] = useState("");
-  const [pricePerDay, setPricePerDay] = useState("");
-  const [pricePerYear, setPricePerYear] = useState("");
-  const [originalPrice, setOriginalPrice] = useState("");
-  const [availableRooms, setAvailableRooms] = useState("1");
-  const [roomSize, setRoomSize] = useState("3x4 m");
-  const [bedrooms, setBedrooms] = useState("1");
-  const [bathrooms, setBathrooms] = useState("1");
-  const [electricityIncluded, setElectricityIncluded] = useState(false);
+  const [pricePerMonth, setPricePerMonth] = useState(
+    initialKost?.pricePerMonth ? String(initialKost.pricePerMonth) : "",
+  );
+  const [pricePerDay, setPricePerDay] = useState(
+    initialKost?.pricePerDay ? String(initialKost.pricePerDay) : "",
+  );
+  const [pricePerYear, setPricePerYear] = useState(
+    initialKost?.pricePerYear ? String(initialKost.pricePerYear) : "",
+  );
+  const [originalPrice, setOriginalPrice] = useState(
+    initialKost?.originalPrice ? String(initialKost.originalPrice) : "",
+  );
+  const [availableRooms, setAvailableRooms] = useState(
+    initialKost?.availableRooms != null ? String(initialKost.availableRooms) : "1",
+  );
+  const [roomSize, setRoomSize] = useState(initialKost?.roomSize || "3x4 m");
+  const [bedrooms, setBedrooms] = useState(
+    initialKost?.bedrooms != null ? String(initialKost.bedrooms) : "1",
+  );
+  const [bathrooms, setBathrooms] = useState(
+    initialKost?.bathrooms != null ? String(initialKost.bathrooms) : "1",
+  );
+  const [electricityIncluded, setElectricityIncluded] = useState(
+    initialKost?.electricityIncluded ?? false,
+  );
 
-  const [roomFacilities, setRoomFacilities] = useState<string[]>([]);
-  const [publicFacilities, setPublicFacilities] = useState<string[]>([]);
+  const [roomFacilities, setRoomFacilities] = useState<string[]>(
+    initialKost?.roomFacilities || [],
+  );
+  const [publicFacilities, setPublicFacilities] = useState<string[]>(
+    initialKost?.publicFacilities || [],
+  );
   const [customRoomFacility, setCustomRoomFacility] = useState("");
   const [customPublicFacility, setCustomPublicFacility] = useState("");
   const [rulesText, setRulesText] = useState(
-    "Dilarang merokok di dalam kamar, Menjaga kebersihan bersama",
+    initialKost?.rules?.length
+      ? initialKost.rules.join(", ")
+      : "Dilarang merokok di dalam kamar, Menjaga kebersihan bersama",
   );
 
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<string[]>(initialKost?.images || []);
   const [imageUrlInput, setImageUrlInput] = useState("");
   const [uploadingImages, setUploadingImages] = useState(false);
 
-  const [ownerName, setOwnerName] = useState(currentUser.name || "");
-  const [ownerPhone, setOwnerPhone] = useState(currentUser.phone || "");
+  const [ownerName, setOwnerName] = useState(
+    initialKost?.ownerName || currentUser.name || "",
+  );
+  const [ownerPhone, setOwnerPhone] = useState(
+    initialKost?.ownerPhone || currentUser.phone || "",
+  );
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -465,16 +505,23 @@ export function NewPropertyClient({
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/proxy/kosts", {
-        method: "POST",
+      const endpoint =
+        isEditMode && initialKost
+          ? `/api/proxy/kosts/${initialKost.id}`
+          : "/api/proxy/kosts";
+      const res = await fetch(endpoint, {
+        method: isEditMode ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data?.message || "Gagal menambahkan properti.");
+        throw new Error(
+          data?.message ||
+            (isEditMode ? "Gagal memperbarui properti." : "Gagal menambahkan properti."),
+        );
       }
-      router.push("/dashboard?created=1");
+      router.push(isEditMode ? "/dashboard?updated=1" : "/dashboard?created=1");
       router.refresh();
     } catch (err) {
       setError(
@@ -802,6 +849,15 @@ export function NewPropertyClient({
               />
             </div>
           </div>
+
+          <KostLocationPicker
+            latitude={latitude}
+            longitude={longitude}
+            onChange={(lat, lng) => {
+              setLatitude(lat);
+              setLongitude(lng);
+            }}
+          />
         </section>
 
         {/* 3. Harga & Spesifikasi Unit */}
@@ -1279,6 +1335,15 @@ export function NewPropertyClient({
               />
             </div>
           </div>
+
+          <KostLocationPicker
+            latitude={latitude}
+            longitude={longitude}
+            onChange={(lat, lng) => {
+              setLatitude(lat);
+              setLongitude(lng);
+            }}
+          />
         </section>
 
         {/* Submit Bar */}

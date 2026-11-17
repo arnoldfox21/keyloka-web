@@ -8,10 +8,12 @@ import {
   Award,
   CheckCircle2,
   CreditCard,
+  MessageCircle,
   RefreshCw,
   RotateCcw,
   Search,
   ShieldCheck,
+  Users,
 } from "lucide-react";
 import {
   formatRupiah,
@@ -345,6 +347,72 @@ export function BookingsClient({
                           Pembayaran: {b.paymentStatus}
                         </p>
                       </div>
+                    )}
+                  </div>
+
+                  {/* Status Timeline (matching Flutter) */}
+                  {(() => {
+                    const st = (b.status || "").toUpperCase();
+                    const isCanceled = st === "DIBATALKAN" || st === "DITOLAK";
+                    const stepConfirmed =
+                      st === "DISETUJUI" || st === "APPROVED" || st === "AKTIF" || st === "SELESAI";
+                    const stepDone = st === "SELESAI";
+                    if (isCanceled) return null;
+                    return (
+                      <div className="grid grid-cols-3 gap-2 pt-1 text-[11px] font-bold">
+                        <div className="flex items-center gap-1.5 text-emerald-700">
+                          <span className="h-2 w-2 rounded-full bg-emerald-600" />
+                          Terkirim
+                        </div>
+                        <div
+                          className={`flex items-center gap-1.5 ${
+                            stepConfirmed ? "text-emerald-700" : "text-gray-400"
+                          }`}
+                        >
+                          <span
+                            className={`h-2 w-2 rounded-full ${
+                              stepConfirmed ? "bg-emerald-600" : "bg-gray-300"
+                            }`}
+                          />
+                          Dikonfirmasi
+                        </div>
+                        <div
+                          className={`flex items-center gap-1.5 ${
+                            stepDone ? "text-emerald-700" : "text-gray-400"
+                          }`}
+                        >
+                          <span
+                            className={`h-2 w-2 rounded-full ${
+                              stepDone ? "bg-emerald-600" : "bg-gray-300"
+                            }`}
+                          />
+                          Selesai
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Chat & Group Shortcuts */}
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {b.kost?.ownerId && (
+                      <Link
+                        href={`/chat?kostId=${b.kostId}&peerId=${b.kost.ownerId}`}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-100"
+                      >
+                        <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
+                        Chat Pemilik
+                      </Link>
+                    )}
+                    {["DISETUJUI", "APPROVED", "AKTIF", "SELESAI"].includes(
+                      (b.status || "").toUpperCase(),
+                    ) && (
+                      <Link
+                        href={`/chat?groupKostId=${b.kostId}`}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
+                      >
+                        <Users className="h-3.5 w-3.5" />
+                        Grup {b.kost?.name || "Penghuni"}
+                      </Link>
                     )}
                   </div>
 

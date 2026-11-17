@@ -7,8 +7,10 @@ import {
   Building2,
   CalendarClock,
   CheckCircle2,
+  Edit3,
   Flag,
   Gavel,
+  MessageCircle,
   Plus,
   RefreshCw,
   RotateCcw,
@@ -16,13 +18,17 @@ import {
   ShieldAlert,
   Star,
   Trash2,
+  UserCheck,
+  UserPlus,
   Users,
   Wallet,
   XCircle,
+  Zap,
 } from "lucide-react";
 import {
   formatRupiah,
   getDisplayPrice,
+  type BoostPackageOption,
   type Booking,
   type Kost,
   type UserProfile,
@@ -156,6 +162,12 @@ export function DashboardClient({
   const [bankName, setBankName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [accountHolder, setAccountHolder] = useState(currentUser.name || "");
+
+  const [topupAmount, setTopupAmount] = useState("50000");
+  const [boostTargetKost, setBoostTargetKost] = useState<DashboardKostItem | null>(
+    null,
+  );
+  const [boostPackages, setBoostPackages] = useState<BoostPackageOption[]>([]);
 
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{
@@ -618,6 +630,147 @@ export function DashboardClient({
         type: "err",
         text: e instanceof Error ? e.message : "Terjadi kesalahan.",
       });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleOpenBoost(kost: DashboardKostItem) {
+    setBoostTargetKost(kost);
+    if (boostPackages.length === 0) {
+      try {
+        const res = await fetch("/api/proxy/wallet/pricing");
+        if (res.ok) {
+          const data = await res.json();
+          setBoostPackages(data?.boostPackages || []);
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  async function handleBoostKost(tier: string) {
+    if (!boostTargetKost) return;
+    setBusy(true);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/proxy/wallet/boost/${boostTargetKost.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tier }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setNotice({ type: "err", text: data?.message || "Gagal boost properti." });
+        return;
+      }
+      if (typeof data?.creditBalance === "number") {
+        setCreditBalance(data.creditBalance);
+      }
+      setNotice({
+        type: "ok",
+        text: `Properti "${boostTargetKost.name}" berhasil di-boost!`,
+      });
+      setBoostTargetKost(null);
+      await loadKosts(1, false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleTopupCredit(e: React.FormEvent) {
+    e.preventDefault();
+    const amt = Number(topupAmount);
+    if (!Number.isFinite(amt) || amt < 10000) {
+      setNotice({ type: "err", text: "Minimal top-up kredit adalah Rp10.000." });
+      return;
+    }
+    setBusy(true);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/proxy/wallet/topup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: amt }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setNotice({ type: "err", text: data?.message || "Gagal membuat transaksi top-up." });
+        return;
+      }
+      const orderId = data.orderId || data.paymentOrderId;
+      const snapToken = data.snapToken;
+      const syncTopup = async () => {
+        if (!orderId) return;
+        const sRes = await fetch(`/api/proxy/wallet/topup/${orderId}/sync`, {
+          method: "POST",
+        });
+        const sData = await sRes.json().catch(() => ({}));
+        if (sRes.ok && typeof sData?.creditBalance === "number") {
+          setCreditBalance(sData.creditBalance);
+          setNotice({ type: "ok", text: "Saldo kredit berhasil ditambahkan!" });
+        }
+      };
+
+      if (snapToken && typeof window !== "undefined" && (window as unknown as { snap?: { pay: (t: string, cb: Record<string, () => void>) => void } }).snap) {
+        (window as unknown as { snap: { pay: (t: string, cb: Record<string, () => void>) => void } }).snap.pay(snapToken, {
+          onSuccess: syncTopup,
+          onPending: syncTopup,
+          onClose: syncTopup,
+        });
+      } else if (data.paymentUrl) {
+        window.open(data.paymentUrl, "_blank");
+        setNotice({
+          type: "ok",
+          text: `Invoice top-up dibuat (${orderId}). Selesaikan pembayaran lalu muat ulang.`,
+        });
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleTransferOwner(kost: DashboardKostItem) {
+    const newOwnerIdStr = window.prompt(
+      `Masukkan ID User pemilik baru untuk "${kost.name}":`,
+    );
+    if (!newOwnerIdStr) return;
+    const newOwnerId = Number(newOwnerIdStr);
+    if (!Number.isFinite(newOwnerId)) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/proxy/kosts/${kost.id}/transfer-owner`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newOwnerId }),
+      });
+      if (res.ok) {
+        setNotice({ type: "ok", text: "Kepemilikan properti berhasil dipindahkan." });
+        await loadKosts(1, false);
+      } else {
+        const d = await res.json().catch(() => ({}));
+        setNotice({ type: "err", text: d?.message || "Gagal memindahkan pemilik." });
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDeleteUser(u: DashboardUserItem) {
+    if (!window.confirm(`Hapus permanen akun "${u.name}" (${u.email})?`)) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/proxy/auth/users/${u.id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setUsers((prev) => prev.filter((item) => item.id !== u.id));
+        setNotice({ type: "ok", text: `Akun ${u.name} berhasil dihapus.` });
+      } else {
+        const d = await res.json().catch(() => ({}));
+        setNotice({ type: "err", text: d?.message || "Gagal menghapus user." });
+      }
     } finally {
       setBusy(false);
     }
@@ -1088,15 +1241,42 @@ export function DashboardClient({
                             >
                               +
                             </button>
+                            <Link
+                              href={`/dashboard/edit-property/${k.id}`}
+                              title="Edit Properti"
+                              className="ml-1 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-100"
+                            >
+                              <Edit3 className="h-3.5 w-3.5" />
+                            </Link>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => handleOpenBoost(k)}
+                              title="Boost Iklan"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:opacity-40"
+                            >
+                              <Zap className="h-3.5 w-3.5" />
+                            </button>
                             {isStaffOrAdmin && (
-                              <button
-                                disabled={busy}
-                                onClick={() => handleDeleteKost(k)}
-                                title="Hapus Properti"
-                                className="ml-1 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-40"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => handleTransferOwner(k)}
+                                  title="Pindahkan Pemilik"
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-40"
+                                >
+                                  <UserCheck className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  disabled={busy}
+                                  onClick={() => handleDeleteKost(k)}
+                                  title="Hapus Properti"
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-40"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </>
                             )}
                           </div>
                         </div>
@@ -1307,6 +1487,42 @@ export function DashboardClient({
                   </div>
                 )}
 
+                {b.userId && (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <Link
+                      href={`/chat?kostId=${b.kostId}&peerId=${b.userId}`}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-100"
+                    >
+                      <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
+                      Chat Penyewa
+                    </Link>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={async () => {
+                        const res = await fetch(
+                          `/api/proxy/chats/groups/${b.kostId}/members`,
+                          {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ userId: b.userId }),
+                          },
+                        );
+                        if (res.ok) {
+                          setNotice({
+                            type: "ok",
+                            text: `${b.tenantName} ditambahkan ke Grup Penghuni.`,
+                          });
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
+                    >
+                      <UserPlus className="h-3.5 w-3.5" />
+                      Masukkan ke Grup
+                    </button>
+                  </div>
+                )}
+
                 {isStaffOrAdmin && b.escrowStatus === "DISPUTED" && (
                   <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 space-y-2.5">
                     <p className="flex items-center gap-1.5 text-xs font-extrabold text-amber-900">
@@ -1357,7 +1573,63 @@ export function DashboardClient({
 
       {/* Tab Content: WALLET & PAYOUT */}
       {tab === "WALLET" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="space-y-6">
+          {/* Top-Up Saldo Kredit */}
+          <form
+            onSubmit={handleTopupCredit}
+            className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-6 space-y-4"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 className="text-lg font-black text-gray-900">
+                  Top-Up Saldo Kredit Iklan & Boost
+                </h2>
+                <p className="text-xs text-gray-600">
+                  Saldo kredit saat ini:{" "}
+                  <span className="font-bold text-emerald-700">
+                    {formatRupiah(creditBalance)}
+                  </span>{" "}
+                  (digunakan untuk slot properti ekstra & Boost Iklan)
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {["25000", "50000", "100000", "250000"].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setTopupAmount(preset)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-bold border transition ${
+                      topupAmount === preset
+                        ? "border-emerald-600 bg-emerald-600 text-white"
+                        : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    {formatRupiah(Number(preset))}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input
+                type="number"
+                min={10000}
+                step={5000}
+                value={topupAmount}
+                onChange={(e) => setTopupAmount(e.target.value)}
+                placeholder="Nominal top-up (min Rp10.000)"
+                className="flex-1 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold"
+              />
+              <button
+                type="submit"
+                disabled={busy}
+                className="rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {busy ? "Memproses..." : "Top-Up via Midtrans"}
+              </button>
+            </div>
+          </form>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <form
             onSubmit={handleRequestPayout}
             className="rounded-2xl border border-gray-200 bg-white p-6 space-y-4"
@@ -1471,6 +1743,7 @@ export function DashboardClient({
               </div>
             )}
           </div>
+        </div>
         </div>
       )}
 
@@ -1823,6 +2096,18 @@ export function DashboardClient({
                         {u.isBanned ? "Buka Ban" : "Ban Akun"}
                       </button>
                     )}
+
+                    {isAdmin && u.id !== currentUser.id && u.id !== 1 && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => handleDeleteUser(u)}
+                        className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Hapus
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -1839,6 +2124,62 @@ export function DashboardClient({
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Boost Modal */}
+      {boostTargetKost && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-extrabold text-gray-900 flex items-center gap-2">
+                <Zap className="h-5 w-5 text-amber-500" />
+                Boost Iklan Properti
+              </h3>
+              <button
+                type="button"
+                onClick={() => setBoostTargetKost(null)}
+                className="rounded-full bg-gray-100 p-1.5 text-gray-600 hover:bg-gray-200"
+              >
+                <XCircle className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-xs text-gray-600">
+              Properti: <span className="font-bold text-gray-900">{boostTargetKost.name}</span>
+              <br />
+              Saldo Kredit Anda:{" "}
+              <span className="font-bold text-emerald-700">
+                {formatRupiah(creditBalance)}
+              </span>
+            </p>
+            <div className="space-y-2.5">
+              {boostPackages.length === 0 ? (
+                <p className="text-xs text-gray-400">Memuat paket boost...</p>
+              ) : (
+                boostPackages.map((pkg) => (
+                  <button
+                    key={pkg.tier}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => handleBoostKost(pkg.tier)}
+                    className="flex w-full items-center justify-between rounded-2xl border border-gray-200 p-3.5 text-left hover:border-amber-400 hover:bg-amber-50/40 transition"
+                  >
+                    <div>
+                      <p className="text-sm font-extrabold text-gray-900">
+                        {pkg.label || pkg.tier} ({pkg.durationDays} Hari)
+                      </p>
+                      {pkg.description && (
+                        <p className="text-xs text-gray-500">{pkg.description}</p>
+                      )}
+                    </div>
+                    <span className="text-sm font-black text-amber-600">
+                      {formatRupiah(pkg.price)}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}
