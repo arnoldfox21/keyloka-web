@@ -55,6 +55,11 @@ interface DashboardUserItem {
   phone: string;
   role: string;
   isBanned?: boolean;
+  isVerified?: boolean;
+  verificationStatus?: string;
+  verificationSurveyDate?: string;
+  verificationNotes?: string;
+  verificationRejectionReason?: string;
 }
 
 interface DashboardKostItem extends Kost {
@@ -588,6 +593,69 @@ export function DashboardClient({
         type: "err",
         text: e instanceof Error ? e.message : "Terjadi kesalahan.",
       });
+      setBusy(false);
+    }
+  }
+
+  async function handleToggleVerifyUser(
+    u: DashboardUserItem,
+    nextVerified: boolean,
+    reject = false,
+  ) {
+    let rejectionReason = "";
+    if (reject) {
+      const input = prompt(`Alasan penolakan verifikasi untuk ${u.name}:`);
+      if (input === null) return;
+      rejectionReason = input.trim();
+    } else if (
+      !confirm(
+        nextVerified
+          ? `Verifikasi akun ${u.name} (${u.email})? Pemilik akan dapat mengaktifkan Booking Langsung & Tarik Dana.`
+          : `Cabut status verifikasi ${u.name}?`,
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/proxy/auth/users/${u.id}/verify`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          reject
+            ? { isVerified: false, status: "REJECTED", rejectionReason }
+            : { isVerified: nextVerified, status: nextVerified ? "VERIFIED" : "NONE" },
+        ),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d?.message || "Gagal memperbarui verifikasi user.");
+      setUsers((prev) =>
+        prev.map((item) =>
+          item.id === u.id
+            ? {
+                ...item,
+                isVerified: d.isVerified ?? nextVerified,
+                verificationStatus: d.verificationStatus ?? (reject ? "REJECTED" : nextVerified ? "VERIFIED" : "NONE"),
+                verificationRejectionReason: d.verificationRejectionReason ?? rejectionReason,
+              }
+            : item,
+        ),
+      );
+      setNotice({
+        type: "ok",
+        text: reject
+          ? `Pengajuan verifikasi ${u.name} ditolak.`
+          : nextVerified
+            ? `${u.name} berhasil diverifikasi.`
+            : `Verifikasi ${u.name} dicabut.`,
+      });
+    } catch (e) {
+      setNotice({
+        type: "err",
+        text: e instanceof Error ? e.message : "Terjadi kesalahan.",
+      });
+    } finally {
       setBusy(false);
     }
   }
@@ -1681,6 +1749,15 @@ export function DashboardClient({
                 Saldo tersedia: <span className="font-bold text-emerald-700">{formatRupiah(payoutBalance)}</span> (minimal Rp10.000)
               </p>
             </div>
+            {!currentUser.isVerified && !isStaffOrAdmin && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                Akun Anda belum terverifikasi.{" "}
+                <Link href="/profile" className="font-bold underline text-emerald-700">
+                  Ajukan survei verifikasi di Profil
+                </Link>{" "}
+                untuk membuka fitur Tarik Dana.
+              </div>
+            )}
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1">
                 Nominal (Rp)
@@ -1731,7 +1808,7 @@ export function DashboardClient({
             </div>
             <button
               type="submit"
-              disabled={busy || payoutBalance < 10000}
+              disabled={busy || payoutBalance < 10000 || (!currentUser.isVerified && !isStaffOrAdmin)}
               className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-extrabold text-white hover:bg-emerald-700 disabled:opacity-50"
             >
               Ajukan Penarikan Dana
@@ -2136,6 +2213,16 @@ export function DashboardClient({
                       <span className="rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-700">
                         {targetRole}
                       </span>
+                      {(u.isVerified || targetRole === "STAFF" || targetRole === "ADMINISTRATOR") && (
+                        <span className="rounded-lg bg-emerald-100 px-2 py-0.5 text-[11px] font-extrabold text-emerald-800">
+                          TERVERIFIKASI
+                        </span>
+                      )}
+                      {u.verificationStatus === "PENDING" && !u.isVerified && (
+                        <span className="rounded-lg bg-amber-100 px-2 py-0.5 text-[11px] font-extrabold text-amber-800">
+                          MENUNGGU SURVEI
+                        </span>
+                      )}
                       {u.isBanned && (
                         <span className="rounded-lg bg-red-100 px-2 py-0.5 text-[11px] font-extrabold text-red-700">
                           DIBANNED
@@ -2145,9 +2232,49 @@ export function DashboardClient({
                     <p className="text-xs text-gray-500">
                       {u.email} • {u.phone || "-"}
                     </p>
+                    {u.verificationStatus === "PENDING" && (
+                      <p className="mt-1 text-[11px] text-amber-800 font-semibold">
+                        Usulan Survei: {u.verificationSurveyDate || "-"}
+                        {u.verificationNotes ? ` • "${u.verificationNotes}"` : ""}
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
+                    {targetRole !== "STAFF" && targetRole !== "ADMINISTRATOR" && (
+                      <>
+                        {!u.isVerified ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => handleToggleVerifyUser(u, true)}
+                            className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            Verifikasi
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => handleToggleVerifyUser(u, false)}
+                            className="inline-flex items-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100"
+                          >
+                            Cabut Verif
+                          </button>
+                        )}
+                        {u.verificationStatus === "PENDING" && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => handleToggleVerifyUser(u, false, true)}
+                            className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-50"
+                          >
+                            Tolak Verif
+                          </button>
+                        )}
+                      </>
+                    )}
                     {isAdmin && u.id !== 1 && (
                       <select
                         disabled={busy}

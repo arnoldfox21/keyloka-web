@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   Award,
+  BadgeCheck,
   Building2,
   Camera,
   CheckCircle2,
@@ -49,9 +50,25 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savingPass, setSavingPass] = useState(false);
 
+  // Verification survey state
+  const [showVerifyForm, setShowVerifyForm] = useState(false);
+  const [verifyDate, setVerifyDate] = useState(
+    initialUser.verificationSurveyDate ||
+      new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+  );
+  const [verifyPhone, setVerifyPhone] = useState(initialUser.phone || "");
+  const [verifyNotes, setVerifyNotes] = useState(
+    initialUser.verificationNotes || "",
+  );
+  const [submittingVerify, setSubmittingVerify] = useState(false);
+
   const role = (user.role || "").toUpperCase();
-  const isOwnerOrAdmin =
-    role === "PEMILIK_KOST" || role === "STAFF" || role === "ADMINISTRATOR";
+  const isStaffOrAdmin = role === "STAFF" || role === "ADMINISTRATOR";
+  const isOwnerOrAdmin = role === "PEMILIK_KOST" || isStaffOrAdmin;
+  const isVerifiedAccount = Boolean(user.isVerified) || isStaffOrAdmin;
+  const verificationStatus = (
+    user.verificationStatus || (isVerifiedAccount ? "VERIFIED" : "NONE")
+  ).toUpperCase();
 
   const completenessFields = [name, username, bio, city, phone, avatarUrl];
   const completenessPct = Math.round(
@@ -190,6 +207,41 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
     }
   }
 
+  async function handleRequestVerification(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmittingVerify(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/proxy/auth/users/verification-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          preferredDate: verifyDate,
+          phone: verifyPhone,
+          notes: verifyNotes,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.message || "Gagal mengirim pengajuan survei verifikasi.");
+      }
+      setUser(data);
+      setShowVerifyForm(false);
+      setMsg({
+        type: "ok",
+        text: "Pengajuan survei verifikasi terkirim! Staff akan segera berkoordinasi via WhatsApp.",
+      });
+      router.refresh();
+    } catch (err) {
+      setMsg({
+        type: "err",
+        text: err instanceof Error ? err.message : "Terjadi kesalahan.",
+      });
+    } finally {
+      setSubmittingVerify(false);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
       {/* Cover & Header */}
@@ -240,14 +292,37 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
                 </label>
               </div>
               <div className="pb-1">
-                <h1 className="text-xl font-extrabold text-gray-900">{user.name}</h1>
+                <div className="flex items-center gap-1.5">
+                  <h1 className="text-xl font-extrabold text-gray-900">{user.name}</h1>
+                  {isVerifiedAccount && (
+                    <BadgeCheck
+                      className="h-5 w-5 text-emerald-600"
+                      aria-label="Terverifikasi"
+                    />
+                  )}
+                </div>
                 <p className="text-xs text-gray-500">
                   {user.username ? `@${user.username} • ` : ""}
                   {user.email}
                 </p>
-                <span className="mt-1 inline-block rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
-                  {user.role}
-                </span>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  <span className="inline-block rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
+                    {user.role}
+                  </span>
+                  {isVerifiedAccount ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800">
+                      Terverifikasi
+                    </span>
+                  ) : role === "PEMILIK_KOST" ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-800">
+                      {verificationStatus === "PENDING"
+                        ? "Menunggu Survei Staff"
+                        : verificationStatus === "REJECTED"
+                          ? "Verifikasi Ditolak"
+                          : "Belum Terverifikasi"}
+                    </span>
+                  ) : null}
+                </div>
               </div>
             </div>
 
@@ -288,6 +363,104 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
           </div>
         </div>
       </div>
+
+      {/* Verifikasi Pemilik (Ajukan Survei dengan Staff) */}
+      {role === "PEMILIK_KOST" && !isVerifiedAccount && (
+        <div className="rounded-3xl border border-amber-200 bg-amber-50/60 p-6 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-extrabold text-gray-900">
+                Verifikasi Pemilik Properti
+              </h2>
+              <p className="mt-0.5 text-xs text-gray-600 leading-relaxed">
+                Dapatkan badge <strong>Pemilik Terverifikasi</strong> melalui survei lokasi/koordinasi dengan Staff Keyloka untuk membuka:
+                <br />• <strong>Booking Langsung (Escrow)</strong> pada properti Anda
+                <br />• <strong>Tarik Dana (Payout)</strong> pendapatan sewa ke rekening bank
+              </p>
+            </div>
+            {verificationStatus !== "PENDING" && (
+              <button
+                type="button"
+                onClick={() => setShowVerifyForm((v) => !v)}
+                className="shrink-0 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-emerald-700 transition"
+              >
+                {showVerifyForm ? "Tutup Form" : "Ajukan Survei Verifikasi"}
+              </button>
+            )}
+          </div>
+
+          {verificationStatus === "PENDING" && (
+            <div className="rounded-2xl border border-emerald-200 bg-white p-4 text-xs text-gray-700 space-y-1">
+              <p className="font-bold text-emerald-700">
+                Pengajuan Survei Sedang Diproses Staff
+              </p>
+              <p>
+                Jadwal usulan: <span className="font-semibold">{user.verificationSurveyDate || "-"}</span> • WhatsApp: <span className="font-semibold">{user.phone || "-"}</span>
+              </p>
+              {user.verificationNotes && <p>Catatan: {user.verificationNotes}</p>}
+            </div>
+          )}
+
+          {verificationStatus === "REJECTED" && user.verificationRejectionReason && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-700">
+              <strong>Alasan Penolakan Sebelumnya:</strong> {user.verificationRejectionReason}
+            </div>
+          )}
+
+          {showVerifyForm && (
+            <form
+              onSubmit={handleRequestVerification}
+              className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3"
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Usulan Tanggal Survei
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={verifyDate}
+                    onChange={(e) => setVerifyDate(e.target.value)}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Nomor WhatsApp Aktif
+                  </label>
+                  <input
+                    required
+                    value={verifyPhone}
+                    onChange={(e) => setVerifyPhone(e.target.value)}
+                    placeholder="08xxxxxxxxxx"
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Alamat / Patokan & Catatan untuk Staff
+                </label>
+                <textarea
+                  rows={2}
+                  value={verifyNotes}
+                  onChange={(e) => setVerifyNotes(e.target.value)}
+                  placeholder="Contoh: Kost Putri Melati Jl. Soekarno Hatta No. 12, tersedia jam 10.00-15.00"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={submittingVerify}
+                className="rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-extrabold text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {submittingVerify ? "Mengirim..." : "Kirim Pengajuan Survei"}
+              </button>
+            </form>
+          )}
+        </div>
+      )}
 
       {/* Quick Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-2">

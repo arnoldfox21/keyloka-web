@@ -75,6 +75,12 @@ export interface UserProfile {
   email: string;
   phone: string;
   role: string;
+  isVerified?: boolean;
+  verificationStatus?: string;
+  verificationSurveyDate?: string;
+  verificationKostId?: number | null;
+  verificationNotes?: string;
+  verificationRejectionReason?: string;
   avatarUrl: string;
   username?: string;
   bio?: string;

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
+  BadgeCheck,
   Building2,
   Heart,
   MapPin,
@@ -163,7 +164,21 @@ export function OwnerProfileClient({
                 )}
               </div>
               <div>
-                <h1 className="text-xl font-extrabold text-gray-900">{owner.name}</h1>
+                <div className="flex items-center gap-1.5">
+                  <h1 className="text-xl font-extrabold text-gray-900">{owner.name}</h1>
+                  {(owner.isVerified ||
+                    ["STAFF", "ADMINISTRATOR"].includes(
+                      (owner.role || "").toUpperCase(),
+                    )) && (
+                    <span
+                      title="Pemilik Terverifikasi"
+                      className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700"
+                    >
+                      <BadgeCheck className="h-4 w-4 text-emerald-600" />
+                      Terverifikasi
+                    </span>
+                  )}
+                </div>
                 {owner.city && (
                   <p className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
                     <MapPin className="h-3.5 w-3.5 text-emerald-600" />
