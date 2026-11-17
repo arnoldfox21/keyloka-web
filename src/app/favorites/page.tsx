@@ -20,7 +20,7 @@ export default async function FavoritesPage() {
     while (page <= 10) {
       const res = await serverFetch<
         Kost[] | { data: Kost[]; hasMore?: boolean }
-      >(`/kosts?page=${page}&limit=100`);
+      >(`/kosts?onlyFavorite=true&page=${page}&limit=100`);
       const list = Array.isArray(res) ? res : res.data || [];
       kosts.push(...list.filter((k) => Boolean(k.isFavorite)));
       const hasMore = Array.isArray(res)

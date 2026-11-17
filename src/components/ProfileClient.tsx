@@ -53,7 +53,8 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
   // Verification survey state
   const [showVerifyForm, setShowVerifyForm] = useState(false);
   const [verifyDate, setVerifyDate] = useState(
-    initialUser.verificationSurveyDate ||
+    () =>
+      initialUser.verificationSurveyDate ||
       new Date(Date.now() + 86400000).toISOString().slice(0, 10),
   );
   const [verifyPhone, setVerifyPhone] = useState(initialUser.phone || "");
