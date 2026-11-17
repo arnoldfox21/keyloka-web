@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { cache } from "react";
+import { JsonLd } from "@/components/JsonLd";
 import { KostDetailClient } from "@/components/KostDetailClient";
+import { getSiteUrl, toAbsoluteImageUrl, truncateDescription } from "@/lib/seo";
 import { API_BASE_URL, getServerToken, serverFetch } from "@/lib/server-api";
 import { formatRupiah, getDisplayPrice, type Kost, type ReviewItem, type UserProfile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-async function fetchKostDetail(id: string): Promise<Kost | null> {
+const fetchKostDetail = cache(async (id: string): Promise<Kost | null> => {
   try {
     const token = await getServerToken();
     const res = await fetch(`${API_BASE_URL}/kosts/${id}`, {
@@ -18,7 +21,7 @@ async function fetchKostDetail(id: string): Promise<Kost | null> {
   } catch {
     return null;
   }
-}
+});
 
 export async function generateMetadata({
   params,
@@ -28,12 +31,50 @@ export async function generateMetadata({
   const { id } = await params;
   const kost = await fetchKostDetail(id);
   if (!kost) {
-    return { title: "Properti Tidak Ditemukan — Keyloka" };
+    return {
+      title: "Properti Tidak Ditemukan",
+      robots: { index: false, follow: false },
+    };
   }
+
   const price = getDisplayPrice(kost);
+  const title = `${kost.name} (${formatRupiah(price.amount)}${price.unit})`;
+  const description = truncateDescription(
+    `${kost.propertyCategory} ${kost.type} di ${kost.district}, ${kost.city}. ${kost.description || ""}`,
+  );
+  const images = (kost.images || [])
+    .map((img) => toAbsoluteImageUrl(img))
+    .filter((url): url is string => Boolean(url));
+  const canonicalPath = `/kost/${kost.id}`;
+
   return {
-    title: `${kost.name} (${formatRupiah(price.amount)}${price.unit}) — Keyloka`,
-    description: `${kost.propertyCategory} ${kost.type} di ${kost.district}, ${kost.city}. ${kost.description?.slice(0, 140)}`,
+    title,
+    description,
+    keywords: [
+      kost.name,
+      `${kost.propertyCategory} ${kost.city}`,
+      `${kost.propertyCategory} ${kost.district}`,
+      `${kost.propertyCategory} ${kost.type}`,
+      "sewa kost",
+      "Keyloka",
+    ],
+    alternates: {
+      canonical: canonicalPath,
+    },
+    openGraph: {
+      type: "website",
+      locale: "id_ID",
+      url: canonicalPath,
+      title,
+      description,
+      ...(images.length > 0 ? { images: images.slice(0, 4).map((url) => ({ url })) } : {}),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      ...(images.length > 0 ? { images: [images[0]] } : {}),
+    },
   };
 }
 
@@ -56,12 +97,93 @@ export default async function KostDetailPage({
   ]);
 
   const reviews: ReviewItem[] = Array.isArray(reviewsRes) ? reviewsRes : [];
+  const siteUrl = getSiteUrl();
+  const pageUrl = `${siteUrl}/kost/${kost.id}`;
+  const price = getDisplayPrice(kost);
+  const images = (kost.images || [])
+    .map((img) => toAbsoluteImageUrl(img))
+    .filter((url): url is string => Boolean(url));
+
+  const lodgingJsonLd: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "LodgingBusiness",
+    name: kost.name,
+    description: truncateDescription(kost.description, 300),
+    url: pageUrl,
+    ...(images.length > 0 ? { image: images } : {}),
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: kost.address,
+      addressLocality: kost.district,
+      addressRegion: kost.city,
+      addressCountry: "ID",
+    },
+    ...(kost.latitude && kost.longitude
+      ? {
+          geo: {
+            "@type": "GeoCoordinates",
+            latitude: kost.latitude,
+            longitude: kost.longitude,
+          },
+        }
+      : {}),
+    priceRange: `${formatRupiah(price.amount)}${price.unit}`,
+    makesOffer: {
+      "@type": "Offer",
+      price: price.amount,
+      priceCurrency: "IDR",
+      availability:
+        kost.availableRooms > 0
+          ? "https://schema.org/InStock"
+          : "https://schema.org/OutOfStock",
+      url: pageUrl,
+    },
+    ...(kost.reviewCount > 0 && kost.rating > 0
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: kost.rating,
+            reviewCount: kost.reviewCount,
+            bestRating: 5,
+            worstRating: 1,
+          },
+        }
+      : {}),
+  };
+
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Beranda",
+        item: siteUrl,
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: kost.city,
+        item: `${siteUrl}/?city=${encodeURIComponent(kost.city)}`,
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: kost.name,
+        item: pageUrl,
+      },
+    ],
+  };
 
   return (
-    <KostDetailClient
-      kost={kost}
-      reviews={reviews}
-      currentUser={currentUser}
-    />
+    <>
+      <JsonLd data={[lodgingJsonLd, breadcrumbJsonLd]} />
+      <KostDetailClient
+        kost={kost}
+        reviews={reviews}
+        currentUser={currentUser}
+      />
+    </>
   );
 }

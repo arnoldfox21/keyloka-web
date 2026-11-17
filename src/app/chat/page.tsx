@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { privatePageMetadata } from "@/lib/seo";
 import { getServerToken, serverFetch } from "@/lib/server-api";
 import type { ChatMessage, KostGroupRoom, UserProfile } from "@/lib/types";
 import { ChatClient } from "@/components/ChatClient";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = privatePageMetadata("Chat");
 
 export default async function ChatPage({
   searchParams,

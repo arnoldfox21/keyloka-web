@@ -4,6 +4,12 @@ import Script from "next/script";
 import "./globals.css";
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
+import {
+  DEFAULT_DESCRIPTION,
+  DEFAULT_KEYWORDS,
+  SITE_NAME,
+  getSiteUrl,
+} from "@/lib/seo";
 import { serverFetch, getServerToken } from "@/lib/server-api";
 import type { UserProfile } from "@/lib/types";
 
@@ -13,9 +19,41 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Keyloka — Cari Kost, Apartemen & Kontrakan Aman",
-  description:
-    "Platform pencarian & booking hunian dengan pembayaran Escrow aman, survei terverifikasi, dan poin loyalti.",
+  metadataBase: new URL(getSiteUrl()),
+  title: {
+    default: "Keyloka — Cari Kost, Apartemen & Kontrakan Aman",
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: DEFAULT_DESCRIPTION,
+  keywords: DEFAULT_KEYWORDS,
+  applicationName: SITE_NAME,
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    locale: "id_ID",
+    siteName: SITE_NAME,
+    title: "Keyloka — Cari Kost, Apartemen & Kontrakan Aman",
+    description: DEFAULT_DESCRIPTION,
+    url: "/",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Keyloka — Cari Kost, Apartemen & Kontrakan Aman",
+    description: DEFAULT_DESCRIPTION,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
 };
 
 async function getCurrentUser(): Promise<UserProfile | null> {

@@ -1,4 +1,6 @@
 import { HomeExplorer } from "@/components/HomeExplorer";
+import { JsonLd } from "@/components/JsonLd";
+import { DEFAULT_DESCRIPTION, SITE_NAME, getSiteUrl } from "@/lib/seo";
 import { API_BASE_URL } from "@/lib/server-api";
 import type { Kost, KostFilters } from "@/lib/types";
 
@@ -42,12 +44,38 @@ async function fetchInitialData(): Promise<{
 
 export default async function HomePage() {
   const { kosts, hasMore, filters } = await fetchInitialData();
+  const siteUrl = getSiteUrl();
+
+  const structuredData = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: SITE_NAME,
+      url: siteUrl,
+      logo: `${siteUrl}/images/keyloka_logo_full.png`,
+      description: DEFAULT_DESCRIPTION,
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      name: SITE_NAME,
+      url: siteUrl,
+      potentialAction: {
+        "@type": "SearchAction",
+        target: `${siteUrl}/?q={search_term_string}`,
+        "query-input": "required name=search_term_string",
+      },
+    },
+  ];
 
   return (
-    <HomeExplorer
-      initialKosts={kosts}
-      initialHasMore={hasMore}
-      filters={filters}
-    />
+    <>
+      <JsonLd data={structuredData} />
+      <HomeExplorer
+        initialKosts={kosts}
+        initialHasMore={hasMore}
+        filters={filters}
+      />
+    </>
   );
 }

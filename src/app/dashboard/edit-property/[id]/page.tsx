@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
+import { privatePageMetadata } from "@/lib/seo";
 import { getServerToken, serverFetch } from "@/lib/server-api";
 import type { Kost, UserProfile } from "@/lib/types";
 import { NewPropertyClient } from "@/components/NewPropertyClient";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = privatePageMetadata("Edit Properti");
 
 export default async function EditPropertyPage({
   params,

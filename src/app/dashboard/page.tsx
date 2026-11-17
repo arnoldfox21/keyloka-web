@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { DashboardClient } from "@/components/DashboardClient";
+import { privatePageMetadata } from "@/lib/seo";
 import { getServerToken, serverFetch } from "@/lib/server-api";
 import type { Booking, Kost, UserProfile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = privatePageMetadata("Dashboard");
 
 export default async function DashboardPage({
   searchParams,

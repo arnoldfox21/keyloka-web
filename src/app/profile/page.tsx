@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { privatePageMetadata } from "@/lib/seo";
 import { getServerToken, serverFetch } from "@/lib/server-api";
 import type { UserProfile } from "@/lib/types";
 import { ProfileClient } from "@/components/ProfileClient";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = privatePageMetadata("Profil Saya");
 
 export default async function ProfilePage() {
   const token = await getServerToken();

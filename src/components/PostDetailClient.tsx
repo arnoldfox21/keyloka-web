@@ -94,7 +94,10 @@ export function PostDetailClient({
         Kembali
       </button>
 
-      <div className="rounded-3xl border border-gray-200 bg-white p-6 space-y-4 shadow-sm">
+      <article className="rounded-3xl border border-gray-200 bg-white p-6 space-y-4 shadow-sm">
+        <h1 className="sr-only">
+          Postingan oleh {post.ownerName || `Pemilik #${post.ownerId}`}
+        </h1>
         <div className="flex items-center justify-between">
           <Link href={`/owner/${post.ownerId}`} className="font-bold text-gray-900 hover:text-emerald-700">
             {post.ownerName || `Pemilik #${post.ownerId}`}
@@ -141,7 +144,7 @@ export function PostDetailClient({
             {comments.length} Komentar
           </span>
         </div>
-      </div>
+      </article>
 
       {/* Comments */}
       <div className="rounded-3xl border border-gray-200 bg-white p-6 space-y-4">

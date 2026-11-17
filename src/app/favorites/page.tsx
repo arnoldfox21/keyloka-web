@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { privatePageMetadata } from "@/lib/seo";
 import { getServerToken, serverFetch } from "@/lib/server-api";
 import type { Kost } from "@/lib/types";
 import { FavoritesClient } from "@/components/FavoritesClient";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = privatePageMetadata("Favorit Saya");
 
 export default async function FavoritesPage() {
   const token = await getServerToken();

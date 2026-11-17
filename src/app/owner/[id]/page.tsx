@@ -1,9 +1,66 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { cache } from "react";
+import { JsonLd } from "@/components/JsonLd";
+import { OwnerProfileClient } from "@/components/OwnerProfileClient";
+import { getSiteUrl, toAbsoluteImageUrl, truncateDescription } from "@/lib/seo";
 import { getServerToken, serverFetch } from "@/lib/server-api";
 import type { Kost, OwnerPost, UserProfile } from "@/lib/types";
-import { OwnerProfileClient } from "@/components/OwnerProfileClient";
 
 export const dynamic = "force-dynamic";
+
+const fetchOwnerProfile = cache(async (ownerId: number): Promise<UserProfile | null> => {
+  try {
+    return await serverFetch<UserProfile>(`/auth/users/${ownerId}`);
+  } catch {
+    return null;
+  }
+});
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const ownerId = Number(id);
+  if (!Number.isFinite(ownerId)) {
+    return { title: "Pemilik Tidak Ditemukan", robots: { index: false, follow: false } };
+  }
+
+  const owner = await fetchOwnerProfile(ownerId);
+  if (!owner) {
+    return { title: "Pemilik Tidak Ditemukan", robots: { index: false, follow: false } };
+  }
+
+  const title = `${owner.name} — Pemilik Properti`;
+  const description = truncateDescription(
+    owner.bio ||
+      `Lihat profil dan daftar properti hunian dari ${owner.name}${owner.city ? ` di ${owner.city}` : ""} di Keyloka.`,
+  );
+  const image = toAbsoluteImageUrl(owner.coverUrl) || toAbsoluteImageUrl(owner.avatarUrl);
+  const canonicalPath = `/owner/${owner.id}`;
+
+  return {
+    title,
+    description,
+    alternates: { canonical: canonicalPath },
+    openGraph: {
+      type: "profile",
+      locale: "id_ID",
+      url: canonicalPath,
+      title,
+      description,
+      ...(image ? { images: [{ url: image }] } : {}),
+    },
+    twitter: {
+      card: image ? "summary_large_image" : "summary",
+      title,
+      description,
+      ...(image ? { images: [image] } : {}),
+    },
+  };
+}
 
 export default async function OwnerProfilePage({
   params,
@@ -24,13 +81,7 @@ export default async function OwnerProfilePage({
     }
   }
 
-  let owner: UserProfile | null = null;
-  try {
-    owner = await serverFetch<UserProfile>(`/auth/users/${ownerId}`);
-  } catch {
-    notFound();
-  }
-
+  const owner = await fetchOwnerProfile(ownerId);
   if (!owner) notFound();
 
   let properties: Kost[] = [];
@@ -55,12 +106,29 @@ export default async function OwnerProfilePage({
     posts = [];
   }
 
+  const siteUrl = getSiteUrl();
+  const avatar = toAbsoluteImageUrl(owner.avatarUrl);
+  const profileJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ProfilePage",
+    mainEntity: {
+      "@type": "Person",
+      name: owner.name,
+      url: `${siteUrl}/owner/${owner.id}`,
+      ...(owner.bio ? { description: owner.bio } : {}),
+      ...(avatar ? { image: avatar } : {}),
+    },
+  };
+
   return (
-    <OwnerProfileClient
-      owner={owner}
-      initialProperties={properties}
-      initialPosts={posts}
-      currentUser={currentUser}
-    />
+    <>
+      <JsonLd data={profileJsonLd} />
+      <OwnerProfileClient
+        owner={owner}
+        initialProperties={properties}
+        initialPosts={posts}
+        currentUser={currentUser}
+      />
+    </>
   );
 }
