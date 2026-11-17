@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Building2, Lock, Mail } from "lucide-react";
+import { Lock, Mail } from "lucide-react";
 
 declare global {
   interface Window {
@@ -143,9 +143,12 @@ export default function LoginPage() {
 
       <div className="w-full rounded-3xl border border-gray-200 bg-white p-6 sm:p-8 shadow-sm">
         <div className="flex flex-col items-center text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-sm">
-            <Building2 className="h-6 w-6" />
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/images/keyloka_logo.png"
+            alt="Keyloka Logo"
+            className="h-14 w-14 rounded-2xl object-contain"
+          />
           <h1 className="mt-4 text-2xl font-black text-gray-900">
             Masuk / Daftar Keyloka
           </h1>

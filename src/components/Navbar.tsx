@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   Award,
-  Building2,
   CalendarCheck,
   Heart,
   LayoutDashboard,
@@ -41,9 +40,12 @@ export function Navbar({ user }: NavbarProps) {
     <header className="sticky top-0 z-40 border-b border-gray-200 bg-white/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
-            <Building2 className="h-5 w-5" />
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/images/keyloka_logo.png"
+            alt="Keyloka Logo"
+            className="h-9 w-9 rounded-xl object-contain"
+          />
           <div>
             <span className="text-lg font-extrabold tracking-tight text-gray-900">
               Key<span className="text-emerald-600">loka</span>
