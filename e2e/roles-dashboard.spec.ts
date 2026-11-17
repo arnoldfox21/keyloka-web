@@ -38,6 +38,37 @@ test.describe("Role-based Dashboard Flows (Owner, Staff, Administrator)", () => 
       page.getByPlaceholder("Contoh: Kost Eksklusif Melati Lowokwaru"),
     ).toBeVisible();
 
+    // Pastikan tidak ada teks teknikal dan pilih foto tidak langsung upload ke R2
+    await expect(page.getByText("Pilih Foto Properti")).toBeVisible();
+    await expect(page.getByText(/WebP|kompres/i)).toHaveCount(0);
+
+    let uploadImageCalled = false;
+    page.on("request", (req) => {
+      if (req.url().includes("/upload-image")) {
+        uploadImageCalled = true;
+      }
+    });
+
+    const tinyPng = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "base64",
+    );
+    await page.locator('input[type="file"]').setInputFiles({
+      name: "test-room.png",
+      mimeType: "image/png",
+      buffer: tinyPng,
+    });
+
+    await expect(page.getByText("1 foto ditambahkan")).toBeVisible();
+    await expect(page.locator('img[alt="Foto properti 1"]')).toHaveAttribute(
+      "src",
+      /^blob:/,
+    );
+    expect(uploadImageCalled).toBe(false);
+
+    await page.locator('button[title="Hapus foto"]').click();
+    await expect(page.getByText("0 foto ditambahkan")).toBeVisible();
+
     expect(pageErrors).toEqual([]);
   });
 

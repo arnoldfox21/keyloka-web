@@ -82,7 +82,6 @@ export async function compressImageToDataUrl(
       return { dataUrl: await fileToDataUrlFallback(file), mimeType: file.type };
     }
 
-    ctx.drawImage = ctx.drawImage.bind(ctx);
     source.draw(ctx, targetW, targetH);
 
     const webpUrl = canvas.toDataURL("image/webp", quality);

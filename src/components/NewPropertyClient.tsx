@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   Building2,
@@ -223,9 +223,29 @@ export function NewPropertyClient({
       : "Dilarang merokok di dalam kamar, Menjaga kebersihan bersama",
   );
 
-  const [images, setImages] = useState<string[]>(initialKost?.images || []);
+  type PropertyImageItem =
+    | { kind: "remote"; url: string }
+    | { kind: "local"; file: File; previewUrl: string };
+
+  const [images, setImages] = useState<PropertyImageItem[]>(() =>
+    (initialKost?.images || []).map((url) => ({ kind: "remote", url })),
+  );
   const [imageUrlInput, setImageUrlInput] = useState("");
-  const [uploadingImages, setUploadingImages] = useState(false);
+  const latestImagesRef = useRef(images);
+
+  useEffect(() => {
+    latestImagesRef.current = images;
+  }, [images]);
+
+  useEffect(() => {
+    return () => {
+      for (const item of latestImagesRef.current) {
+        if (item.kind === "local") {
+          URL.revokeObjectURL(item.previewUrl);
+        }
+      }
+    };
+  }, []);
 
   const [ownerName, setOwnerName] = useState(
     initialKost?.ownerName || currentUser.name || "",
@@ -327,53 +347,40 @@ export function NewPropertyClient({
     clear();
   }
 
-  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    setError(null);
-    setUploadingImages(true);
-    try {
-      const uploadedPaths: string[] = [];
-      for (const file of files) {
-        if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-          throw new Error(
-            `Format "${file.name}" tidak didukung. Gunakan JPG, PNG, atau WebP.`,
-          );
-        }
-        if (file.size > 15 * 1024 * 1024) {
-          throw new Error(`Ukuran "${file.name}" melebihi batas maksimal 15 MB.`);
-        }
+    const validItems: PropertyImageItem[] = [];
+    const errors: string[] = [];
 
-        const { dataUrl, mimeType } = await compressImageToDataUrl(file, {
-          maxDimension: 1600,
-          quality: 0.82,
-        });
-        const res = await fetch("/api/proxy/kosts/upload-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            base64: dataUrl,
-            filename: file.name,
-            mimeType,
-          }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          throw new Error(data?.message || `Gagal mengunggah "${file.name}".`);
-        }
-        const savedPath = data.path || data.url;
-        if (savedPath) {
-          uploadedPaths.push(savedPath);
-        }
+    for (const file of files) {
+      const isAllowedMime = ["image/jpeg", "image/png", "image/webp"].includes(
+        file.type,
+      );
+      const isAllowedExt = /\.(jpe?g|png|webp)$/i.test(file.name);
+      if (!isAllowedMime && !(file.type === "" && isAllowedExt)) {
+        errors.push(
+          `Format "${file.name}" tidak didukung. Gunakan file JPG atau PNG.`,
+        );
+        continue;
       }
-      setImages((prev) => [...prev, ...uploadedPaths]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal mengunggah foto.");
-    } finally {
-      setUploadingImages(false);
-      e.target.value = "";
+      if (file.size > 15 * 1024 * 1024) {
+        errors.push(`Ukuran "${file.name}" melebihi batas maksimal 15 MB.`);
+        continue;
+      }
+      validItems.push({
+        kind: "local",
+        file,
+        previewUrl: URL.createObjectURL(file),
+      });
     }
+
+    if (validItems.length > 0) {
+      setImages((prev) => [...prev, ...validItems]);
+    }
+    setError(errors.length > 0 ? errors[0] : null);
+    e.target.value = "";
   }
 
   function handleAddImageUrl() {
@@ -383,11 +390,24 @@ export function NewPropertyClient({
       setError("URL gambar harus diawali http:// atau https://");
       return;
     }
-    if (!images.includes(trimmed)) {
-      setImages((prev) => [...prev, trimmed]);
+    const alreadyExists = images.some(
+      (item) => item.kind === "remote" && item.url === trimmed,
+    );
+    if (!alreadyExists) {
+      setImages((prev) => [...prev, { kind: "remote", url: trimmed }]);
     }
     setImageUrlInput("");
     setError(null);
+  }
+
+  function handleRemoveImage(idx: number) {
+    setImages((prev) => {
+      const target = prev[idx];
+      if (target?.kind === "local") {
+        URL.revokeObjectURL(target.previewUrl);
+      }
+      return prev.filter((_, i) => i !== idx);
+    });
   }
 
   function handleDetectLocation() {
@@ -465,7 +485,7 @@ export function NewPropertyClient({
       .map((r) => r.trim())
       .filter(Boolean);
 
-    const payload: Record<string, unknown> = {
+    const basePayload: Record<string, unknown> = {
       propertyCategory,
       ...(isDailyStay ? { unitType } : {}),
       name: name.trim(),
@@ -495,7 +515,6 @@ export function NewPropertyClient({
       roomFacilities,
       publicFacilities,
       rules,
-      images,
       ownerName: ownerName.trim() || currentUser.name,
       ownerPhone: ownerPhone.trim() || currentUser.phone,
       ...(parsedLat !== undefined && Number.isFinite(parsedLat)
@@ -508,6 +527,23 @@ export function NewPropertyClient({
 
     setSubmitting(true);
     try {
+      const preparedImages: string[] = [];
+      for (const item of images) {
+        if (item.kind === "remote") {
+          preparedImages.push(item.url);
+        } else {
+          const { dataUrl } = await compressImageToDataUrl(item.file, {
+            maxDimension: 1600,
+            quality: 0.82,
+          });
+          preparedImages.push(dataUrl);
+        }
+      }
+
+      const payload: Record<string, unknown> = {
+        ...basePayload,
+        images: preparedImages,
+      };
       const endpoint =
         isEditMode && initialKost
           ? `/api/proxy/kosts/${initialKost.id}`
@@ -1227,22 +1263,14 @@ export function NewPropertyClient({
 
           <div className="flex flex-col sm:flex-row gap-3">
             <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-emerald-400 bg-emerald-50/70 px-4 py-3 text-xs font-extrabold text-emerald-800 hover:bg-emerald-100 transition">
-              {uploadingImages ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Upload className="h-4 w-4" />
-              )}
-              <span>
-                {uploadingImages
-                  ? "Mengompres & mengunggah foto..."
-                  : "Upload Foto (otomatis dikompres ke WebP)"}
-              </span>
+              <Upload className="h-4 w-4" />
+              <span>Pilih Foto Properti</span>
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 multiple
-                disabled={uploadingImages}
-                onChange={handleFileUpload}
+                disabled={submitting}
+                onChange={handleFileSelect}
                 className="hidden"
               />
             </label>
@@ -1272,29 +1300,35 @@ export function NewPropertyClient({
 
           {images.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-              {images.map((img, idx) => (
-                <div
-                  key={`${img}-${idx}`}
-                  className="group relative aspect-4/3 overflow-hidden rounded-xl border border-gray-200 bg-gray-100"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={resolveImageUrl(img)}
-                    alt={`Foto properti ${idx + 1}`}
-                    className="h-full w-full object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setImages((prev) => prev.filter((_, i) => i !== idx))
-                    }
-                    title="Hapus foto"
-                    className="absolute right-2 top-2 rounded-lg bg-red-600/90 p-1.5 text-white opacity-90 hover:bg-red-700"
+              {images.map((item, idx) => {
+                const src =
+                  item.kind === "local"
+                    ? item.previewUrl
+                    : resolveImageUrl(item.url);
+                const key =
+                  item.kind === "local" ? item.previewUrl : `${item.url}-${idx}`;
+                return (
+                  <div
+                    key={key}
+                    className="group relative aspect-4/3 overflow-hidden rounded-xl border border-gray-200 bg-gray-100"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={src}
+                      alt={`Foto properti ${idx + 1}`}
+                      className="h-full w-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveImage(idx)}
+                      title="Hapus foto"
+                      className="absolute right-2 top-2 rounded-lg bg-red-600/90 p-1.5 text-white opacity-90 hover:bg-red-700"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>
@@ -1350,7 +1384,7 @@ export function NewPropertyClient({
           </Link>
           <button
             type="submit"
-            disabled={submitting || uploadingImages}
+            disabled={submitting}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-extrabold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
           >
             {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
