@@ -50,13 +50,8 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savingPass, setSavingPass] = useState(false);
 
-  // Verification survey state
+  // Verification request state
   const [showVerifyForm, setShowVerifyForm] = useState(false);
-  const [verifyDate, setVerifyDate] = useState(
-    () =>
-      initialUser.verificationSurveyDate ||
-      new Date(Date.now() + 86400000).toISOString().slice(0, 10),
-  );
   const [verifyPhone, setVerifyPhone] = useState(initialUser.phone || "");
   const [verifyNotes, setVerifyNotes] = useState(
     initialUser.verificationNotes || "",
@@ -245,20 +240,19 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          preferredDate: verifyDate,
           phone: verifyPhone,
           notes: verifyNotes,
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data?.message || "Gagal mengirim pengajuan survei verifikasi.");
+        throw new Error(data?.message || "Gagal mengirim pengajuan verifikasi.");
       }
       setUser(data);
       setShowVerifyForm(false);
       setMsg({
         type: "ok",
-        text: "Pengajuan survei verifikasi terkirim! Staff akan segera berkoordinasi via WhatsApp.",
+        text: "Pengajuan verifikasi terkirim! Staff akan segera menghubungi Anda via WhatsApp.",
       });
       router.refresh();
     } catch (err) {
@@ -406,7 +400,7 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
         </div>
       )}
 
-      {/* Verifikasi Pemilik (Ajukan Survei dengan Staff) */}
+      {/* Verifikasi Pemilik */}
       {role === "PEMILIK_KOST" && !isVerifiedAccount && (
         <div className="rounded-3xl border border-amber-200 bg-amber-50/60 p-6 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -415,7 +409,7 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
                 Verifikasi Pemilik Properti
               </h2>
               <p className="mt-0.5 text-xs text-gray-600 leading-relaxed">
-                Dapatkan badge <strong>Pemilik Terverifikasi</strong> melalui survei lokasi/koordinasi dengan Staff Keyloka untuk membuka:
+                Dapatkan badge <strong>Pemilik Terverifikasi</strong> melalui verifikasi oleh Staff Keyloka untuk membuka:
                 <br />• <strong>Booking Langsung (Escrow)</strong> pada properti Anda
                 <br />• <strong>Tarik Dana (Payout)</strong> pendapatan sewa ke rekening bank
               </p>
@@ -426,7 +420,7 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
                 onClick={() => setShowVerifyForm((v) => !v)}
                 className="shrink-0 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-emerald-700 transition"
               >
-                {showVerifyForm ? "Tutup Form" : "Ajukan Survei Verifikasi"}
+                {showVerifyForm ? "Tutup Form" : "Ajukan Verifikasi"}
               </button>
             )}
           </div>
@@ -434,10 +428,13 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
           {verificationStatus === "PENDING" && (
             <div className="rounded-2xl border border-emerald-200 bg-white p-4 text-xs text-gray-700 space-y-1">
               <p className="font-bold text-emerald-700">
-                Pengajuan Survei Sedang Diproses Staff
+                Pengajuan Verifikasi Sedang Diproses Staff
               </p>
               <p>
-                Jadwal usulan: <span className="font-semibold">{user.verificationSurveyDate || "-"}</span> • WhatsApp: <span className="font-semibold">{user.phone || "-"}</span>
+                WhatsApp: <span className="font-semibold">{user.phone || "-"}</span>
+                {user.verificationKostId ? (
+                  <> • Klaim Properti <span className="font-semibold">#{user.verificationKostId}</span></>
+                ) : null}
               </p>
               {user.verificationNotes && <p>Catatan: {user.verificationNotes}</p>}
             </div>
@@ -454,41 +451,27 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
               onSubmit={handleRequestVerification}
               className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3"
             >
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Usulan Tanggal Survei
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={verifyDate}
-                    onChange={(e) => setVerifyDate(e.target.value)}
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Nomor WhatsApp Aktif
-                  </label>
-                  <input
-                    required
-                    value={verifyPhone}
-                    onChange={(e) => setVerifyPhone(e.target.value)}
-                    placeholder="08xxxxxxxxxx"
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Nomor WhatsApp Aktif
+                </label>
+                <input
+                  required
+                  value={verifyPhone}
+                  onChange={(e) => setVerifyPhone(e.target.value)}
+                  placeholder="08xxxxxxxxxx"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                />
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Alamat / Patokan & Catatan untuk Staff
+                  Catatan untuk Staff (Opsional)
                 </label>
                 <textarea
                   rows={2}
                   value={verifyNotes}
                   onChange={(e) => setVerifyNotes(e.target.value)}
-                  placeholder="Contoh: Kost Putri Melati Jl. Soekarno Hatta No. 12, tersedia jam 10.00-15.00"
+                  placeholder="Contoh: Kost Putri Melati Jl. Soekarno Hatta No. 12, bisa dihubungi jam kerja"
                   className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
                 />
               </div>
@@ -497,7 +480,7 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
                 disabled={submittingVerify}
                 className="rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-extrabold text-white hover:bg-emerald-700 disabled:opacity-50"
               >
-                {submittingVerify ? "Mengirim..." : "Kirim Pengajuan Survei"}
+                {submittingVerify ? "Mengirim..." : "Kirim Pengajuan Verifikasi"}
               </button>
             </form>
           )}

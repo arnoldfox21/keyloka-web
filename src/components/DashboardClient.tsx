@@ -62,6 +62,7 @@ interface DashboardUserItem {
   isBanned?: boolean;
   isVerified?: boolean;
   verificationStatus?: string;
+  verificationKostId?: number | null;
   verificationSurveyDate?: string;
   verificationNotes?: string;
   verificationRejectionReason?: string;
@@ -642,6 +643,7 @@ export function DashboardClient({
                 ...item,
                 isVerified: d.isVerified ?? nextVerified,
                 verificationStatus: d.verificationStatus ?? (reject ? "REJECTED" : nextVerified ? "VERIFIED" : "NONE"),
+                verificationKostId: d.verificationKostId ?? null,
                 verificationRejectionReason: d.verificationRejectionReason ?? rejectionReason,
               }
             : item,
@@ -652,7 +654,9 @@ export function DashboardClient({
         text: reject
           ? `Pengajuan verifikasi ${u.name} ditolak.`
           : nextVerified
-            ? `${u.name} berhasil diverifikasi.`
+            ? u.verificationKostId
+              ? `Klaim properti #${u.verificationKostId} oleh ${u.name} disetujui & akun terverifikasi.`
+              : `${u.name} berhasil diverifikasi.`
             : `Verifikasi ${u.name} dicabut.`,
       });
     } catch (e) {
@@ -2223,9 +2227,11 @@ export function DashboardClient({
                           TERVERIFIKASI
                         </span>
                       )}
-                      {u.verificationStatus === "PENDING" && !u.isVerified && (
+                      {u.verificationStatus === "PENDING" && (
                         <span className="rounded-lg bg-amber-100 px-2 py-0.5 text-[11px] font-extrabold text-amber-800">
-                          MENUNGGU SURVEI
+                          {u.verificationKostId
+                            ? `KLAIM PROPERTI #${u.verificationKostId}`
+                            : "MENUNGGU VERIFIKASI"}
                         </span>
                       )}
                       {u.isBanned && (
@@ -2239,7 +2245,10 @@ export function DashboardClient({
                     </p>
                     {u.verificationStatus === "PENDING" && (
                       <p className="mt-1 text-[11px] text-amber-800 font-semibold">
-                        Usulan Survei: {u.verificationSurveyDate || "-"}
+                        {u.verificationKostId
+                          ? `Klaim Properti #${u.verificationKostId}`
+                          : "Pengajuan Verifikasi"}
+                        {u.verificationSurveyDate ? ` • ${u.verificationSurveyDate}` : ""}
                         {u.verificationNotes ? ` • "${u.verificationNotes}"` : ""}
                       </p>
                     )}
@@ -2248,7 +2257,7 @@ export function DashboardClient({
                   <div className="flex flex-wrap items-center gap-2">
                     {targetRole !== "STAFF" && targetRole !== "ADMINISTRATOR" && (
                       <>
-                        {!u.isVerified ? (
+                        {!u.isVerified || (u.verificationStatus === "PENDING" && Boolean(u.verificationKostId)) ? (
                           <button
                             type="button"
                             disabled={busy}
@@ -2256,7 +2265,7 @@ export function DashboardClient({
                             className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"
                           >
                             <CheckCircle2 className="h-3.5 w-3.5" />
-                            Verifikasi
+                            {u.verificationKostId ? "Setujui Klaim" : "Verifikasi"}
                           </button>
                         ) : (
                           <button
@@ -2275,7 +2284,7 @@ export function DashboardClient({
                             onClick={() => handleToggleVerifyUser(u, false, true)}
                             className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-50"
                           >
-                            Tolak Verif
+                            Tolak
                           </button>
                         )}
                       </>

@@ -39,6 +39,8 @@ export interface Kost {
   ownerName: string;
   ownerPhone?: string;
   showOwnerWhatsapp?: boolean;
+  isStaffPosted?: boolean;
+  staffWhatsapp?: string;
   nearbyLandmark?: string;
   latitude?: number | null;
   longitude?: number | null;

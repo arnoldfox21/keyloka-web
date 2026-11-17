@@ -34,6 +34,7 @@ import {
   type ReviewItem,
   type UserProfile,
 } from "@/lib/types";
+import { getSiteUrl } from "@/lib/seo";
 
 declare global {
   interface Window {
@@ -107,6 +108,28 @@ export function KostDetailClient({
     text: string;
   } | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
+  const [propertyActionOpen, setPropertyActionOpen] = useState(false);
+  const [propertyActionTab, setPropertyActionTab] = useState<"CLAIM" | "DELETE">("CLAIM");
+  const [claimPhone, setClaimPhone] = useState(currentUser?.phone || "");
+  const [claimNotes, setClaimNotes] = useState("");
+  const [claiming, setClaiming] = useState(false);
+  const [claimFeedback, setClaimFeedback] = useState<{
+    type: "error" | "success";
+    text: string;
+  } | null>(null);
+  const [claimSubmitted, setClaimSubmitted] = useState(
+    Boolean(
+      currentUser?.verificationStatus === "PENDING" &&
+        currentUser?.verificationKostId === kost.id,
+    ),
+  );
+
+  const currentUserRole = (currentUser?.role || "").toUpperCase();
+  const canShowClaim =
+    Boolean(kost.isStaffPosted) &&
+    currentUser?.id !== kost.ownerId &&
+    currentUserRole !== "STAFF" &&
+    currentUserRole !== "ADMINISTRATOR";
 
   const price = getDisplayPrice(kost);
   const cat = (kost.propertyCategory || "").toUpperCase();
@@ -134,6 +157,46 @@ export function KostDetailClient({
     }
     setFeedback(null);
     setModalMode(mode);
+  }
+
+  function openPropertyActionModal() {
+    setClaimFeedback(null);
+    setPropertyActionTab("CLAIM");
+    setPropertyActionOpen(true);
+  }
+
+  async function handleSubmitClaim(e: React.FormEvent) {
+    e.preventDefault();
+    setClaiming(true);
+    setClaimFeedback(null);
+    try {
+      const res = await fetch("/api/proxy/auth/users/verification-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kostId: kost.id,
+          phone: claimPhone,
+          notes: claimNotes,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.message || "Gagal mengirim pengajuan klaim.");
+      }
+      setClaimSubmitted(true);
+      setClaimFeedback({
+        type: "success",
+        text: "Pengajuan klaim terkirim! Staff akan segera menghubungi Anda untuk verifikasi.",
+      });
+      router.refresh();
+    } catch (err) {
+      setClaimFeedback({
+        type: "error",
+        text: err instanceof Error ? err.message : "Terjadi kesalahan.",
+      });
+    } finally {
+      setClaiming(false);
+    }
   }
 
   async function handleSubmitSurvey(e: React.FormEvent) {
@@ -771,8 +834,9 @@ export function KostDetailClient({
                 const waNumber = digits.startsWith("0")
                   ? `62${digits.slice(1)}`
                   : digits;
+                const kostUrl = `${getSiteUrl()}/kost/${kost.id}`;
                 const waText = encodeURIComponent(
-                  `Halo ${kost.ownerName}, saya tertarik dengan properti "${kost.name}" di Keyloka. Apakah masih tersedia?`,
+                  `Halo, saya melihat ${kost.name} (${kost.city}) di platform Keyloka.\nBoleh info ketersediaan dan detail lengkapnya?\n\n${kostUrl}`,
                 );
                 return waNumber ? (
                   <a
@@ -830,6 +894,23 @@ export function KostDetailClient({
                 >
                   Ajukan Survei Lokasi
                 </button>
+              )}
+              {canShowClaim && (
+                <div className="pt-1 text-center">
+                  <button
+                    type="button"
+                    onClick={openPropertyActionModal}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-medium text-gray-400 hover:text-gray-600 transition"
+                    title="Opsi pemilik: Ajukan klaim atau hapus properti"
+                  >
+                    <Info className="h-3.5 w-3.5" />
+                    <span>
+                      {claimSubmitted
+                        ? "Klaim sedang diproses"
+                        : "Pemilik properti? Klaim / Hapus"}
+                    </span>
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -1106,6 +1187,178 @@ export function KostDetailClient({
           </div>
         </div>
       )}
+
+      {/* Modal Opsi Pemilik: Ajukan Klaim / Hapus Properti */}
+      {propertyActionOpen && (() => {
+        const rawStaffWa = (kost.staffWhatsapp || kost.ownerPhone || "").replace(/\D/g, "");
+        const staffWaDigits = rawStaffWa.startsWith("0")
+          ? `62${rawStaffWa.slice(1)}`
+          : rawStaffWa;
+        const kostUrl = `${getSiteUrl()}/kost/${kost.id}`;
+        const buildStaffWaHref = (message: string) => {
+          const encoded = encodeURIComponent(message);
+          return staffWaDigits
+            ? `https://wa.me/${staffWaDigits}?text=${encoded}`
+            : `https://wa.me/?text=${encoded}`;
+        };
+        const claimWaHref = buildStaffWaHref(
+          `Halo Staff Keyloka, saya pemilik properti "${kost.name}" (ID #${kost.id}) ingin mengajukan klaim properti${currentUser?.email ? ` ke akun ${currentUser.email}` : ""}.\n\n${kostUrl}`,
+        );
+        const deleteWaHref = buildStaffWaHref(
+          `Halo Staff Keyloka, saya pemilik properti "${kost.name}" (ID #${kost.id}) ingin mengajukan penghapusan listing properti ini.\n\n${kostUrl}`,
+        );
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-black text-gray-900">
+                  Opsi Pemilik Properti
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setPropertyActionOpen(false)}
+                  className="rounded-full p-1 text-gray-400 hover:bg-gray-100"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Properti <strong>{kost.name}</strong> saat ini diposting oleh Staff Keyloka.
+              </p>
+
+              <div className="mt-4 grid grid-cols-2 gap-1.5 rounded-xl bg-gray-100 p-1">
+                <button
+                  type="button"
+                  onClick={() => setPropertyActionTab("CLAIM")}
+                  className={`rounded-lg py-2 text-xs font-bold transition ${
+                    propertyActionTab === "CLAIM"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  Ajukan Klaim
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPropertyActionTab("DELETE")}
+                  className={`rounded-lg py-2 text-xs font-bold transition ${
+                    propertyActionTab === "DELETE"
+                      ? "bg-white text-red-700 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  Ajukan Hapus Properti
+                </button>
+              </div>
+
+              {propertyActionTab === "CLAIM" ? (
+                <div className="mt-4 space-y-3">
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    Ambil alih pengelolaan listing properti ini ke akun Keyloka Anda. Staff akan menghubungi nomor WhatsApp Anda untuk verifikasi kepemilikan.
+                  </p>
+                  {!currentUser ? (
+                    <Link
+                      href="/login"
+                      className="block w-full rounded-xl bg-emerald-600 py-3 text-center text-sm font-extrabold text-white hover:bg-emerald-700 transition"
+                    >
+                      Login untuk Mengajukan Klaim
+                    </Link>
+                  ) : claimSubmitted ? (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-center text-xs font-bold text-amber-800">
+                      Pengajuan klaim properti sedang diproses oleh Staff.
+                    </div>
+                  ) : (
+                    <form onSubmit={handleSubmitClaim} className="space-y-3.5">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          Nomor WhatsApp Aktif
+                        </label>
+                        <input
+                          required
+                          value={claimPhone}
+                          onChange={(e) => setClaimPhone(e.target.value)}
+                          placeholder="08xxxxxxxxxx"
+                          className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">
+                          Catatan Tambahan (Opsional)
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={claimNotes}
+                          onChange={(e) => setClaimNotes(e.target.value)}
+                          placeholder="Contoh: Saya pemilik langsung kost ini"
+                          className="w-full rounded-xl border border-gray-200 px-3.5 py-2 text-sm"
+                        />
+                      </div>
+                      {claimFeedback && (
+                        <div
+                          className={`rounded-xl p-3 text-xs font-semibold ${
+                            claimFeedback.type === "success"
+                              ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                              : "bg-red-50 text-red-700 border border-red-200"
+                          }`}
+                        >
+                          {claimFeedback.text}
+                        </div>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={claiming}
+                        className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-extrabold text-white hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        {claiming ? "Mengirim..." : "Kirim Pengajuan Klaim"}
+                      </button>
+                    </form>
+                  )}
+
+                  <div className="relative flex items-center py-1">
+                    <div className="flex-grow border-t border-gray-200" />
+                    <span className="mx-2.5 shrink-0 text-[11px] font-semibold text-gray-400">
+                      atau via WhatsApp
+                    </span>
+                    <div className="flex-grow border-t border-gray-200" />
+                  </div>
+
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-900 leading-relaxed">
+                    <strong>Metode WhatsApp Staff:</strong> Hubungi WhatsApp Staff menggunakan <strong>nomor WhatsApp yang sama</strong> dengan nomor yang tertera pada properti ini untuk verifikasi klaim.
+                  </div>
+                  <a
+                    href={claimWaHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-600 bg-white py-2.5 text-xs font-extrabold text-emerald-700 hover:bg-emerald-50 transition"
+                  >
+                    <Phone className="h-4 w-4" />
+                    Hubungi WA Staff untuk Klaim
+                  </a>
+                </div>
+              ) : (
+                <div className="mt-4 space-y-3.5">
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    Ajukan penghapusan listing properti ini dari Keyloka jika Anda pemilik sah dan tidak ingin properti ini ditayangkan.
+                  </p>
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900 leading-relaxed">
+                    <strong>Syarat Penghapusan:</strong> Anda wajib menghubungi WhatsApp Staff menggunakan <strong>nomor WhatsApp yang sama</strong> dengan nomor yang tertera pada properti ini untuk verifikasi kepemilikan.
+                  </div>
+                  <a
+                    href={deleteWaHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 py-3 text-sm font-extrabold text-white hover:bg-red-700 transition"
+                  >
+                    <Phone className="h-4 w-4" />
+                    Hubungi WA Staff untuk Hapus Properti
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Lightbox Fullscreen Image Viewer */}
       {lightboxOpen && photos[activePhoto] && (
