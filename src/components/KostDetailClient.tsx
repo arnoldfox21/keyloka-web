@@ -1201,8 +1201,9 @@ export function KostDetailClient({
             ? `https://wa.me/${staffWaDigits}?text=${encoded}`
             : `https://wa.me/?text=${encoded}`;
         };
+        const claimEmailText = currentUser?.email || "[isi email akun Keyloka Anda]";
         const claimWaHref = buildStaffWaHref(
-          `Halo Staff Keyloka, saya pemilik properti "${kost.name}" (ID #${kost.id}) ingin mengajukan klaim properti${currentUser?.email ? ` ke akun ${currentUser.email}` : ""}.\n\n${kostUrl}`,
+          `Halo Staff Keyloka, saya pemilik properti "${kost.name}" (ID #${kost.id}) ingin mengajukan klaim properti.\nEmail Akun: ${claimEmailText}\n\n${kostUrl}`,
         );
         const deleteWaHref = buildStaffWaHref(
           `Halo Staff Keyloka, saya pemilik properti "${kost.name}" (ID #${kost.id}) ingin mengajukan penghapusan listing properti ini.\n\n${kostUrl}`,
@@ -1210,7 +1211,7 @@ export function KostDetailClient({
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
+            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-black text-gray-900">
                   Opsi Pemilik Properti
@@ -1254,95 +1255,119 @@ export function KostDetailClient({
 
               {propertyActionTab === "CLAIM" ? (
                 <div className="mt-4 space-y-3">
-                  <p className="text-xs text-gray-600 leading-relaxed">
-                    Ambil alih pengelolaan listing properti ini ke akun Keyloka Anda. Staff akan menghubungi nomor WhatsApp Anda untuk verifikasi kepemilikan.
-                  </p>
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 space-y-1.5 leading-relaxed">
+                    <p className="font-bold text-gray-900">Panduan Ajukan Klaim Properti:</p>
+                    <ol className="list-decimal pl-4 space-y-1">
+                      <li>Pastikan Anda sudah memiliki &amp; login ke akun Keyloka tujuan.</li>
+                      <li>
+                        <strong>Via Form:</strong> Isi nomor WhatsApp aktif Anda lalu kirim pengajuan. Staff akan menghubungi Anda untuk verifikasi kepemilikan.
+                      </li>
+                      <li>
+                        <strong>Via WhatsApp Staff:</strong> Hubungi WA Staff menggunakan <strong>nomor WhatsApp yang sama</strong> dengan nomor pada properti ini serta cantumkan email akun Keyloka Anda.
+                      </li>
+                      <li>Setelah disetujui, pengelolaan listing properti otomatis berpindah ke akun Anda.</li>
+                    </ol>
+                  </div>
                   {!currentUser ? (
-                    <Link
-                      href="/login"
-                      className="block w-full rounded-xl bg-emerald-600 py-3 text-center text-sm font-extrabold text-white hover:bg-emerald-700 transition"
-                    >
-                      Login untuk Mengajukan Klaim
-                    </Link>
-                  ) : claimSubmitted ? (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-center text-xs font-bold text-amber-800">
-                      Pengajuan klaim properti sedang diproses oleh Staff.
+                    <div className="space-y-3">
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900 leading-relaxed">
+                        Anda harus <strong>login terlebih dahulu</strong> untuk mengajukan klaim properti (baik melalui form maupun WhatsApp Staff).
+                      </div>
+                      <Link
+                        href="/login"
+                        className="block w-full rounded-xl bg-emerald-600 py-3 text-center text-sm font-extrabold text-white hover:bg-emerald-700 transition"
+                      >
+                        Login untuk Mengajukan Klaim
+                      </Link>
                     </div>
                   ) : (
-                    <form onSubmit={handleSubmitClaim} className="space-y-3.5">
-                      <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-1">
-                          Nomor WhatsApp Aktif
-                        </label>
-                        <input
-                          required
-                          value={claimPhone}
-                          onChange={(e) => setClaimPhone(e.target.value)}
-                          placeholder="08xxxxxxxxxx"
-                          className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-1">
-                          Catatan Tambahan (Opsional)
-                        </label>
-                        <textarea
-                          rows={2}
-                          value={claimNotes}
-                          onChange={(e) => setClaimNotes(e.target.value)}
-                          placeholder="Contoh: Saya pemilik langsung kost ini"
-                          className="w-full rounded-xl border border-gray-200 px-3.5 py-2 text-sm"
-                        />
-                      </div>
-                      {claimFeedback && (
-                        <div
-                          className={`rounded-xl p-3 text-xs font-semibold ${
-                            claimFeedback.type === "success"
-                              ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                              : "bg-red-50 text-red-700 border border-red-200"
-                          }`}
-                        >
-                          {claimFeedback.text}
+                    <>
+                      {claimSubmitted ? (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-center text-xs font-bold text-amber-800">
+                          Pengajuan klaim properti sedang diproses oleh Staff.
                         </div>
+                      ) : (
+                        <form onSubmit={handleSubmitClaim} className="space-y-3.5">
+                          <div>
+                            <label className="block text-xs font-bold text-gray-700 mb-1">
+                              Nomor WhatsApp Aktif
+                            </label>
+                            <input
+                              required
+                              value={claimPhone}
+                              onChange={(e) => setClaimPhone(e.target.value)}
+                              placeholder="08xxxxxxxxxx"
+                              className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-gray-700 mb-1">
+                              Catatan Tambahan (Opsional)
+                            </label>
+                            <textarea
+                              rows={2}
+                              value={claimNotes}
+                              onChange={(e) => setClaimNotes(e.target.value)}
+                              placeholder="Contoh: Saya pemilik langsung kost ini"
+                              className="w-full rounded-xl border border-gray-200 px-3.5 py-2 text-sm"
+                            />
+                          </div>
+                          {claimFeedback && (
+                            <div
+                              className={`rounded-xl p-3 text-xs font-semibold ${
+                                claimFeedback.type === "success"
+                                  ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                                  : "bg-red-50 text-red-700 border border-red-200"
+                              }`}
+                            >
+                              {claimFeedback.text}
+                            </div>
+                          )}
+                          <button
+                            type="submit"
+                            disabled={claiming}
+                            className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-extrabold text-white hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            {claiming ? "Mengirim..." : "Kirim Pengajuan Klaim"}
+                          </button>
+                        </form>
                       )}
-                      <button
-                        type="submit"
-                        disabled={claiming}
-                        className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-extrabold text-white hover:bg-emerald-700 disabled:opacity-50"
+
+                      <div className="relative flex items-center py-1">
+                        <div className="flex-grow border-t border-gray-200" />
+                        <span className="mx-2.5 shrink-0 text-[11px] font-semibold text-gray-400">
+                          atau via WhatsApp
+                        </span>
+                        <div className="flex-grow border-t border-gray-200" />
+                      </div>
+
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-900 leading-relaxed">
+                        <strong>Metode WhatsApp Staff:</strong> Gunakan <strong>nomor WhatsApp yang sama</strong> dengan nomor yang tertera pada properti ini. Template pesan otomatis menyertakan email akun Anda (<strong>{claimEmailText}</strong>).
+                      </div>
+                      <a
+                        href={claimWaHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-600 bg-white py-2.5 text-xs font-extrabold text-emerald-700 hover:bg-emerald-50 transition"
                       >
-                        {claiming ? "Mengirim..." : "Kirim Pengajuan Klaim"}
-                      </button>
-                    </form>
+                        <Phone className="h-4 w-4" />
+                        Hubungi WA Staff untuk Klaim
+                      </a>
+                    </>
                   )}
-
-                  <div className="relative flex items-center py-1">
-                    <div className="flex-grow border-t border-gray-200" />
-                    <span className="mx-2.5 shrink-0 text-[11px] font-semibold text-gray-400">
-                      atau via WhatsApp
-                    </span>
-                    <div className="flex-grow border-t border-gray-200" />
-                  </div>
-
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-900 leading-relaxed">
-                    <strong>Metode WhatsApp Staff:</strong> Hubungi WhatsApp Staff menggunakan <strong>nomor WhatsApp yang sama</strong> dengan nomor yang tertera pada properti ini untuk verifikasi klaim.
-                  </div>
-                  <a
-                    href={claimWaHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-600 bg-white py-2.5 text-xs font-extrabold text-emerald-700 hover:bg-emerald-50 transition"
-                  >
-                    <Phone className="h-4 w-4" />
-                    Hubungi WA Staff untuk Klaim
-                  </a>
                 </div>
               ) : (
                 <div className="mt-4 space-y-3.5">
-                  <p className="text-xs text-gray-600 leading-relaxed">
-                    Ajukan penghapusan listing properti ini dari Keyloka jika Anda pemilik sah dan tidak ingin properti ini ditayangkan.
-                  </p>
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 space-y-1.5 leading-relaxed">
+                    <p className="font-bold text-gray-900">Panduan Ajukan Hapus Properti:</p>
+                    <ol className="list-decimal pl-4 space-y-1">
+                      <li>Klik tombol <strong>Hubungi WA Staff untuk Hapus Properti</strong> di bawah.</li>
+                      <li>Kirim pesan dari <strong>nomor WhatsApp yang sama</strong> dengan nomor yang tertera pada properti ini.</li>
+                      <li>Staff akan memverifikasi kecocokan nomor sebelum menghapus listing properti dari Keyloka.</li>
+                    </ol>
+                  </div>
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900 leading-relaxed">
-                    <strong>Syarat Penghapusan:</strong> Anda wajib menghubungi WhatsApp Staff menggunakan <strong>nomor WhatsApp yang sama</strong> dengan nomor yang tertera pada properti ini untuk verifikasi kepemilikan.
+                    <strong>Syarat Wajib:</strong> Permintaan hapus hanya diproses jika dikirim melalui <strong>nomor WhatsApp yang sama</strong> dengan nomor pada properti ini.
                   </div>
                   <a
                     href={deleteWaHref}
