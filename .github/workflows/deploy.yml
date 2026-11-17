@@ -74,7 +74,20 @@ jobs:
           envs: GITHUB_TOKEN,GITHUB_ACTOR,IMAGE_NAME,GITHUB_REF_NAME
           script: |
             set -e
-            cd "${{ secrets.VPS_APP_DIR }}"
+            RAW_DIR="${{ secrets.VPS_APP_DIR }}"
+            if [ -z "$RAW_DIR" ]; then
+              echo "Error: VPS_APP_DIR secret is empty"
+              exit 1
+            fi
+            APP_DIR="${RAW_DIR/#\~/$HOME}"
+            if [ ! -d "$APP_DIR/.git" ]; then
+              mkdir -p "$(dirname "$APP_DIR")"
+              git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" "$APP_DIR"
+            fi
+            cd "$APP_DIR"
+            if [ ! -f ".env" ] && [ -f ".env.example" ]; then
+              cp .env.example .env
+            fi
             git fetch origin --tags
             if git show-ref --verify --quiet "refs/tags/${GITHUB_REF_NAME}"; then
               git checkout -f "tags/${GITHUB_REF_NAME}"
