@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { BadgeCheck, Heart, MapPin, ShieldCheck, Star, Zap } from "lucide-react";
-import { formatRupiah, getDisplayPrice, resolveImageUrl, type Kost } from "@/lib/types";
+import { formatCategoryLabel, formatRupiah, getDisplayPrice, resolveImageUrl, type Kost } from "@/lib/types";
 
 interface KostCardProps {
   kost: Kost;
@@ -86,7 +86,7 @@ export function KostCard({ kost, isFavorite, onToggleFavorite }: KostCardProps) 
       <div className="flex flex-1 flex-col p-4">
         <div className="flex items-center justify-between gap-2 text-xs text-gray-500">
           <span className="inline-flex items-center gap-1 truncate font-bold text-emerald-700">
-            {kost.propertyCategory}
+            {formatCategoryLabel(kost.propertyCategory)}
             {kost.isVerified && (
               <BadgeCheck
                 className="h-3.5 w-3.5 shrink-0 text-emerald-600"

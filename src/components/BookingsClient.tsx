@@ -16,6 +16,9 @@ import {
   Users,
 } from "lucide-react";
 import {
+  formatBookingStatusLabel,
+  formatEscrowStatusLabel,
+  formatPaymentStatusLabel,
   formatRupiah,
   type Booking,
   type LoyaltySummary,
@@ -246,12 +249,12 @@ export function BookingsClient({
               className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-bold text-gray-700"
             >
               <option value="SEMUA">Semua Status</option>
-              <option value="TERKIRIM">TERKIRIM</option>
-              <option value="MENUNGGU KONFIRMASI">MENUNGGU KONFIRMASI</option>
-              <option value="DISETUJUI">DISETUJUI</option>
-              <option value="SELESAI">SELESAI</option>
-              <option value="DITOLAK">DITOLAK</option>
-              <option value="DIBATALKAN">DIBATALKAN</option>
+              <option value="TERKIRIM">Terkirim</option>
+              <option value="MENUNGGU KONFIRMASI">Menunggu Konfirmasi</option>
+              <option value="DISETUJUI">Disetujui</option>
+              <option value="SELESAI">Selesai</option>
+              <option value="DITOLAK">Ditolak</option>
+              <option value="DIBATALKAN">Dibatalkan</option>
             </select>
             {(search.trim() || statusFilter !== "SEMUA") && (
               <button
@@ -335,12 +338,12 @@ export function BookingsClient({
                           {isDirect ? "BOOKING LANGSUNG" : "SURVEI"}
                         </span>
                         <span className="rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-700">
-                          {b.status}
+                          {formatBookingStatusLabel(b.status)}
                         </span>
                         {isDirect && b.escrowStatus !== "NONE" && (
                           <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-800">
                             <ShieldCheck className="h-3 w-3" />
-                            Escrow: {b.escrowStatus}
+                            Escrow: {formatEscrowStatusLabel(b.escrowStatus)}
                           </span>
                         )}
                       </div>
@@ -377,7 +380,7 @@ export function BookingsClient({
                           </p>
                         )}
                         <p className="text-[11px] font-semibold text-gray-500">
-                          Pembayaran: {b.paymentStatus}
+                          Pembayaran: {formatPaymentStatusLabel(b.paymentStatus)}
                         </p>
                       </div>
                     )}

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { MapPin, Star, X } from "lucide-react";
-import { formatRupiah, resolveImageUrl } from "@/lib/types";
+import { formatCategoryLabel, formatRupiah, resolveImageUrl } from "@/lib/types";
 import type { MapPoint } from "@/lib/types";
 
 interface KostMapSearchViewProps {
@@ -161,7 +161,7 @@ export function KostMapSearchView({ points, loading }: KostMapSearchViewProps) {
             </div>
             <div className="min-w-0 flex-1 pr-5">
               <p className="text-[11px] font-bold uppercase text-emerald-700">
-                {selected.propertyCategory} • {selected.type}
+                {formatCategoryLabel(selected.propertyCategory)} • {selected.type}
               </p>
               <Link
                 href={`/kost/${selected.id}`}

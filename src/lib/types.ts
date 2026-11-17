@@ -303,6 +303,93 @@ export function formatRupiah(value: number): string {
   }).format(value || 0);
 }
 
+const ROLE_LABELS: Record<string, string> = {
+  PENYEWA: "Penyewa",
+  PEMILIK_KOST: "Pemilik Kost",
+  STAFF: "Staff",
+  ADMINISTRATOR: "Administrator",
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  KOST: "Kost",
+  APARTEMEN: "Apartemen",
+  KONTRAKAN: "Kontrakan",
+  HUNIAN_HARIAN: "Hunian Harian",
+};
+
+const APPROVAL_STATUS_LABELS: Record<string, string> = {
+  APPROVED: "Disetujui",
+  PENDING: "Menunggu Review",
+  REJECTED: "Ditolak",
+};
+
+const BOOKING_TYPE_LABELS: Record<string, string> = {
+  SEWA: "Booking Langsung",
+  SURVEI: "Survei",
+};
+
+const BOOKING_STATUS_LABELS: Record<string, string> = {
+  TERKIRIM: "Terkirim",
+  "MENUNGGU KONFIRMASI": "Menunggu Konfirmasi",
+  DISETUJUI: "Disetujui",
+  SELESAI: "Selesai",
+  DITOLAK: "Ditolak",
+  DIBATALKAN: "Dibatalkan",
+};
+
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  UNPAID: "Belum Dibayar",
+  PAID: "Lunas",
+  EXPIRED: "Kedaluwarsa",
+  REFUNDED: "Dikembalikan",
+};
+
+const ESCROW_STATUS_LABELS: Record<string, string> = {
+  NONE: "Tidak Ada",
+  HELD: "Dana Ditahan",
+  RELEASED: "Dana Diteruskan",
+  DISPUTED: "Dalam Sengketa",
+  REFUNDED: "Dikembalikan",
+};
+
+function formatEnumLabel(
+  value: string | null | undefined,
+  labels: Record<string, string>,
+  fallback = "-",
+): string {
+  const raw = (value || "").trim();
+  if (!raw) return fallback;
+  return labels[raw.toUpperCase()] ?? raw;
+}
+
+export function formatRoleLabel(role?: string | null): string {
+  return formatEnumLabel(role, ROLE_LABELS);
+}
+
+export function formatCategoryLabel(category?: string | null): string {
+  return formatEnumLabel(category, CATEGORY_LABELS, "Kost");
+}
+
+export function formatApprovalStatusLabel(status?: string | null): string {
+  return formatEnumLabel(status, APPROVAL_STATUS_LABELS);
+}
+
+export function formatBookingTypeLabel(bookingType?: string | null): string {
+  return formatEnumLabel(bookingType, BOOKING_TYPE_LABELS, "Survei");
+}
+
+export function formatBookingStatusLabel(status?: string | null): string {
+  return formatEnumLabel(status, BOOKING_STATUS_LABELS);
+}
+
+export function formatPaymentStatusLabel(status?: string | null): string {
+  return formatEnumLabel(status, PAYMENT_STATUS_LABELS);
+}
+
+export function formatEscrowStatusLabel(status?: string | null): string {
+  return formatEnumLabel(status, ESCROW_STATUS_LABELS);
+}
+
 export function resolveImageUrl(pathOrUrl?: string | null): string {
   if (!pathOrUrl) return "";
   if (pathOrUrl.startsWith("data:")) {

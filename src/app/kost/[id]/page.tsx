@@ -5,7 +5,7 @@ import { JsonLd } from "@/components/JsonLd";
 import { KostDetailClient } from "@/components/KostDetailClient";
 import { getSiteUrl, toAbsoluteImageUrl, truncateDescription } from "@/lib/seo";
 import { API_BASE_URL, getServerToken, serverFetch } from "@/lib/server-api";
-import { formatRupiah, getDisplayPrice, type Kost, type ReviewItem, type UserProfile } from "@/lib/types";
+import { formatCategoryLabel, formatRupiah, getDisplayPrice, type Kost, type ReviewItem, type UserProfile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -37,10 +37,11 @@ export async function generateMetadata({
     };
   }
 
+  const categoryLabel = formatCategoryLabel(kost.propertyCategory);
   const price = getDisplayPrice(kost);
   const title = `${kost.name} (${formatRupiah(price.amount)}${price.unit})`;
   const description = truncateDescription(
-    `${kost.propertyCategory} ${kost.type} di ${kost.district}, ${kost.city}. ${kost.description || ""}`,
+    `${categoryLabel} ${kost.type} di ${kost.district}, ${kost.city}. ${kost.description || ""}`,
   );
   const images = (kost.images || [])
     .map((img) => toAbsoluteImageUrl(img))
@@ -52,9 +53,9 @@ export async function generateMetadata({
     description,
     keywords: [
       kost.name,
-      `${kost.propertyCategory} ${kost.city}`,
-      `${kost.propertyCategory} ${kost.district}`,
-      `${kost.propertyCategory} ${kost.type}`,
+      `${categoryLabel} ${kost.city}`,
+      `${categoryLabel} ${kost.district}`,
+      `${categoryLabel} ${kost.type}`,
       "sewa kost",
       "Keyloka",
     ],

@@ -26,6 +26,11 @@ import {
   Zap,
 } from "lucide-react";
 import {
+  formatApprovalStatusLabel,
+  formatBookingStatusLabel,
+  formatBookingTypeLabel,
+  formatCategoryLabel,
+  formatEscrowStatusLabel,
   formatRupiah,
   getDisplayPrice,
   type BoostPackageOption,
@@ -1181,9 +1186,9 @@ export function DashboardClient({
                   className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-bold text-gray-700"
                 >
                   <option value="SEMUA">Semua Status Approval</option>
-                  <option value="APPROVED">APPROVED</option>
-                  <option value="PENDING">PENDING</option>
-                  <option value="REJECTED">REJECTED</option>
+                  <option value="APPROVED">Disetujui</option>
+                  <option value="PENDING">Menunggu Review</option>
+                  <option value="REJECTED">Ditolak</option>
                 </select>
 
                 <select
@@ -1278,10 +1283,10 @@ export function DashboardClient({
                                     : "bg-amber-50 text-amber-800"
                               }`}
                             >
-                              {approval}
+                              {formatApprovalStatusLabel(approval)}
                             </span>
                             <span className="text-xs font-semibold text-gray-500">
-                              {k.propertyCategory}
+                              {formatCategoryLabel(k.propertyCategory)}
                             </span>
                           </div>
                           <Link
@@ -1450,12 +1455,12 @@ export function DashboardClient({
                   className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-bold text-gray-700"
                 >
                   <option value="SEMUA">Semua Status</option>
-                  <option value="TERKIRIM">TERKIRIM</option>
-                  <option value="MENUNGGU KONFIRMASI">MENUNGGU KONFIRMASI</option>
-                  <option value="DISETUJUI">DISETUJUI</option>
-                  <option value="DITOLAK">DITOLAK</option>
-                  <option value="DIBATALKAN">DIBATALKAN</option>
-                  <option value="SELESAI">SELESAI</option>
+                  <option value="TERKIRIM">Terkirim</option>
+                  <option value="MENUNGGU KONFIRMASI">Menunggu Konfirmasi</option>
+                  <option value="DISETUJUI">Disetujui</option>
+                  <option value="DITOLAK">Ditolak</option>
+                  <option value="DIBATALKAN">Dibatalkan</option>
+                  <option value="SELESAI">Selesai</option>
                 </select>
                 <select
                   value={bookingTypeFilter}
@@ -1463,8 +1468,8 @@ export function DashboardClient({
                   className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-bold text-gray-700"
                 >
                   <option value="SEMUA">Semua Tipe</option>
-                  <option value="SURVEI">SURVEI</option>
-                  <option value="SEWA">BOOKING LANGSUNG (SEWA)</option>
+                  <option value="SURVEI">Survei</option>
+                  <option value="SEWA">Booking Langsung</option>
                 </select>
               </div>
 
@@ -1533,14 +1538,14 @@ export function DashboardClient({
                   <div>
                     <div className="flex flex-wrap gap-2">
                       <span className="rounded-lg bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700">
-                        {b.bookingType || "SURVEI"}
+                        {formatBookingTypeLabel(b.bookingType)}
                       </span>
                       <span className="rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-800">
-                        {b.status}
+                        {formatBookingStatusLabel(b.status)}
                       </span>
                       {b.escrowStatus && b.escrowStatus !== "NONE" && (
                         <span className="rounded-lg bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-800">
-                          Escrow: {b.escrowStatus}
+                          Escrow: {formatEscrowStatusLabel(b.escrowStatus)}
                         </span>
                       )}
                     </div>
@@ -1843,7 +1848,7 @@ export function DashboardClient({
                               : "bg-amber-100 text-amber-800"
                         }`}
                       >
-                        {p.status}
+                        {formatApprovalStatusLabel(p.status)}
                       </span>
                     </div>
                     <p className="mt-1 text-xs text-gray-600">
@@ -2076,9 +2081,9 @@ export function DashboardClient({
                 className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-bold text-gray-700"
               >
                 <option value="SEMUA">Semua Status</option>
-                <option value="PENDING">PENDING</option>
-                <option value="APPROVED">APPROVED</option>
-                <option value="REJECTED">REJECTED</option>
+                <option value="PENDING">Menunggu Review</option>
+                <option value="APPROVED">Disetujui</option>
+                <option value="REJECTED">Ditolak</option>
               </select>
               {(q.length > 0 || withdrawStatusFilter !== "SEMUA") && (
                 <button
@@ -2120,7 +2125,7 @@ export function DashboardClient({
                               : "bg-amber-100 text-amber-800"
                         }`}
                       >
-                        {p.status}
+                        {formatApprovalStatusLabel(p.status)}
                       </span>
                     </div>
                     <p className="mt-1 text-lg font-black text-emerald-700">
@@ -2282,10 +2287,10 @@ export function DashboardClient({
                         onChange={(e) => handleChangeUserRole(u, e.target.value)}
                         className="rounded-xl border border-gray-200 px-2.5 py-1.5 text-xs font-bold text-gray-700"
                       >
-                        <option value="PENYEWA">PENYEWA</option>
-                        <option value="PEMILIK_KOST">PEMILIK_KOST</option>
-                        <option value="STAFF">STAFF</option>
-                        <option value="ADMINISTRATOR">ADMINISTRATOR</option>
+                        <option value="PENYEWA">Penyewa</option>
+                        <option value="PEMILIK_KOST">Pemilik Kost</option>
+                        <option value="STAFF">Staff</option>
+                        <option value="ADMINISTRATOR">Administrator</option>
                       </select>
                     )}
 

@@ -20,7 +20,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { compressImageToDataUrl } from "@/lib/image-compress";
-import { formatRupiah, resolveImageUrl, type UserProfile } from "@/lib/types";
+import { formatRoleLabel, formatRupiah, resolveImageUrl, type UserProfile } from "@/lib/types";
 
 interface ProfileClientProps {
   initialUser: UserProfile;
@@ -336,7 +336,7 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
                 </p>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
                   <span className="inline-block rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
-                    {user.role}
+                    {formatRoleLabel(user.role)}
                   </span>
                   {isVerifiedAccount ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800">

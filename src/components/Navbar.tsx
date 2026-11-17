@@ -16,7 +16,7 @@ import {
   User,
   X,
 } from "lucide-react";
-import type { UserProfile } from "@/lib/types";
+import { formatRoleLabel, type UserProfile } from "@/lib/types";
 import { UserGuideModal } from "./UserGuideModal";
 
 interface NavbarProps {
@@ -157,7 +157,7 @@ export function Navbar({ user }: NavbarProps) {
                   <p className="text-xs font-bold text-gray-900 leading-tight max-w-[120px] truncate">
                     {user.name}
                   </p>
-                  <p className="text-[10px] text-gray-500">{user.role}</p>
+                  <p className="text-[10px] text-gray-500">{formatRoleLabel(user.role)}</p>
                 </div>
               </Link>
               <button

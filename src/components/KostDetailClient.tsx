@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import {
   calculateBookingBreakdown,
+  formatCategoryLabel,
   formatRupiah,
   getDisplayPrice,
   resolveImageUrl,
@@ -355,7 +356,7 @@ export function KostDetailClient({
           <div className="rounded-3xl border border-gray-200 bg-white p-6 space-y-5">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
-                {kost.propertyCategory} • {kost.type}
+                {formatCategoryLabel(kost.propertyCategory)} • {kost.type}
               </span>
               {kost.isVerified && (
                 <span className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
