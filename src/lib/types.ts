@@ -295,18 +295,29 @@ export function formatRupiah(value: number): string {
 
 export function resolveImageUrl(pathOrUrl?: string | null): string {
   if (!pathOrUrl) return "";
-  if (
-    pathOrUrl.startsWith("http://") ||
-    pathOrUrl.startsWith("https://") ||
-    pathOrUrl.startsWith("data:")
-  ) {
+  if (pathOrUrl.startsWith("data:")) {
     return pathOrUrl;
   }
   const apiBase = process.env.NEXT_PUBLIC_API_URL || "";
-  if (!apiBase) {
+  const hostBase = apiBase ? apiBase.replace(/\/api\/?$/, "") : "";
+
+  if (pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://")) {
+    if (hostBase) {
+      try {
+        const parsed = new URL(pathOrUrl);
+        if (parsed.pathname.startsWith("/uploads/")) {
+          return `${hostBase}${parsed.pathname}`;
+        }
+      } catch {
+        // ignore invalid URL
+      }
+    }
+    return pathOrUrl;
+  }
+
+  if (!hostBase) {
     return pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`;
   }
-  const hostBase = apiBase.replace(/\/api\/?$/, "");
   return pathOrUrl.startsWith("/") ? `${hostBase}${pathOrUrl}` : `${hostBase}/${pathOrUrl}`;
 }
 
