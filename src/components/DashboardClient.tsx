@@ -1484,9 +1484,26 @@ export function DashboardClient({
                     </p>
                   </div>
                   {b.totalAmount > 0 && (
-                    <p className="text-base font-black text-emerald-700">
-                      {formatRupiah(b.totalAmount)}
-                    </p>
+                    <div className="sm:text-right space-y-0.5">
+                      <p className="text-base font-black text-emerald-700">
+                        {formatRupiah(b.totalAmount)}
+                      </p>
+                      {b.platformFee > 0 && (
+                        <p className="text-[11px] text-gray-500">
+                          Potongan Platform: -{formatRupiah(b.platformFee)}
+                        </p>
+                      )}
+                      {b.ownerNetAmount > 0 && (
+                        <p className="text-[11px] font-bold text-gray-800">
+                          Bersih ke Saldo: {formatRupiah(b.ownerNetAmount)}
+                        </p>
+                      )}
+                      {b.paymentScheme === "DP" && (b.remainingAmount ?? 0) > 0 && (
+                        <p className="text-[11px] font-semibold text-amber-700">
+                          Skema DP • Sisa saat Check-In: {formatRupiah(b.remainingAmount!)}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
 
@@ -1646,7 +1663,7 @@ export function DashboardClient({
                 disabled={busy}
                 className="rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
               >
-                {busy ? "Memproses..." : "Top-Up via Midtrans"}
+                {busy ? "Memproses..." : "Top-Up Saldo"}
               </button>
             </div>
           </form>

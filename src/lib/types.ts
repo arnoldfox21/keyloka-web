@@ -112,6 +112,10 @@ export interface Booking {
   totalAmount: number;
   platformFee: number;
   ownerNetAmount: number;
+  serviceFee?: number;
+  paymentScheme?: "FULL" | "DP" | string;
+  paidAmount?: number;
+  remainingAmount?: number;
   paymentOrderId?: string | null;
   snapToken?: string | null;
   paymentUrl?: string | null;
@@ -338,4 +342,70 @@ export function getDisplayPrice(kost: Pick<Kost, "propertyCategory" | "pricePerD
     return { amount: Number(kost.pricePerYear), unit: "/tahun" };
   }
   return { amount: Number(kost.pricePerMonth || 0), unit: "/bulan" };
+}
+
+export interface BookingBreakdown {
+  baseTotal: number;
+  canUseDp: boolean;
+  effectiveScheme: "FULL" | "DP";
+  payableRent: number;
+  remainingRent: number;
+  depositAmount: number;
+  platformFee: number;
+  serviceFee: number;
+  maxUsablePoints: number;
+  appliedDiscount: number;
+  finalPayNow: number;
+}
+
+/**
+ * Menghitung rincian pembayaran booking dengan perlindungan fee payment gateway
+ * agar platform tidak mengalami kerugian pada transaksi kecil maupun penggunaan poin.
+ */
+export function calculateBookingBreakdown(params: {
+  priceAmount: number;
+  durationCount: number;
+  isDaily: boolean;
+  isYearly: boolean;
+  paymentScheme: "FULL" | "DP";
+  userPoints: number;
+  usePoints: boolean;
+  depositAmount?: number | null;
+}): BookingBreakdown {
+  const baseTotal = Math.max(0, params.priceAmount * params.durationCount);
+  const canUseDp = !params.isDaily && (params.durationCount > 1 || params.isYearly);
+  const effectiveScheme: "FULL" | "DP" =
+    canUseDp && params.paymentScheme === "DP" ? "DP" : "FULL";
+
+  const payableRent =
+    effectiveScheme === "DP" ? Math.round(baseTotal * 0.3) : baseTotal;
+  const remainingRent = Math.max(0, baseTotal - payableRent);
+
+  const platformFee = Math.round(payableRent * 0.05);
+  const maxPointDiscount = Math.floor(platformFee * 0.5);
+  const pointCapByPayable = Math.max(0, payableRent - 1000);
+  const maxUsablePoints = Math.min(
+    Math.max(0, params.userPoints),
+    Math.floor(Math.min(maxPointDiscount, pointCapByPayable) / 50),
+  );
+  const appliedDiscount = params.usePoints ? maxUsablePoints * 50 : 0;
+
+  const netRentPayNow = Math.max(1000, payableRent - appliedDiscount);
+  // Minimal Rp5.000 atau 2,5% untuk menutup fee VA/QRIS/E-Wallet tanpa menggerus margin platform
+  const serviceFee = Math.max(5000, Math.round(netRentPayNow * 0.025));
+  const finalPayNow = netRentPayNow + serviceFee;
+
+  return {
+    baseTotal,
+    canUseDp,
+    effectiveScheme,
+    payableRent,
+    remainingRent,
+    depositAmount: Math.max(0, Number(params.depositAmount || 0)),
+    platformFee,
+    serviceFee,
+    maxUsablePoints,
+    appliedDiscount,
+    finalPayNow,
+  };
 }

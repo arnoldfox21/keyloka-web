@@ -59,7 +59,7 @@ export function Footer({ user }: FooterProps) {
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-slate-300">
                 <Lock className="h-3.5 w-3.5 text-emerald-400" />
-                Midtrans Verified
+                Verified Payment
               </span>
             </div>
           </div>
@@ -181,11 +181,11 @@ export function Footer({ user }: FooterProps) {
                 Buka Panduan Pengguna
               </button>
               <a
-                href="mailto:support@keyloka.id"
+                href="mailto:admin@keyloka.com"
                 className="inline-flex items-center gap-2 text-xs text-slate-400 hover:text-emerald-400 transition"
               >
                 <Mail className="h-3.5 w-3.5 text-slate-500" />
-                support@keyloka.id
+                admin@keyloka.com
               </a>
             </div>
           </div>

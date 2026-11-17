@@ -32,7 +32,7 @@ const GUIDE_STEPS = [
     icon: ShieldCheck,
     title: "3. Pembayaran Aman dengan Escrow",
     description:
-      "Pembayaran melalui Midtrans ditahan aman di rekening bersama (Escrow) dan baru diteruskan ke pemilik setelah Anda konfirmasi Check-In.",
+      "Pembayaran ditahan aman di rekening bersama (Escrow) dan baru diteruskan ke pemilik setelah Anda konfirmasi Check-In.",
   },
   {
     icon: Sparkles,

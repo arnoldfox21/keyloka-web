@@ -360,10 +360,22 @@ export function BookingsClient({
 
                     {isDirect && (
                       <div className="sm:text-right">
-                        <p className="text-xs text-gray-500">Total Tagihan</p>
+                        <div className="flex sm:justify-end items-center gap-1.5">
+                          <p className="text-xs text-gray-500">Total Tagihan</p>
+                          {b.paymentScheme === "DP" && (
+                            <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">
+                              DP 30%
+                            </span>
+                          )}
+                        </div>
                         <p className="text-lg font-black text-emerald-700">
-                          {formatRupiah(b.totalAmount)}
+                          {formatRupiah(b.paidAmount && b.paidAmount > 0 ? b.paidAmount : b.totalAmount)}
                         </p>
+                        {(b.remainingAmount ?? 0) > 0 && (
+                          <p className="text-[11px] font-semibold text-amber-700">
+                            Sisa saat Check-In: {formatRupiah(b.remainingAmount!)}
+                          </p>
+                        )}
                         <p className="text-[11px] font-semibold text-gray-500">
                           Pembayaran: {b.paymentStatus}
                         </p>

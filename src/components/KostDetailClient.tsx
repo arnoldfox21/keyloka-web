@@ -10,6 +10,7 @@ import {
   ExternalLink,
   Flag,
   Heart,
+  Info,
   MapPin,
   Maximize2,
   MessageCircle,
@@ -24,6 +25,7 @@ import {
   X,
 } from "lucide-react";
 import {
+  calculateBookingBreakdown,
   formatRupiah,
   getDisplayPrice,
   resolveImageUrl,
@@ -94,7 +96,9 @@ export function KostDetailClient({
     new Date(Date.now() + 86400000).toISOString().slice(0, 10),
   );
   const [durationCount, setDurationCount] = useState(1);
+  const [paymentScheme, setPaymentScheme] = useState<"FULL" | "DP">("FULL");
   const [usePoints, setUsePoints] = useState(false);
+  const [showFeeInfo, setShowFeeInfo] = useState(false);
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{
@@ -110,13 +114,17 @@ export function KostDetailClient({
   const photos = (kost.images || []).map(resolveImageUrl).filter(Boolean);
   const maxDuration = isDaily ? 30 : isYearly ? 5 : 12;
 
-  const baseTotal = price.amount * durationCount;
-  const basePlatformFee = Math.round(baseTotal * 0.05);
-  const maxPointDiscount = Math.floor(basePlatformFee * 0.5);
-  const userPoints = currentUser?.pointsBalance ?? 0;
-  const maxUsablePoints = Math.min(userPoints, Math.floor(maxPointDiscount / 50));
-  const appliedDiscount = usePoints ? maxUsablePoints * 50 : 0;
-  const finalTotal = Math.max(1000, baseTotal - appliedDiscount);
+  const breakdown = calculateBookingBreakdown({
+    priceAmount: price.amount,
+    durationCount,
+    isDaily,
+    isYearly,
+    paymentScheme,
+    userPoints: currentUser?.pointsBalance ?? 0,
+    usePoints,
+    depositAmount: kost.depositAmount,
+  });
+  const { maxUsablePoints, appliedDiscount } = breakdown;
 
   function openModal(mode: "SURVEI" | "DIRECT") {
     if (!currentUser) {
@@ -189,6 +197,7 @@ export function KostDetailClient({
           tenantPhone,
           startDate,
           durationCount,
+          paymentScheme: breakdown.effectiveScheme,
           notes,
           usePoints,
         }),
@@ -215,7 +224,7 @@ export function KostDetailClient({
         window.open(booking.paymentUrl, "_blank", "noopener,noreferrer");
         setFeedback({
           type: "success",
-          text: "Halaman pembayaran Midtrans dibuka di tab baru. Setelah bayar, cek status di Booking & Poin.",
+          text: "Halaman pembayaran dibuka di tab baru. Setelah bayar, cek status di Booking & Poin.",
         });
         setTimeout(() => {
           setModalMode(null);
@@ -915,6 +924,48 @@ export function KostDetailClient({
                     />
                   </div>
 
+                  {breakdown.canUseDp && (
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-gray-700">
+                        Skema Pembayaran
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setPaymentScheme("FULL")}
+                          className={`rounded-xl border p-2.5 text-left transition ${
+                            breakdown.effectiveScheme === "FULL"
+                              ? "border-emerald-600 bg-emerald-50 ring-1 ring-emerald-600"
+                              : "border-gray-200 bg-white hover:bg-gray-50"
+                          }`}
+                        >
+                          <p className="text-xs font-extrabold text-gray-900">
+                            Bayar Penuh (100%)
+                          </p>
+                          <p className="mt-0.5 text-[11px] text-gray-500">
+                            Langsung lunas tanpa sisa tagihan
+                          </p>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPaymentScheme("DP")}
+                          className={`rounded-xl border p-2.5 text-left transition ${
+                            breakdown.effectiveScheme === "DP"
+                              ? "border-emerald-600 bg-emerald-50 ring-1 ring-emerald-600"
+                              : "border-gray-200 bg-white hover:bg-gray-50"
+                          }`}
+                        >
+                          <p className="text-xs font-extrabold text-gray-900">
+                            DP 30% (Booking Fee)
+                          </p>
+                          <p className="mt-0.5 text-[11px] text-gray-500">
+                            Kunci unit, lunasi sisa saat check-in
+                          </p>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {maxUsablePoints > 0 && (
                     <label className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs cursor-pointer">
                       <span className="flex items-center gap-2 font-bold text-amber-900">
@@ -931,23 +982,86 @@ export function KostDetailClient({
                     </label>
                   )}
 
-                  <div className="rounded-xl bg-gray-50 p-3 text-xs space-y-1">
+                  <div className="rounded-xl bg-gray-50 p-3.5 text-xs space-y-1.5 border border-gray-100">
                     <div className="flex justify-between text-gray-600">
-                      <span>Subtotal Sewa</span>
-                      <span>{formatRupiah(baseTotal)}</span>
+                      <span>Subtotal Sewa ({durationCount} {isDaily ? "Hari" : isYearly ? "Tahun" : "Bulan"})</span>
+                      <span className="font-semibold text-gray-800">{formatRupiah(breakdown.baseTotal)}</span>
                     </div>
+
+                    {breakdown.effectiveScheme === "DP" && (
+                      <>
+                        <div className="flex justify-between text-emerald-700 font-semibold">
+                          <span>Tagihan DP Sekarang (30%)</span>
+                          <span>{formatRupiah(breakdown.payableRent)}</span>
+                        </div>
+                        <div className="flex justify-between text-gray-500">
+                          <span>Sisa Pelunasan (saat Check-In)</span>
+                          <span>{formatRupiah(breakdown.remainingRent)}</span>
+                        </div>
+                      </>
+                    )}
+
                     {appliedDiscount > 0 && (
                       <div className="flex justify-between text-emerald-700 font-semibold">
-                        <span>Potongan Poin</span>
+                        <span>Potongan Poin Loyalti</span>
                         <span>-{formatRupiah(appliedDiscount)}</span>
                       </div>
                     )}
-                    <div className="flex justify-between border-t border-gray-200 pt-1.5 text-sm font-black text-gray-900">
-                      <span>Total Bayar</span>
+
+                    <div className="flex items-center justify-between text-gray-600">
+                      <button
+                        type="button"
+                        onClick={() => setShowFeeInfo((v) => !v)}
+                        className="inline-flex items-center gap-1 text-left hover:text-emerald-700 transition"
+                        title="Klik untuk penjelasan biaya layanan"
+                      >
+                        <span>Biaya Layanan & Transaksi</span>
+                        <Info className="h-3.5 w-3.5 text-gray-400" />
+                      </button>
+                      <span className="font-semibold text-gray-800">{formatRupiah(breakdown.serviceFee)}</span>
+                    </div>
+
+                    {showFeeInfo && (
+                      <p className="rounded-lg bg-white border border-gray-200 p-2 text-[11px] leading-relaxed text-gray-600">
+                        Biaya layanan (min. Rp5.000 atau 2,5%) digunakan untuk biaya pemrosesan pembayaran & perlindungan rekening bersama (Escrow). Biaya ini tidak terpotong oleh poin.
+                      </p>
+                    )}
+
+                    <div className="flex justify-between border-t border-gray-200 pt-2 text-sm font-black text-gray-900">
+                      <span>{breakdown.effectiveScheme === "DP" ? "Total Bayar DP" : "Total Bayar Sekarang"}</span>
                       <span className="text-emerald-700">
-                        {formatRupiah(finalTotal)}
+                        {formatRupiah(breakdown.finalPayNow)}
                       </span>
                     </div>
+                  </div>
+
+                  {/* Info Penting untuk Penyewa (Escrow, Deposit, Listrik) */}
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-[11px] leading-relaxed text-emerald-950 space-y-1.5">
+                    <p className="flex items-start gap-1.5 font-semibold">
+                      <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600 mt-0.5" />
+                      <span>
+                        <strong>Dilindungi Escrow:</strong> Dana Anda ditahan aman di rekening bersama dan baru diteruskan ke pemilik setelah Anda konfirmasi Check-In.
+                      </span>
+                    </p>
+                    {breakdown.depositAmount > 0 && (
+                      <p className="flex items-start gap-1.5">
+                        <Info className="h-3.5 w-3.5 shrink-0 text-amber-600 mt-0.5" />
+                        <span>
+                          <strong>Info Deposit Keamanan:</strong> Pemilik mensyaratkan deposit{" "}
+                          <span className="font-bold">{formatRupiah(breakdown.depositAmount)}</span>{" "}
+                          yang dibayar terpisah saat Check-In dan dikembalikan saat Check-Out jika tidak ada kerusakan.
+                        </span>
+                      </p>
+                    )}
+                    <p className="flex items-start gap-1.5 text-emerald-900">
+                      <Info className="h-3.5 w-3.5 shrink-0 text-emerald-600 mt-0.5" />
+                      <span>
+                        <strong>Listrik:</strong>{" "}
+                        {kost.electricityIncluded
+                          ? "Sudah termasuk dalam harga sewa."
+                          : "Belum termasuk harga sewa (dibayar terpisah sesuai pemakaian/token)."}
+                      </span>
+                    </p>
                   </div>
                 </>
               )}
@@ -984,7 +1098,7 @@ export function KostDetailClient({
                 {submitting
                   ? "Memproses..."
                   : modalMode === "DIRECT"
-                    ? "Lanjut Pembayaran Midtrans"
+                    ? "Lanjut Pembayaran"
                     : "Kirim Jadwal Survei"}
               </button>
             </form>
