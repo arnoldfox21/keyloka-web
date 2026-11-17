@@ -42,8 +42,8 @@ export function ChatClient({
   initialPeerId,
   initialGroupKostId,
 }: ChatClientProps) {
-  const [conversations] = useState<ChatMessage[]>(initialConversations);
-  const [groups] = useState<KostGroupRoom[]>(initialGroups);
+  const [conversations, setConversations] = useState<ChatMessage[]>(initialConversations);
+  const [groups, setGroups] = useState<KostGroupRoom[]>(initialGroups);
 
   const [activeDirect, setActiveDirect] = useState<{
     kostId: number;
@@ -70,6 +70,12 @@ export function ChatClient({
   const [sending, setSending] = useState(false);
   const [loadingRoom, setLoadingRoom] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
+  const [socketConnected, setSocketConnected] = useState(false);
+  const [candidateQuery, setCandidateQuery] = useState("");
+  const [candidates, setCandidates] = useState<
+    Array<{ id: number; name: string; email?: string }>
+  >([]);
+  const [searchingCandidates, setSearchingCandidates] = useState(false);
 
   const socketRef = useRef<Socket | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -83,11 +89,28 @@ export function ChatClient({
     });
     socketRef.current = socket;
 
+    socket.on("connect", () => setSocketConnected(true));
+    socket.on("disconnect", () => setSocketConnected(false));
+
     socket.on("newMessage", (msg: ChatMessage) => {
       setDirectMessages((prev) => {
         if (prev.some((m) => m.id === msg.id)) return prev;
         return [...prev, msg];
       });
+      setConversations((prev) =>
+        prev.map((c) => {
+          const peerId = c.senderId === currentUser.id ? c.receiverId : c.senderId;
+          const matches =
+            c.kostId === msg.kostId &&
+            (msg.senderId === peerId || msg.receiverId === peerId);
+          if (!matches) return c;
+          return {
+            ...c,
+            message: msg.message,
+            createdAt: msg.createdAt,
+          };
+        }),
+      );
     });
 
     socket.on("newGroupMessage", (msg: KostGroupDetail["messages"][number]) => {
@@ -96,13 +119,21 @@ export function ChatClient({
         if (prev.messages.some((m) => m.id === msg.id)) return prev;
         return { ...prev, messages: [...prev.messages, msg] };
       });
+      setGroups((prev) =>
+        prev.map((g) =>
+          g.kostId === msg.kostId
+            ? { ...g, lastMessage: msg.message, lastMessageAt: msg.createdAt }
+            : g,
+        ),
+      );
     });
 
     return () => {
       socket.disconnect();
       socketRef.current = null;
+      setSocketConnected(false);
     };
-  }, []);
+  }, [currentUser.id]);
 
   // Load 1-on-1 chat messages
   useEffect(() => {
@@ -176,6 +207,39 @@ export function ChatClient({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [directMessages.length, groupDetail?.messages?.length]);
 
+  // Polling fallback when Socket.IO is not connected
+  useEffect(() => {
+    if (socketConnected) return;
+    if (!activeDirect && !activeGroupKostId) return;
+
+    const timer = setInterval(async () => {
+      if (activeDirect) {
+        const params = new URLSearchParams({
+          kostId: String(activeDirect.kostId),
+          user1: String(currentUser.id),
+          user2: String(activeDirect.peerId),
+        });
+        const res = await fetch(`/api/proxy/chats?${params.toString()}`).catch(
+          () => null,
+        );
+        if (res?.ok) {
+          const data = await res.json();
+          setDirectMessages(Array.isArray(data) ? data : data?.data || []);
+        }
+      } else if (activeGroupKostId) {
+        const res = await fetch(
+          `/api/proxy/chats/groups/${activeGroupKostId}`,
+        ).catch(() => null);
+        if (res?.ok) {
+          const data: KostGroupDetail = await res.json();
+          setGroupDetail(data);
+        }
+      }
+    }, 6000);
+
+    return () => clearInterval(timer);
+  }, [socketConnected, activeDirect, activeGroupKostId, currentUser.id]);
+
   async function handleSend(textToSend?: string) {
     const content = (textToSend ?? input).trim();
     if (!content) return;
@@ -196,6 +260,16 @@ export function ChatClient({
         if (res.ok && data) {
           setDirectMessages((prev) =>
             prev.some((m) => m.id === data.id) ? prev : [...prev, data],
+          );
+          setConversations((prev) =>
+            prev.map((c) => {
+              const peerId =
+                c.senderId === currentUser.id ? c.receiverId : c.senderId;
+              return c.kostId === activeDirect.kostId &&
+                peerId === activeDirect.peerId
+                ? { ...c, message: content, createdAt: data.createdAt }
+                : c;
+            }),
           );
           if (!textToSend) setInput("");
         }
@@ -219,6 +293,13 @@ export function ChatClient({
                     : [...prev.messages, data],
                 }
               : prev,
+          );
+          setGroups((prev) =>
+            prev.map((g) =>
+              g.kostId === activeGroupKostId
+                ? { ...g, lastMessage: content, lastMessageAt: data.createdAt }
+                : g,
+            ),
           );
           if (!textToSend) setInput("");
         }
@@ -266,6 +347,64 @@ export function ChatClient({
     }
   }
 
+  async function handleSearchCandidates(query: string) {
+    if (!activeGroupKostId) return;
+    setCandidateQuery(query);
+    setSearchingCandidates(true);
+    try {
+      const params = new URLSearchParams({ adminId: String(currentUser.id) });
+      if (query.trim()) params.set("q", query.trim());
+      const res = await fetch(
+        `/api/proxy/chats/groups/${activeGroupKostId}/candidates?${params.toString()}`,
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setCandidates(Array.isArray(data) ? data : data?.data || []);
+      }
+    } finally {
+      setSearchingCandidates(false);
+    }
+  }
+
+  async function handleAddMemberToGroup(userId: number) {
+    if (!activeGroupKostId) return;
+    const res = await fetch(
+      `/api/proxy/chats/groups/${activeGroupKostId}/members`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      },
+    );
+    if (res.ok) {
+      const detailRes = await fetch(
+        `/api/proxy/chats/groups/${activeGroupKostId}`,
+      );
+      if (detailRes.ok) {
+        setGroupDetail(await detailRes.json());
+      }
+      setCandidates((prev) => prev.filter((c) => c.id !== userId));
+    }
+  }
+
+  function handleToggleAdminOnly() {
+    if (!activeGroupKostId || !groupDetail) return;
+    const nextAdminOnly = !groupDetail.settings?.adminOnly;
+    socketRef.current?.emit("updateGroupSettings", {
+      kostId: activeGroupKostId,
+      userId: currentUser.id,
+      adminOnly: nextAdminOnly,
+    });
+    setGroupDetail((prev) =>
+      prev
+        ? {
+            ...prev,
+            settings: { ...prev.settings, adminOnly: nextAdminOnly },
+          }
+        : prev,
+    );
+  }
+
   const isGroupOwner =
     groupDetail &&
     (groupDetail.ownerId === currentUser.id ||
@@ -300,6 +439,13 @@ export function ChatClient({
                       onClick={() => {
                         setActiveDirect(null);
                         setActiveGroupKostId(g.kostId);
+                        setGroups((prev) =>
+                          prev.map((item) =>
+                            item.kostId === g.kostId
+                              ? { ...item, unreadCount: 0 }
+                              : item,
+                          ),
+                        );
                       }}
                       className={`flex w-full items-center gap-3 rounded-2xl p-2.5 text-left transition ${
                         activeGroupKostId === g.kostId
@@ -318,6 +464,11 @@ export function ChatClient({
                           {g.lastMessage || "Buka obrolan grup"}
                         </p>
                       </div>
+                      {(g.unreadCount ?? 0) > 0 && (
+                        <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-extrabold text-white">
+                          {g.unreadCount}
+                        </span>
+                      )}
                     </button>
                   ))
                 )}
@@ -358,6 +509,18 @@ export function ChatClient({
                             peerId,
                             title: `${peerName} • ${c.kost?.name || `Properti #${c.kostId}`}`,
                           });
+                          setConversations((prev) =>
+                            prev.map((item) => {
+                              const itemPeerId =
+                                item.senderId === currentUser.id
+                                  ? item.receiverId
+                                  : item.senderId;
+                              return item.kostId === c.kostId &&
+                                itemPeerId === peerId
+                                ? { ...item, unreadCount: 0 }
+                                : item;
+                            }),
+                          );
                         }}
                         className={`flex w-full items-center gap-3 rounded-2xl p-2.5 text-left transition ${
                           isSelected
@@ -455,7 +618,60 @@ export function ChatClient({
 
               {/* Group Members Drawer */}
               {showMembers && groupDetail && (
-                <div className="border-b border-gray-200 bg-gray-50 px-5 py-3 max-h-40 overflow-y-auto space-y-1.5">
+                <div className="border-b border-gray-200 bg-gray-50 px-5 py-3 max-h-64 overflow-y-auto space-y-2.5">
+                  {isGroupOwner && (
+                    <div className="space-y-2 border-b border-gray-200 pb-2.5">
+                      <label className="flex items-center justify-between text-xs font-bold text-gray-800 cursor-pointer">
+                        <span>Mode Hanya Admin (kunci chat anggota)</span>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(groupDetail.settings?.adminOnly)}
+                          onChange={handleToggleAdminOnly}
+                          className="h-4 w-4 rounded text-emerald-600"
+                        />
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={candidateQuery}
+                          onChange={(e) => setCandidateQuery(e.target.value)}
+                          placeholder="Cari nama/email untuk tambah anggota..."
+                          className="flex-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSearchCandidates(candidateQuery)}
+                          disabled={searchingCandidates}
+                          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                          {searchingCandidates ? "..." : "Cari"}
+                        </button>
+                      </div>
+                      {candidates.length > 0 && (
+                        <div className="space-y-1 rounded-lg border border-emerald-200 bg-white p-2">
+                          {candidates.map((cand) => (
+                            <div
+                              key={cand.id}
+                              className="flex items-center justify-between text-xs"
+                            >
+                              <span className="truncate font-semibold text-gray-800">
+                                {cand.name}{" "}
+                                {cand.email ? `(${cand.email})` : ""}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleAddMemberToGroup(cand.id)}
+                                className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 font-bold text-emerald-700 hover:bg-emerald-100"
+                              >
+                                <UserPlus className="h-3 w-3" />
+                                Tambah
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {groupDetail.members.map((m) => (
                     <div
                       key={m.userId}

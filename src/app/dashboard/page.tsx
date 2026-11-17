@@ -8,10 +8,12 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ created?: string }>;
+  searchParams: Promise<{ created?: string; updated?: string; tab?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
   const initialCreated = resolvedSearchParams?.created === "1";
+  const initialUpdated = resolvedSearchParams?.updated === "1";
+  const initialTab = resolvedSearchParams?.tab?.toUpperCase();
 
   const token = await getServerToken();
   if (!token) {
@@ -42,9 +44,23 @@ export default async function DashboardPage({
           ? "/bookings?all=true&page=1&limit=30"
           : `/bookings?ownerId=${user.id}&page=1&limit=30`,
       ).catch(() => []),
-      serverFetch<{ creditBalance: number; payoutBalance: number }>("/wallet/me").catch(
-        () => ({ creditBalance: 0, payoutBalance: 0 }),
-      ),
+      serverFetch<{
+        creditBalance: number;
+        payoutBalance: number;
+        transactions?: Array<{
+          id: number;
+          amount: number;
+          type: string;
+          description: string;
+          status?: string;
+          referenceId?: string | null;
+          createdAt: string;
+        }>;
+      }>("/wallet/me").catch(() => ({
+        creditBalance: 0,
+        payoutBalance: 0,
+        transactions: [],
+      })),
       serverFetch<Array<{
         id: number;
         amount: number;
@@ -115,11 +131,14 @@ export default async function DashboardPage({
       initialBookingsHasMore={initialBookingsHasMore}
       initialCreditBalance={walletRes.creditBalance}
       initialPayoutBalance={walletRes.payoutBalance}
+      initialWalletTransactions={walletRes.transactions || []}
       initialMyPayouts={myPayoutsRes}
       initialPendingKosts={initialPendingKosts}
       initialAllPayouts={allPayoutsRes}
       initialReviewReports={reviewReportsRes}
       initialCreated={initialCreated}
+      initialUpdated={initialUpdated}
+      initialTab={initialTab}
     />
   );
 }

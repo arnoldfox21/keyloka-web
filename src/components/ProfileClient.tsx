@@ -69,18 +69,23 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
     setUploading(target);
     setMsg(null);
     try {
-      const dataUrl = await compressImageToDataUrl(file);
+      const { dataUrl, mimeType } = await compressImageToDataUrl(file);
       const res = await fetch("/api/proxy/kosts/upload-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: dataUrl }),
+        body: JSON.stringify({
+          base64: dataUrl,
+          filename: file.name,
+          mimeType,
+        }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data?.url) {
+      const uploadedUrl = data?.url || data?.path;
+      if (!res.ok || !uploadedUrl) {
         setMsg({ type: "err", text: data?.message || "Gagal mengunggah gambar." });
       } else {
-        if (target === "avatar") setAvatarUrl(data.url);
-        else setCoverUrl(data.url);
+        if (target === "avatar") setAvatarUrl(uploadedUrl);
+        else setCoverUrl(uploadedUrl);
         setMsg({ type: "ok", text: "Gambar berhasil diunggah. Klik Simpan Profil." });
       }
     } catch {

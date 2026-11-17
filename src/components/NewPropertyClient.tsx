@@ -488,7 +488,10 @@ export function NewPropertyClient({
       bedrooms: parsedBedrooms,
       bathrooms: parsedBathrooms,
       electricityIncluded: isDailyStay ? true : electricityIncluded,
-      allowDirectBooking: isAutoApproved,
+      allowDirectBooking:
+        isEditMode && initialKost
+          ? initialKost.allowDirectBooking
+          : isAutoApproved,
       roomFacilities,
       publicFacilities,
       rules,
@@ -543,7 +546,7 @@ export function NewPropertyClient({
             Kembali ke Dashboard
           </Link>
           <h1 className="mt-1 text-2xl sm:text-3xl font-black text-gray-900">
-            Tambah Properti Baru
+            {isEditMode ? "Edit Properti" : "Tambah Properti Baru"}
           </h1>
           <p className="mt-0.5 text-sm text-gray-500">
             Lengkapi informasi hunian agar mudah ditemukan oleh calon penyewa.
@@ -1335,15 +1338,6 @@ export function NewPropertyClient({
               />
             </div>
           </div>
-
-          <KostLocationPicker
-            latitude={latitude}
-            longitude={longitude}
-            onChange={(lat, lng) => {
-              setLatitude(lat);
-              setLongitude(lng);
-            }}
-          />
         </section>
 
         {/* Submit Bar */}
@@ -1360,7 +1354,11 @@ export function NewPropertyClient({
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-extrabold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
           >
             {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-            {submitting ? "Menyimpan Properti..." : "Simpan & Ajukan Properti"}
+            {submitting
+              ? "Menyimpan Properti..."
+              : isEditMode
+                ? "Simpan Perubahan"
+                : "Simpan & Ajukan Properti"}
           </button>
         </div>
       </form>

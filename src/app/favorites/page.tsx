@@ -11,13 +11,23 @@ export default async function FavoritesPage() {
     redirect("/login");
   }
 
-  let kosts: Kost[] = [];
+  const kosts: Kost[] = [];
   try {
-    const res = await serverFetch<Kost[] | { data: Kost[] }>("/kosts?limit=100");
-    const list = Array.isArray(res) ? res : res.data || [];
-    kosts = list.filter((k) => Boolean(k.isFavorite));
+    let page = 1;
+    while (page <= 10) {
+      const res = await serverFetch<
+        Kost[] | { data: Kost[]; hasMore?: boolean }
+      >(`/kosts?page=${page}&limit=100`);
+      const list = Array.isArray(res) ? res : res.data || [];
+      kosts.push(...list.filter((k) => Boolean(k.isFavorite)));
+      const hasMore = Array.isArray(res)
+        ? list.length >= 100
+        : Boolean(res.hasMore);
+      if (!hasMore || list.length === 0) break;
+      page += 1;
+    }
   } catch {
-    kosts = [];
+    // keep collected favorites if a later page fails
   }
 
   return <FavoritesClient initialKosts={kosts} />;

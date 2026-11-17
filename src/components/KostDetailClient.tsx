@@ -13,12 +13,14 @@ import {
   MapPin,
   Maximize2,
   MessageCircle,
+  Phone,
   Reply,
   Share2,
   ShieldCheck,
   Sparkles,
   Star,
   User,
+  Users,
   X,
 } from "lucide-react";
 import {
@@ -99,6 +101,7 @@ export function KostDetailClient({
     type: "error" | "success";
     text: string;
   } | null>(null);
+  const [reviewError, setReviewError] = useState<string | null>(null);
 
   const price = getDisplayPrice(kost);
   const cat = (kost.propertyCategory || "").toUpperCase();
@@ -492,6 +495,7 @@ export function KostDetailClient({
                 onSubmit={async (e) => {
                   e.preventDefault();
                   setSubmittingReview(true);
+                  setReviewError(null);
                   try {
                     const res = await fetch("/api/proxy/reviews", {
                       method: "POST",
@@ -509,13 +513,24 @@ export function KostDetailClient({
                       setReviews((prev) => [data, ...prev]);
                       setReviewComment("");
                       setShowReviewForm(false);
+                    } else {
+                      setReviewError(
+                        data?.message || "Gagal mengirim ulasan. Silakan coba lagi.",
+                      );
                     }
+                  } catch {
+                    setReviewError("Gagal mengirim ulasan. Periksa koneksi Anda.");
                   } finally {
                     setSubmittingReview(false);
                   }
                 }}
                 className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 space-y-3"
               >
+                {reviewError && (
+                  <p className="rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+                    {reviewError}
+                  </p>
+                )}
                 <div className="grid grid-cols-3 gap-3 text-xs">
                   <label className="font-bold text-gray-700">
                     Kebersihan (1-5)
@@ -741,6 +756,35 @@ export function KostDetailClient({
                   Tanya Pemilik (Chat)
                 </Link>
               )}
+              {kost.showOwnerWhatsapp && kost.ownerPhone && (() => {
+                const digits = kost.ownerPhone.replace(/\D/g, "");
+                const waNumber = digits.startsWith("0")
+                  ? `62${digits.slice(1)}`
+                  : digits;
+                const waText = encodeURIComponent(
+                  `Halo ${kost.ownerName}, saya tertarik dengan properti "${kost.name}" di Keyloka. Apakah masih tersedia?`,
+                );
+                return waNumber ? (
+                  <a
+                    href={`https://wa.me/${waNumber}?text=${waText}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 py-2.5 text-sm font-bold text-emerald-800 hover:bg-emerald-100 transition"
+                  >
+                    <Phone className="h-4 w-4 text-emerald-600" />
+                    Chat Pemilik via WhatsApp
+                  </a>
+                ) : null;
+              })()}
+              {currentUser && (
+                <Link
+                  href={`/chat?groupKostId=${kost.id}`}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 py-2.5 text-xs font-bold text-gray-700 hover:bg-gray-100 transition"
+                >
+                  <Users className="h-4 w-4 text-emerald-600" />
+                  Grup Penghuni Kost
+                </Link>
+              )}
               {currentUser?.id === kost.ownerId ? (
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-3.5 text-center text-xs font-bold text-gray-600">
                   Ini adalah properti milik Anda.
@@ -852,7 +896,7 @@ export function KostDetailClient({
                 <>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Durasi ({isDaily ? "Hari" : "Bulan"})
+                      Durasi ({isDaily ? "Hari" : isYearly ? "Tahun" : "Bulan"})
                     </label>
                     <input
                       type="number"

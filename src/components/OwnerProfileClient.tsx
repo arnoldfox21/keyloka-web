@@ -62,14 +62,19 @@ export function OwnerProfileClient({
   async function handleUploadPostImage(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const dataUrl = await compressImageToDataUrl(file);
+    const { dataUrl, mimeType } = await compressImageToDataUrl(file);
     const res = await fetch("/api/proxy/kosts/upload-image", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image: dataUrl }),
+      body: JSON.stringify({
+        base64: dataUrl,
+        filename: file.name,
+        mimeType,
+      }),
     });
     const data = await res.json().catch(() => ({}));
-    if (res.ok && data?.url) setImageUrl(data.url);
+    const uploadedUrl = data?.url || data?.path;
+    if (res.ok && uploadedUrl) setImageUrl(uploadedUrl);
   }
 
   async function handleCreatePost(e: React.FormEvent) {

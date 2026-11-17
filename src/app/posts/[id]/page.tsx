@@ -26,7 +26,12 @@ export default async function PostDetailPage({
 
   let post: OwnerPost | null = null;
   try {
-    const allPosts = await serverFetch<OwnerPost[] | { data: OwnerPost[] }>("/posts");
+    const endpoint = currentUser
+      ? `/posts?viewerId=${currentUser.id}`
+      : "/posts";
+    const allPosts = await serverFetch<OwnerPost[] | { data: OwnerPost[] }>(
+      endpoint,
+    );
     const list = Array.isArray(allPosts) ? allPosts : allPosts.data || [];
     post = list.find((p) => p.id === postId) ?? null;
   } catch {

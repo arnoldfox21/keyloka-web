@@ -32,6 +32,7 @@ import {
   type Booking,
   type Kost,
   type UserProfile,
+  type WalletTransaction,
 } from "@/lib/types";
 
 interface PayoutItem {
@@ -84,11 +85,14 @@ interface DashboardClientProps {
   initialBookingsHasMore: boolean;
   initialCreditBalance: number;
   initialPayoutBalance: number;
+  initialWalletTransactions?: WalletTransaction[];
   initialMyPayouts: PayoutItem[];
   initialPendingKosts: DashboardKostItem[];
   initialAllPayouts: PayoutItem[];
   initialReviewReports: ReviewReportItem[];
   initialCreated?: boolean;
+  initialUpdated?: boolean;
+  initialTab?: string;
 }
 
 type TabKey =
@@ -108,19 +112,32 @@ export function DashboardClient({
   initialBookingsHasMore,
   initialCreditBalance,
   initialPayoutBalance,
+  initialWalletTransactions = [],
   initialMyPayouts,
   initialPendingKosts,
   initialAllPayouts,
   initialReviewReports,
   initialCreated = false,
+  initialUpdated = false,
+  initialTab,
 }: DashboardClientProps) {
   const role = (currentUser.role || "").toUpperCase();
   const isStaffOrAdmin = role === "STAFF" || role === "ADMINISTRATOR";
   const isAdmin = role === "ADMINISTRATOR";
 
-  const [tab, setTab] = useState<TabKey>(
-    initialCreated ? "PROPERTIES" : isStaffOrAdmin ? "APPROVAL" : "PROPERTIES",
-  );
+  const validTabs: TabKey[] = isStaffOrAdmin
+    ? ["PROPERTIES", "BOOKINGS", "APPROVAL", "WITHDRAWALS", "USERS"]
+    : ["PROPERTIES", "BOOKINGS", "WALLET"];
+  const resolvedInitialTab: TabKey =
+    initialTab && validTabs.includes(initialTab as TabKey)
+      ? (initialTab as TabKey)
+      : initialCreated || initialUpdated
+        ? "PROPERTIES"
+        : isStaffOrAdmin
+          ? "APPROVAL"
+          : "PROPERTIES";
+
+  const [tab, setTab] = useState<TabKey>(resolvedInitialTab);
   const [myKosts, setMyKosts] = useState<DashboardKostItem[]>(initialMyKosts);
   const [kostsTotal, setKostsTotal] = useState(initialKostsTotal);
   const [kostsPage, setKostsPage] = useState(1);
@@ -181,7 +198,12 @@ export function DashboardClient({
             ? "Properti baru berhasil ditambahkan dan langsung berstatus APPROVED."
             : "Properti baru berhasil diajukan dan sedang menunggu persetujuan Staff/Admin.",
         }
-      : null,
+      : initialUpdated
+        ? {
+            type: "ok",
+            text: "Perubahan properti berhasil disimpan.",
+          }
+        : null,
   );
 
   function buildKostQueryString(
@@ -1258,25 +1280,25 @@ export function DashboardClient({
                               <Zap className="h-3.5 w-3.5" />
                             </button>
                             {isStaffOrAdmin && (
-                              <>
-                                <button
-                                  type="button"
-                                  disabled={busy}
-                                  onClick={() => handleTransferOwner(k)}
-                                  title="Pindahkan Pemilik"
-                                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-40"
-                                >
-                                  <UserCheck className="h-3.5 w-3.5" />
-                                </button>
-                                <button
-                                  disabled={busy}
-                                  onClick={() => handleDeleteKost(k)}
-                                  title="Hapus Properti"
-                                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-40"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </>
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => handleTransferOwner(k)}
+                                title="Pindahkan Pemilik"
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-40"
+                              >
+                                <UserCheck className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                            {(isStaffOrAdmin || k.ownerId === currentUser.id) && (
+                              <button
+                                disabled={busy}
+                                onClick={() => handleDeleteKost(k)}
+                                title="Hapus Properti"
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-40"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
                             )}
                           </div>
                         </div>
@@ -1374,7 +1396,7 @@ export function DashboardClient({
                 >
                   <option value="SEMUA">Semua Tipe</option>
                   <option value="SURVEI">SURVEI</option>
-                  <option value="DIRECT">DIRECT</option>
+                  <option value="SEWA">BOOKING LANGSUNG (SEWA)</option>
                 </select>
               </div>
 
@@ -1740,6 +1762,47 @@ export function DashboardClient({
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 space-y-3">
+            <h2 className="text-lg font-black text-gray-900">
+              Riwayat Transaksi Kredit ({initialWalletTransactions.length})
+            </h2>
+            {initialWalletTransactions.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                Belum ada riwayat transaksi kredit atau boost iklan.
+              </p>
+            ) : (
+              <div className="space-y-2.5">
+                {initialWalletTransactions.map((tx) => {
+                  const isPositive = tx.amount > 0;
+                  return (
+                    <div
+                      key={tx.id}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50 p-3.5"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-extrabold text-gray-900">
+                          {tx.description || tx.type}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-gray-500">
+                          {new Date(tx.createdAt).toLocaleString("id-ID")}
+                          {tx.status ? ` • ${tx.status}` : ""}
+                        </p>
+                      </div>
+                      <span
+                        className={`shrink-0 text-sm font-black ${
+                          isPositive ? "text-emerald-700" : "text-red-600"
+                        }`}
+                      >
+                        {isPositive ? "+" : ""}
+                        {formatRupiah(tx.amount)}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

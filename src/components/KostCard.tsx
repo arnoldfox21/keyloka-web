@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Heart, MapPin, ShieldCheck, Star, Zap } from "lucide-react";
+import { BadgeCheck, Heart, MapPin, ShieldCheck, Star, Zap } from "lucide-react";
 import { formatRupiah, getDisplayPrice, resolveImageUrl, type Kost } from "@/lib/types";
 
 interface KostCardProps {
@@ -19,7 +19,7 @@ export function KostCard({ kost, isFavorite, onToggleFavorite }: KostCardProps) 
   return (
     <Link
       href={`/kost/${kost.id}`}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xs transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"
+      className="group flex flex-col overflow-hidden rounded-2xl border border-gray-200/90 bg-white shadow-xs transition duration-200 hover:-translate-y-1 hover:border-emerald-300 hover:shadow-lg"
     >
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-gray-100">
         {thumb ? (
@@ -28,13 +28,15 @@ export function KostCard({ kost, isFavorite, onToggleFavorite }: KostCardProps) 
             src={thumb}
             alt={kost.name}
             loading="lazy"
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-xs font-medium text-gray-400">
             Foto belum tersedia
           </div>
         )}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/35 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/25 to-transparent" />
 
         <div className="absolute left-2.5 top-2.5 flex flex-wrap gap-1.5 pr-10">
           <span className="rounded-lg bg-white/95 px-2 py-0.5 text-[11px] font-bold text-gray-800 shadow-xs">
@@ -83,8 +85,14 @@ export function KostCard({ kost, isFavorite, onToggleFavorite }: KostCardProps) 
 
       <div className="flex flex-1 flex-col p-4">
         <div className="flex items-center justify-between gap-2 text-xs text-gray-500">
-          <span className="truncate font-semibold text-emerald-700">
+          <span className="inline-flex items-center gap-1 truncate font-bold text-emerald-700">
             {kost.propertyCategory}
+            {kost.isVerified && (
+              <BadgeCheck
+                className="h-3.5 w-3.5 shrink-0 text-emerald-600"
+                aria-label="Terverifikasi"
+              />
+            )}
           </span>
           <span className="inline-flex items-center gap-1 font-bold text-gray-700">
             <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
@@ -95,7 +103,7 @@ export function KostCard({ kost, isFavorite, onToggleFavorite }: KostCardProps) 
           </span>
         </div>
 
-        <h3 className="mt-1.5 line-clamp-1 text-base font-extrabold text-gray-900 group-hover:text-emerald-700">
+        <h3 className="mt-1.5 line-clamp-1 text-base font-extrabold text-gray-900 group-hover:text-emerald-700 transition">
           {kost.name}
         </h3>
 
@@ -105,6 +113,24 @@ export function KostCard({ kost, isFavorite, onToggleFavorite }: KostCardProps) 
             {kost.district}, {kost.city}
           </span>
         </p>
+
+        {(kost.roomFacilities?.length > 0 || kost.electricityIncluded) && (
+          <div className="mt-2.5 flex flex-wrap gap-1">
+            {kost.electricityIncluded && (
+              <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                Listrik Termasuk
+              </span>
+            )}
+            {(kost.roomFacilities || []).slice(0, 2).map((fac) => (
+              <span
+                key={fac}
+                className="rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600"
+              >
+                {fac}
+              </span>
+            ))}
+          </div>
+        )}
 
         <div className="mt-auto pt-3 flex items-end justify-between border-t border-gray-100">
           <div>

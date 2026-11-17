@@ -1,17 +1,26 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  Award,
+  CalendarCheck,
   Clock,
+  GitCompareArrows,
   History,
+  LayoutGrid,
+  Map as MapIcon,
+  MessageCircle,
   RotateCcw,
   Search,
+  ShieldCheck,
   SlidersHorizontal,
   Sparkles,
 } from "lucide-react";
-import type { Kost, KostFilters } from "@/lib/types";
+import type { Kost, KostFilters, MapPoint } from "@/lib/types";
+import { CompareModal } from "./CompareModal";
 import { KostCard } from "./KostCard";
+import { KostMapSearchView } from "./KostMapSearchView";
 
 interface HomeExplorerProps {
   initialKosts: Kost[];
@@ -54,16 +63,53 @@ export function HomeExplorer({
   const [category, setCategory] = useState("SEMUA");
   const [type, setType] = useState("Semua");
   const [city, setCity] = useState("Semua Kota");
+  const [district, setDistrict] = useState("Semua Area");
   const [sortBy, setSortBy] = useState("recommended");
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [selectedFacilities, setSelectedFacilities] = useState<string[]>([]);
 
+  const [viewMode, setViewMode] = useState<"LIST" | "MAP">("LIST");
+  const [mapPoints, setMapPoints] = useState<MapPoint[]>([]);
+  const [loadingMap, setLoadingMap] = useState(false);
+
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareIds, setCompareIds] = useState<number[]>([]);
+  const [showCompareModal, setShowCompareModal] = useState(false);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
+  const activeAdvancedCount =
+    (minPrice.trim() ? 1 : 0) +
+    (maxPrice.trim() ? 1 : 0) +
+    (onlyAvailable ? 1 : 0) +
+    selectedFacilities.length;
+
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [recentlyViewed, setRecentlyViewed] = useState<Kost[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+
+  const districtsForCity = useMemo(() => {
+    if (city === "Semua Kota") return [];
+    const stat = filters.cityStats?.find(
+      (c) => c.city.toLowerCase() === city.toLowerCase(),
+    );
+    return stat?.districts || [];
+  }, [city, filters.cityStats]);
+
+  const compareList = useMemo(
+    () => kosts.filter((k) => compareIds.includes(k.id)),
+    [kosts, compareIds],
+  );
+
+  function toggleCompare(kostId: number) {
+    setCompareIds((prev) => {
+      if (prev.includes(kostId)) return prev.filter((id) => id !== kostId);
+      if (prev.length >= 3) return prev;
+      return [...prev, kostId];
+    });
+  }
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -95,64 +141,82 @@ export function HomeExplorer({
     });
   }
 
-  async function fetchList(
-    nextPage: number,
-    append: boolean,
-    overrides?: {
-      stayMode?: "LONG_TERM" | "HUNIAN_HARIAN";
-      dailySub?: string;
-      search?: string;
-      category?: string;
-      type?: string;
-      city?: string;
-      sortBy?: string;
-      onlyAvailable?: boolean;
-      minPrice?: string;
-      maxPrice?: string;
-      facilities?: string[];
-    },
-  ) {
+  type FilterOverrides = {
+    stayMode?: "LONG_TERM" | "HUNIAN_HARIAN";
+    dailySub?: string;
+    search?: string;
+    category?: string;
+    type?: string;
+    city?: string;
+    district?: string;
+    sortBy?: string;
+    onlyAvailable?: boolean;
+    minPrice?: string;
+    maxPrice?: string;
+    facilities?: string[];
+  };
+
+  function buildFilterParams(overrides?: FilterOverrides) {
     const qMode = overrides?.stayMode ?? stayMode;
     const qDailySub = overrides?.dailySub ?? dailySub;
     const qSearch = overrides?.search ?? search;
     const qCat = overrides?.category ?? category;
     const qType = overrides?.type ?? type;
     const qCity = overrides?.city ?? city;
+    const qDistrict = overrides?.district ?? district;
     const qSort = overrides?.sortBy ?? sortBy;
     const qOnlyAvail = overrides?.onlyAvailable ?? onlyAvailable;
     const qMinPrice = overrides?.minPrice ?? minPrice;
     const qMaxPrice = overrides?.maxPrice ?? maxPrice;
     const qFacs = overrides?.facilities ?? selectedFacilities;
 
+    const params = new URLSearchParams({ sortBy: qSort });
+    const effectiveSearch =
+      qMode === "HUNIAN_HARIAN" && qDailySub !== "ALL_DAILY" && !qSearch.trim()
+        ? qDailySub
+        : qSearch.trim();
+
+    if (effectiveSearch) params.set("search", effectiveSearch);
+    if (qMode === "HUNIAN_HARIAN") {
+      params.set("propertyCategory", "HUNIAN_HARIAN");
+    } else if (qCat !== "SEMUA") {
+      params.set("propertyCategory", qCat);
+    }
+    if (qType !== "Semua") params.set("type", qType);
+    if (qCity !== "Semua Kota") params.set("city", qCity);
+    if (qDistrict !== "Semua Area") params.set("district", qDistrict);
+    if (qOnlyAvail) params.set("onlyAvailable", "true");
+    if (qMinPrice.trim()) params.set("minPrice", qMinPrice.trim());
+    if (qMaxPrice.trim()) params.set("maxPrice", qMaxPrice.trim());
+    if (qFacs.length > 0) params.set("facilities", qFacs.join(","));
+    return params;
+  }
+
+  async function fetchMapPoints(overrides?: FilterOverrides) {
+    setLoadingMap(true);
+    try {
+      const params = buildFilterParams(overrides);
+      const res = await fetch(`/api/proxy/kosts/map-points?${params.toString()}`);
+      if (!res.ok) return;
+      const json = await res.json();
+      setMapPoints(Array.isArray(json) ? json : json.data || []);
+    } finally {
+      setLoadingMap(false);
+    }
+  }
+
+  async function fetchList(
+    nextPage: number,
+    append: boolean,
+    overrides?: FilterOverrides,
+  ) {
     if (append) setLoadingMore(true);
     else setLoading(true);
 
     try {
-      const params = new URLSearchParams({
-        page: String(nextPage),
-        limit: "12",
-        sortBy: qSort,
-      });
-
-      const effectiveSearch =
-        qMode === "HUNIAN_HARIAN" && qDailySub !== "ALL_DAILY" && !qSearch.trim()
-          ? qDailySub
-          : qSearch.trim();
-
-      if (effectiveSearch) params.set("search", effectiveSearch);
-
-      if (qMode === "HUNIAN_HARIAN") {
-        params.set("propertyCategory", "HUNIAN_HARIAN");
-      } else if (qCat !== "SEMUA") {
-        params.set("propertyCategory", qCat);
-      }
-
-      if (qType !== "Semua") params.set("type", qType);
-      if (qCity !== "Semua Kota") params.set("city", qCity);
-      if (qOnlyAvail) params.set("onlyAvailable", "true");
-      if (qMinPrice.trim()) params.set("minPrice", qMinPrice.trim());
-      if (qMaxPrice.trim()) params.set("maxPrice", qMaxPrice.trim());
-      if (qFacs.length > 0) params.set("facilities", qFacs.join(","));
+      const params = buildFilterParams(overrides);
+      params.set("page", String(nextPage));
+      params.set("limit", "12");
 
       const res = await fetch(`/api/proxy/kosts?${params.toString()}`);
       if (!res.ok) return;
@@ -163,6 +227,10 @@ export function HomeExplorer({
       setKosts((prev) => (append ? [...prev, ...rows] : rows));
       setHasMore(more);
       setPage(nextPage);
+
+      if (!append && viewMode === "MAP") {
+        void fetchMapPoints(overrides);
+      }
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -206,6 +274,7 @@ export function HomeExplorer({
     setCategory("SEMUA");
     setType("Semua");
     setCity("Semua Kota");
+    setDistrict("Semua Area");
     setSortBy("recommended");
     setOnlyAvailable(false);
     setMinPrice("");
@@ -218,6 +287,7 @@ export function HomeExplorer({
       category: "SEMUA",
       type: "Semua",
       city: "Semua Kota",
+      district: "Semua Area",
       sortBy: "recommended",
       onlyAvailable: false,
       minPrice: "",
@@ -229,22 +299,27 @@ export function HomeExplorer({
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
       {/* Hero + Search */}
-      <section className="rounded-3xl bg-gradient-to-br from-emerald-700 via-emerald-600 to-teal-600 p-6 sm:p-10 text-white shadow-lg">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-600 p-6 sm:p-10 text-white shadow-xl">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-teal-300/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-emerald-400/20 blur-3xl" />
+
+        <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="max-w-2xl">
-            <span className="inline-block rounded-full bg-white/15 px-3 py-1 text-xs font-bold tracking-wide">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-bold tracking-wide backdrop-blur-xs">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-200" />
               Cari Kost, Apartemen, Kontrakan & Villa Aman
             </span>
-            <h1 className="mt-3 text-2xl sm:text-4xl font-black leading-tight">
+            <h1 className="mt-3 text-2xl sm:text-4xl font-black tracking-tight leading-tight">
               Temukan Hunian Nyaman & Booking Langsung dengan Escrow
             </h1>
-            <p className="mt-2 text-sm sm:text-base text-emerald-50">
-              Dana booking aman ditahan Keyloka hingga Anda konfirmasi check-in. Kumpulkan poin di setiap transaksi.
+            <p className="mt-2.5 text-sm sm:text-base text-emerald-50/90 leading-relaxed">
+              Dana booking aman ditahan Keyloka hingga Anda konfirmasi check-in.
+              Kumpulkan poin di setiap transaksi.
             </p>
           </div>
 
           {/* 2-Mode Switch matching Flutter */}
-          <div className="inline-flex self-start rounded-2xl bg-black/20 p-1 backdrop-blur">
+          <div className="inline-flex self-start rounded-2xl border border-white/15 bg-black/25 p-1 backdrop-blur-md">
             <button
               type="button"
               onClick={() => {
@@ -283,7 +358,7 @@ export function HomeExplorer({
 
         <form
           onSubmit={handleSearchSubmit}
-          className="mt-6 flex flex-col sm:flex-row gap-2.5"
+          className="relative mt-6 flex flex-col sm:flex-row gap-2.5 rounded-2xl bg-white/10 p-2 backdrop-blur-md border border-white/15"
         >
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -297,7 +372,7 @@ export function HomeExplorer({
           </div>
           <button
             type="submit"
-            className="rounded-xl bg-gray-900 px-6 py-3 text-sm font-bold text-white shadow-sm hover:bg-gray-800 transition"
+            className="rounded-xl bg-slate-900 px-6 py-3 text-sm font-bold text-white shadow-sm hover:bg-slate-800 transition"
           >
             Cari Hunian
           </button>
@@ -347,8 +422,48 @@ export function HomeExplorer({
         </div>
       </section>
 
+      {/* Trust Value Strip */}
+      <section className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        <div className="flex items-center gap-2.5 rounded-2xl border border-gray-200/80 bg-white px-3.5 py-2.5 shadow-2xs">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+            <ShieldCheck className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-xs font-extrabold text-gray-900">Escrow Aman</p>
+            <p className="truncate text-[11px] text-gray-500">Dana aman s/d check-in</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2.5 rounded-2xl border border-gray-200/80 bg-white px-3.5 py-2.5 shadow-2xs">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+            <CalendarCheck className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-xs font-extrabold text-gray-900">Survei Terjadwal</p>
+            <p className="truncate text-[11px] text-gray-500">Cek lokasi sebelum sewa</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2.5 rounded-2xl border border-gray-200/80 bg-white px-3.5 py-2.5 shadow-2xs">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+            <Award className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-xs font-extrabold text-gray-900">Poin Loyalti</p>
+            <p className="truncate text-[11px] text-gray-500">Potongan tiap booking</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2.5 rounded-2xl border border-gray-200/80 bg-white px-3.5 py-2.5 shadow-2xs">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-600">
+            <MessageCircle className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-xs font-extrabold text-gray-900">Chat & Grup</p>
+            <p className="truncate text-[11px] text-gray-500">Terhubung dgn penghuni</p>
+          </div>
+        </div>
+      </section>
+
       {/* Filter Bar */}
-      <section className="mt-6 flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-2xs">
+      <section className="mt-5 flex flex-col gap-3.5 rounded-2xl border border-gray-200 bg-white p-4 shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
             {stayMode === "LONG_TERM"
@@ -386,17 +501,36 @@ export function HomeExplorer({
                 ))}
           </div>
 
-          <button
-            type="button"
-            onClick={handleReset}
-            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-gray-500 hover:bg-gray-100 hover:text-gray-800"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Reset
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowAdvancedFilters((v) => !v)}
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition ${
+                showAdvancedFilters || activeAdvancedCount > 0
+                  ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                  : "border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100"
+              }`}
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              Filter Lanjutan
+              {activeAdvancedCount > 0 && (
+                <span className="rounded-full bg-emerald-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">
+                  {activeAdvancedCount}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={handleReset}
+              className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Reset
+            </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <select
             value={type}
             onChange={(e) => {
@@ -415,8 +549,10 @@ export function HomeExplorer({
           <select
             value={city}
             onChange={(e) => {
-              setCity(e.target.value);
-              fetchList(1, false, { city: e.target.value });
+              const nextCity = e.target.value;
+              setCity(nextCity);
+              setDistrict("Semua Area");
+              fetchList(1, false, { city: nextCity, district: "Semua Area" });
             }}
             className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800"
           >
@@ -427,6 +563,24 @@ export function HomeExplorer({
               </option>
             ))}
           </select>
+
+          {districtsForCity.length > 0 && (
+            <select
+              value={district}
+              onChange={(e) => {
+                setDistrict(e.target.value);
+                fetchList(1, false, { district: e.target.value });
+              }}
+              className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800"
+            >
+              <option value="Semua Area">Semua Area</option>
+              {districtsForCity.map((d) => (
+                <option key={d.district} value={d.district}>
+                  {d.district} ({d.count})
+                </option>
+              ))}
+            </select>
+          )}
 
           <select
             value={sortBy}
@@ -442,71 +596,76 @@ export function HomeExplorer({
             <option value="rating_desc">Rating Tertinggi</option>
             <option value="newest">Terbaru</option>
           </select>
-
-          <input
-            type="number"
-            min={0}
-            value={minPrice}
-            onChange={(e) => setMinPrice(e.target.value)}
-            onBlur={() => fetchList(1, false)}
-            placeholder="Harga Min (Rp)"
-            className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800"
-          />
-
-          <input
-            type="number"
-            min={0}
-            value={maxPrice}
-            onChange={(e) => setMaxPrice(e.target.value)}
-            onBlur={() => fetchList(1, false)}
-            placeholder="Harga Max (Rp)"
-            className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800"
-          />
-
-          <label className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={onlyAvailable}
-              onChange={(e) => {
-                setOnlyAvailable(e.target.checked);
-                fetchList(1, false, { onlyAvailable: e.target.checked });
-              }}
-              className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-            />
-            Tersedia Saja
-          </label>
         </div>
 
-        {/* Facility Chips */}
-        {filters.facilities && filters.facilities.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-gray-100">
-            <span className="inline-flex items-center gap-1 text-xs font-bold text-gray-500 mr-1">
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              Fasilitas:
-            </span>
-            {filters.facilities.slice(0, 12).map((fac) => {
-              const active = selectedFacilities.includes(fac);
-              return (
-                <button
-                  key={fac}
-                  type="button"
-                  onClick={() => {
-                    const next = active
-                      ? selectedFacilities.filter((f) => f !== fac)
-                      : [...selectedFacilities, fac];
-                    setSelectedFacilities(next);
-                    fetchList(1, false, { facilities: next });
+        {/* Collapsible Advanced Filters */}
+        {showAdvancedFilters && (
+          <div className="space-y-3 border-t border-gray-100 pt-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <input
+                type="number"
+                min={0}
+                value={minPrice}
+                onChange={(e) => setMinPrice(e.target.value)}
+                onBlur={() => fetchList(1, false)}
+                placeholder="Harga Min (Rp)"
+                className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800"
+              />
+
+              <input
+                type="number"
+                min={0}
+                value={maxPrice}
+                onChange={(e) => setMaxPrice(e.target.value)}
+                onBlur={() => fetchList(1, false)}
+                placeholder="Harga Max (Rp)"
+                className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800"
+              />
+
+              <label className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-800 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={onlyAvailable}
+                  onChange={(e) => {
+                    setOnlyAvailable(e.target.checked);
+                    fetchList(1, false, { onlyAvailable: e.target.checked });
                   }}
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
-                    active
-                      ? "bg-emerald-600 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                >
-                  {fac}
-                </button>
-              );
-            })}
+                  className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                Tersedia Saja
+              </label>
+            </div>
+
+            {filters.facilities && filters.facilities.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs font-bold text-gray-500 mr-1">
+                  Fasilitas:
+                </span>
+                {filters.facilities.slice(0, 12).map((fac) => {
+                  const active = selectedFacilities.includes(fac);
+                  return (
+                    <button
+                      key={fac}
+                      type="button"
+                      onClick={() => {
+                        const next = active
+                          ? selectedFacilities.filter((f) => f !== fac)
+                          : [...selectedFacilities, fac];
+                        setSelectedFacilities(next);
+                        fetchList(1, false, { facilities: next });
+                      }}
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
+                        active
+                          ? "bg-emerald-600 text-white"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      {fac}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </section>
@@ -531,8 +690,71 @@ export function HomeExplorer({
       )}
 
       {/* Main Results */}
-      <section className="mt-6">
-        {loading ? (
+      <section className="mt-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1">
+            <button
+              type="button"
+              onClick={() => setViewMode("LIST")}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                viewMode === "LIST"
+                  ? "bg-emerald-600 text-white"
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Daftar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode("MAP");
+                void fetchMapPoints();
+              }}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                viewMode === "MAP"
+                  ? "bg-emerald-600 text-white"
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              <MapIcon className="h-3.5 w-3.5" />
+              Peta
+            </button>
+          </div>
+
+          {viewMode === "LIST" && kosts.length >= 2 && (
+            <div className="flex flex-wrap items-center gap-2">
+              {compareMode && compareIds.length >= 2 && (
+                <button
+                  type="button"
+                  onClick={() => setShowCompareModal(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+                >
+                  Bandingkan ({compareIds.length}/3)
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setCompareMode((v) => !v);
+                  setCompareIds([]);
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-bold transition ${
+                  compareMode
+                    ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                <GitCompareArrows className="h-3.5 w-3.5" />
+                {compareMode ? "Batal Bandingkan" : "Bandingkan"}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {viewMode === "MAP" ? (
+          <KostMapSearchView points={mapPoints} loading={loadingMap} />
+        ) : loading ? (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, idx) => (
               <div
@@ -560,13 +782,35 @@ export function HomeExplorer({
         ) : (
           <>
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {kosts.map((k) => (
-                <KostCard
-                  key={k.id}
-                  kost={k}
-                  onToggleFavorite={handleToggleFavorite}
-                />
-              ))}
+              {kosts.map((k) => {
+                const isSelected = compareIds.includes(k.id);
+                return (
+                  <div key={k.id} className="relative">
+                    {compareMode && (
+                      <button
+                        type="button"
+                        onClick={() => toggleCompare(k.id)}
+                        className={`mb-2 flex w-full items-center justify-between rounded-xl border px-3 py-1.5 text-xs font-bold transition ${
+                          isSelected
+                            ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                            : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        <span>
+                          {isSelected ? "Dipilih untuk dibandingkan" : "Pilih bandingkan"}
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          readOnly
+                          className="h-4 w-4 rounded text-emerald-600"
+                        />
+                      </button>
+                    )}
+                    <KostCard kost={k} onToggleFavorite={handleToggleFavorite} />
+                  </div>
+                );
+              })}
             </div>
             {hasMore && (
               <div className="mt-8 flex justify-center">
@@ -583,6 +827,13 @@ export function HomeExplorer({
           </>
         )}
       </section>
+
+      {showCompareModal && compareList.length >= 2 && (
+        <CompareModal
+          kosts={compareList}
+          onClose={() => setShowCompareModal(false)}
+        />
+      )}
     </div>
   );
 }

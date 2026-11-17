@@ -66,6 +66,27 @@ export function BookingsClient({
     }
   }
 
+  function handlePayNow(booking: Booking) {
+    setMessage(null);
+    if (typeof window !== "undefined" && window.snap && booking.snapToken) {
+      window.snap.pay(booking.snapToken, {
+        onSuccess: () => {
+          void handleSyncPayment(booking.id);
+        },
+        onPending: () => {
+          void handleSyncPayment(booking.id);
+        },
+        onError: () => {
+          setMessage("Pembayaran gagal atau dibatalkan.");
+        },
+      });
+      return;
+    }
+    if (booking.paymentUrl) {
+      window.open(booking.paymentUrl, "_blank", "noopener,noreferrer");
+    }
+  }
+
   async function handleConfirmCheckIn(bookingId: number) {
     if (!confirm("Konfirmasi bahwa Anda sudah check-in dan kamar sesuai? Dana akan diteruskan ke pemilik.")) {
       return;
@@ -419,16 +440,16 @@ export function BookingsClient({
                   {/* Actions */}
                   {isDirect && b.paymentStatus === "UNPAID" && (
                     <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
-                      {b.paymentUrl && (
-                        <a
-                          href={b.paymentUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+                      {(b.snapToken || b.paymentUrl) && (
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => handlePayNow(b)}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
                         >
                           <CreditCard className="h-3.5 w-3.5" />
                           Bayar Sekarang
-                        </a>
+                        </button>
                       )}
                       <button
                         disabled={isBusy}
