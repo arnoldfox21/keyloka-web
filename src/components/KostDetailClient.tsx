@@ -11,6 +11,7 @@ import {
   Flag,
   Heart,
   Info,
+  KeyRound,
   MapPin,
   Maximize2,
   MessageCircle,
@@ -896,19 +897,27 @@ export function KostDetailClient({
                 </button>
               )}
               {canShowClaim && (
-                <div className="pt-1 text-center">
+                <div className="pt-1 flex justify-end">
                   <button
                     type="button"
                     onClick={openPropertyActionModal}
-                    className="inline-flex items-center gap-1.5 text-[11px] font-medium text-gray-400 hover:text-gray-600 transition"
-                    title="Opsi pemilik: Ajukan klaim atau hapus properti"
+                    aria-label={
+                      claimSubmitted
+                        ? "Klaim properti sedang diproses"
+                        : "Klaim atau hapus properti"
+                    }
+                    title={
+                      claimSubmitted
+                        ? "Klaim properti sedang diproses"
+                        : "Klaim atau hapus properti"
+                    }
+                    className={`rounded-full p-2 transition ${
+                      claimSubmitted
+                        ? "bg-amber-50 text-amber-600 hover:bg-amber-100"
+                        : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                    }`}
                   >
-                    <Info className="h-3.5 w-3.5" />
-                    <span>
-                      {claimSubmitted
-                        ? "Klaim sedang diproses"
-                        : "Pemilik properti? Klaim / Hapus"}
-                    </span>
+                    <KeyRound className="h-4 w-4" />
                   </button>
                 </div>
               )}
@@ -1203,7 +1212,7 @@ export function KostDetailClient({
         };
         const claimEmailText = currentUser?.email || "[isi email akun Keyloka Anda]";
         const claimWaHref = buildStaffWaHref(
-          `Halo Staff Keyloka, saya pemilik properti "${kost.name}" (ID #${kost.id}) ingin mengajukan klaim properti.\nEmail Akun: ${claimEmailText}\n\n${kostUrl}`,
+          `Halo Staff Keyloka, saya pemilik properti "${kost.name}" (ID #${kost.id}) ingin mengajukan klaim properti.\nEmail Akun Pengaju: ${claimEmailText}\n\n${kostUrl}`,
         );
         const deleteWaHref = buildStaffWaHref(
           `Halo Staff Keyloka, saya pemilik properti "${kost.name}" (ID #${kost.id}) ingin mengajukan penghapusan listing properti ini.\n\n${kostUrl}`,
