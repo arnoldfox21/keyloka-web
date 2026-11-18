@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { MapPin, Star, X } from "lucide-react";
@@ -146,12 +147,14 @@ export function KostMapSearchView({ points, loading }: KostMapSearchViewProps) {
             <X className="h-3.5 w-3.5" />
           </button>
           <div className="flex gap-3">
-            <div className="h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-gray-100">
+            <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-gray-100">
               {selectedImg ? (
-                <img
+                <Image
                   src={selectedImg}
                   alt={selected.name}
-                  className="h-full w-full object-cover"
+                  fill
+                  sizes="96px"
+                  className="object-cover"
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-gray-400">

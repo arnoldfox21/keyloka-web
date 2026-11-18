@@ -3,13 +3,15 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 import { JsonLd } from "@/components/JsonLd";
 import { KostDetailClient } from "@/components/KostDetailClient";
-import { getSiteUrl, toAbsoluteImageUrl, truncateDescription } from "@/lib/seo";
+import { getKostHref, getSiteUrl, parseKostIdFromParam, toAbsoluteImageUrl, truncateDescription } from "@/lib/seo";
 import { API_BASE_URL, getServerToken, serverFetch } from "@/lib/server-api";
 import { formatCategoryLabel, formatRupiah, getDisplayPrice, type Kost, type ReviewItem, type UserProfile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-const fetchKostDetail = cache(async (id: string): Promise<Kost | null> => {
+const fetchKostDetail = cache(async (rawId: string): Promise<Kost | null> => {
+  const id = parseKostIdFromParam(rawId);
+  if (!/^\d+$/.test(id)) return null;
   try {
     const token = await getServerToken();
     const res = await fetch(`${API_BASE_URL}/kosts/${id}`, {
@@ -46,7 +48,7 @@ export async function generateMetadata({
   const images = (kost.images || [])
     .map((img) => toAbsoluteImageUrl(img))
     .filter((url): url is string => Boolean(url));
-  const canonicalPath = `/kost/${kost.id}`;
+  const canonicalPath = getKostHref(kost);
 
   return {
     title,
@@ -117,7 +119,7 @@ export default async function KostDetailPage({
     })
     .slice(0, 4);
   const siteUrl = getSiteUrl();
-  const pageUrl = `${siteUrl}/kost/${kost.id}`;
+  const pageUrl = `${siteUrl}${getKostHref(kost)}`;
   const price = getDisplayPrice(kost);
   const images = (kost.images || [])
     .map((img) => toAbsoluteImageUrl(img))

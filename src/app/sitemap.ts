@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getSiteUrl } from "@/lib/seo";
+import { getKostHref, getSiteUrl } from "@/lib/seo";
 import { API_BASE_URL } from "@/lib/server-api";
 import type { Kost, OwnerPost } from "@/lib/types";
 
@@ -41,6 +41,42 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly",
       priority: 0.8,
     },
+    {
+      url: `${siteUrl}/syarat-ketentuan`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.4,
+    },
+    {
+      url: `${siteUrl}/kebijakan-privasi`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.4,
+    },
+    {
+      url: `${siteUrl}/sewa/kost`,
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 0.85,
+    },
+    {
+      url: `${siteUrl}/sewa/apartemen`,
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 0.85,
+    },
+    {
+      url: `${siteUrl}/sewa/kontrakan`,
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 0.85,
+    },
+    {
+      url: `${siteUrl}/sewa/villa`,
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 0.85,
+    },
   ];
 
   if (!API_BASE_URL) {
@@ -57,11 +93,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     : kostsRes?.data || [];
 
   const ownerIds = new Set<number>();
+  const citySlugs = new Set<string>();
 
   for (const kost of kosts) {
     if (!kost?.id) continue;
     entries.push({
-      url: `${siteUrl}/kost/${kost.id}`,
+      url: `${siteUrl}${getKostHref(kost)}`,
       lastModified: now,
       changeFrequency: "daily",
       priority: 0.9,
@@ -69,6 +106,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     if (kost.ownerId) {
       ownerIds.add(kost.ownerId);
     }
+    if (kost.city) {
+      const citySlug = kost.city
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+      if (citySlug) citySlugs.add(citySlug);
+    }
+  }
+
+  for (const citySlug of citySlugs) {
+    entries.push({
+      url: `${siteUrl}/sewa/kost-${citySlug}`,
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 0.8,
+    });
   }
 
   for (const ownerId of ownerIds) {

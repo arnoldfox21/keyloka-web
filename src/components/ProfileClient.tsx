@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -272,10 +273,12 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
       <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
         <div className="relative h-40 sm:h-52 bg-gradient-to-r from-emerald-600 to-teal-500">
           {coverUrl && (
-            <img
+            <Image
               src={resolveImageUrl(coverUrl)}
               alt="Cover"
-              className="h-full w-full object-cover"
+              fill
+              sizes="(max-width: 1024px) 100vw, 1024px"
+              className="object-cover"
             />
           )}
           <label className="absolute right-4 bottom-4 z-10 inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-black/60 px-3 py-1.5 text-xs font-bold text-white hover:bg-black/75">
@@ -295,10 +298,12 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
             <div className="flex items-start gap-4">
               <div className="relative -mt-12 sm:-mt-14 h-20 w-20 sm:h-24 sm:w-24 shrink-0 overflow-hidden rounded-2xl border-4 border-white bg-emerald-100 shadow-md">
                 {avatarUrl ? (
-                  <img
+                  <Image
                     src={resolveImageUrl(avatarUrl)}
                     alt={user.name}
-                    className="h-full w-full object-cover"
+                    fill
+                    sizes="96px"
+                    className="object-cover"
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-emerald-700">

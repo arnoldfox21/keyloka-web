@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { BadgeCheck, Heart, MapPin, ShieldCheck, Star, Zap } from "lucide-react";
+import { getKostHref } from "@/lib/seo";
 import { formatCategoryLabel, formatRupiah, getDisplayPrice, resolveImageUrl, type Kost } from "@/lib/types";
 
 interface KostCardProps {
@@ -18,7 +19,7 @@ export function KostCard({ kost, isFavorite, onToggleFavorite }: KostCardProps) 
 
   return (
     <Link
-      href={`/kost/${kost.id}`}
+      href={getKostHref(kost)}
       className="group flex flex-col overflow-hidden rounded-2xl border border-gray-200/90 bg-white shadow-xs transition duration-200 hover:-translate-y-1 hover:border-emerald-300 hover:shadow-lg"
     >
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-gray-100">

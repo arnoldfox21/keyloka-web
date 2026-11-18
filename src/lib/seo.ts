@@ -59,6 +59,31 @@ export function truncateDescription(text: string | undefined | null, maxLength =
 }
 
 /**
+ * Builds a SEO-friendly property detail path (`/kost/<slug>-<id>` or `/kost/<id>`).
+ */
+export function getKostHref(kost: { id: number; slug?: string | null }): string {
+  const cleanSlug = (kost.slug || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  if (!cleanSlug) return `/kost/${kost.id}`;
+  if (cleanSlug.endsWith(`-${kost.id}`)) return `/kost/${cleanSlug}`;
+  return `/kost/${cleanSlug}-${kost.id}`;
+}
+
+/**
+ * Extracts numeric property ID from `/kost/123` or `/kost/kost-melati-123`.
+ */
+export function parseKostIdFromParam(rawParam: string): string {
+  const trimmed = (rawParam || "").trim();
+  if (/^\d+$/.test(trimmed)) return trimmed;
+  const trailing = trimmed.match(/-(\d+)$/);
+  if (trailing) return trailing[1];
+  return trimmed;
+}
+
+/**
  * Generates noindex/nofollow metadata for authenticated or private routes.
  */
 export function privatePageMetadata(title: string) {

@@ -69,7 +69,7 @@ export function Footer({ user }: FooterProps) {
             <ul className="mt-4 space-y-2.5 text-xs text-slate-400">
               <li>
                 <Link
-                  href="/?category=KOST"
+                  href="/sewa/kost"
                   className="inline-flex items-center gap-2 hover:text-emerald-400 transition"
                 >
                   <Building2 className="h-3.5 w-3.5 text-slate-500" />
@@ -78,7 +78,7 @@ export function Footer({ user }: FooterProps) {
               </li>
               <li>
                 <Link
-                  href="/?category=APARTEMEN"
+                  href="/sewa/apartemen"
                   className="inline-flex items-center gap-2 hover:text-emerald-400 transition"
                 >
                   <Building2 className="h-3.5 w-3.5 text-slate-500" />
@@ -87,7 +87,7 @@ export function Footer({ user }: FooterProps) {
               </li>
               <li>
                 <Link
-                  href="/?category=KONTRAKAN"
+                  href="/sewa/kontrakan"
                   className="inline-flex items-center gap-2 hover:text-emerald-400 transition"
                 >
                   <Building2 className="h-3.5 w-3.5 text-slate-500" />
@@ -96,7 +96,7 @@ export function Footer({ user }: FooterProps) {
               </li>
               <li>
                 <Link
-                  href="/?stayMode=HUNIAN_HARIAN"
+                  href="/sewa/villa"
                   className="inline-flex items-center gap-2 hover:text-emerald-400 transition"
                 >
                   <Building2 className="h-3.5 w-3.5 text-slate-500" />
@@ -188,6 +188,18 @@ export function Footer({ user }: FooterProps) {
                 className="inline-flex items-center gap-2 text-xs text-slate-400 hover:text-emerald-400 transition"
               >
                 Gabung Jadi Pemilik Properti
+              </Link>
+              <Link
+                href="/syarat-ketentuan"
+                className="inline-flex items-center gap-2 text-xs text-slate-400 hover:text-emerald-400 transition"
+              >
+                Syarat & Ketentuan
+              </Link>
+              <Link
+                href="/kebijakan-privasi"
+                className="inline-flex items-center gap-2 text-xs text-slate-400 hover:text-emerald-400 transition"
+              >
+                Kebijakan Privasi
               </Link>
               <a
                 href="mailto:halo@keyloka.com"

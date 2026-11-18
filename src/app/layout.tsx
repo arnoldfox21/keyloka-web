@@ -88,10 +88,22 @@ export default async function RootLayout({
     ? "https://app.midtrans.com/snap/snap.js"
     : "https://app.sandbox.midtrans.com/snap/snap.js";
   const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || "";
+  const gaId = (process.env.NEXT_PUBLIC_GA_ID || "").trim();
 
   return (
     <html lang="id" className={`${geistSans.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-[#F6F7F9] text-gray-900">
+        {gaId ? (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(gaId)}`}
+              strategy="afterInteractive"
+            />
+            <Script id="ga4-init" strategy="afterInteractive">
+              {`window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', '${gaId}');`}
+            </Script>
+          </>
+        ) : null}
         {clientKey ? (
           <Script
             src={snapScriptUrl}

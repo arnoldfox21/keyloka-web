@@ -507,8 +507,8 @@ export function NewPropertyClient({
     );
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(e?: React.FormEvent) {
+    e?.preventDefault();
     setError(null);
 
     if (!name.trim()) {
@@ -763,7 +763,7 @@ export function NewPropertyClient({
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
         {/* 1. Informasi Dasar */}
         {currentStep === 1 && (
         <section className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 space-y-4">
@@ -1733,6 +1733,7 @@ export function NewPropertyClient({
 
           {currentStep < 5 ? (
             <button
+              key="next-step-btn"
               type="button"
               onClick={handleNextStep}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-extrabold text-white shadow-sm hover:bg-emerald-700"
@@ -1741,7 +1742,9 @@ export function NewPropertyClient({
             </button>
           ) : (
             <button
-              type="submit"
+              key="submit-property-btn"
+              type="button"
+              onClick={() => void handleSubmit()}
               disabled={submitting}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-extrabold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
             >
