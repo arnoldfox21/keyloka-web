@@ -18,6 +18,7 @@ import {
 import { formatRupiah, resolveImageUrl, type Kost, type UserProfile } from "@/lib/types";
 import { compressImageToDataUrl } from "@/lib/image-compress";
 import { KostLocationPicker } from "./KostLocationPicker";
+import { FacilityIcon } from "./FacilityIcon";
 
 interface NewPropertyClientProps {
   currentUser: UserProfile;
@@ -216,7 +217,7 @@ export function NewPropertyClient({
     initialKost?.electricityIncluded ?? false,
   );
   const [allowDirectBooking, setAllowDirectBooking] = useState(
-    initialKost?.allowDirectBooking ?? isAutoApproved,
+    initialKost?.allowDirectBooking ?? false,
   );
   const [hasDeposit, setHasDeposit] = useState(
     Boolean(initialKost?.depositAmount && initialKost.depositAmount > 0),
@@ -236,9 +237,7 @@ export function NewPropertyClient({
   const [customRoomFacility, setCustomRoomFacility] = useState("");
   const [customPublicFacility, setCustomPublicFacility] = useState("");
   const [rulesText, setRulesText] = useState(
-    initialKost?.rules?.length
-      ? initialKost.rules.join(", ")
-      : "Dilarang merokok di dalam kamar, Menjaga kebersihan bersama",
+    initialKost?.rules?.length ? initialKost.rules.join(", ") : "",
   );
 
   type PropertyImageItem =
@@ -1343,14 +1342,15 @@ export function NewPropertyClient({
                     onClick={() =>
                       toggleFacility(setRoomFacilities, fac)
                     }
-                    className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold transition ${
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition ${
                       selected
                         ? "border-emerald-600 bg-emerald-600 text-white"
                         : "border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100"
                     }`}
                   >
-                    {selected && <Check className="h-3 w-3" />}
+                    <FacilityIcon name={fac} className="h-3.5 w-3.5 shrink-0" />
                     {fac}
+                    {selected && <Check className="h-3 w-3 shrink-0" />}
                   </button>
                 );
               })}
@@ -1411,14 +1411,15 @@ export function NewPropertyClient({
                     onClick={() =>
                       toggleFacility(setPublicFacilities, fac)
                     }
-                    className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold transition ${
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition ${
                       selected
                         ? "border-emerald-600 bg-emerald-600 text-white"
                         : "border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100"
                     }`}
                   >
-                    {selected && <Check className="h-3 w-3" />}
+                    <FacilityIcon name={fac} className="h-3.5 w-3.5 shrink-0" />
                     {fac}
+                    {selected && <Check className="h-3 w-3 shrink-0" />}
                   </button>
                 );
               })}

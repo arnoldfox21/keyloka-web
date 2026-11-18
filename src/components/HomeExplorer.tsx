@@ -25,6 +25,7 @@ import type { Kost, KostFilters, MapPoint } from "@/lib/types";
 import { CompareModal } from "./CompareModal";
 import { KostCard } from "./KostCard";
 import { KostMapSearchView } from "./KostMapSearchView";
+import { FacilityIcon } from "./FacilityIcon";
 
 interface HomeExplorerProps {
   initialKosts: Kost[];
@@ -707,12 +708,13 @@ export function HomeExplorer({
                         setSelectedFacilities(next);
                         fetchList(1, false, { facilities: next });
                       }}
-                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
                         active
                           ? "bg-emerald-600 text-white"
                           : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                       }`}
                     >
+                      <FacilityIcon name={fac} className="h-3 w-3 shrink-0" />
                       {fac}
                     </button>
                   );

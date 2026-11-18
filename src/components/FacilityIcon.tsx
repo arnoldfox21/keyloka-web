@@ -1,0 +1,175 @@
+import type { LucideIcon } from "lucide-react";
+import {
+  Armchair,
+  Bath,
+  BedDouble,
+  Bike,
+  Camera,
+  Car,
+  CheckCircle2,
+  Droplets,
+  Dumbbell,
+  Fan,
+  Flame,
+  KeyRound,
+  Landmark,
+  Laptop,
+  Layers,
+  Mountain,
+  Refrigerator,
+  ShieldCheck,
+  Shirt,
+  Sofa,
+  Sparkles,
+  Sun,
+  Trees,
+  Tv,
+  UserCheck,
+  Utensils,
+  Waves,
+  Wifi,
+  Wind,
+  Zap,
+} from "lucide-react";
+
+const EXACT_ICON_MAP: Record<string, LucideIcon> = {
+  // Kamar (Kost / Apartemen / Homestay / Kontrakan / Villa)
+  ac: Wind,
+  "kipas angin": Fan,
+  wifi: Wifi,
+  "wifi umum": Wifi,
+  kasur: BedDouble,
+  "kasur nyaman": BedDouble,
+  "kamar tidur": BedDouble,
+  "bantal & guling": Layers,
+  sprei: Layers,
+  "lemari baju": Shirt,
+  lemari: Shirt,
+  "meja belajar": Laptop,
+  "meja & kursi": Laptop,
+  kursi: Armchair,
+  cermin: Sparkles,
+  "kamar mandi dalam": Bath,
+  "kamar mandi luar": Bath,
+  "kamar mandi": Bath,
+  bathtub: Bath,
+  "kloset duduk": Bath,
+  "kloset jongkok": Bath,
+  shower: Droplets,
+  "water heater": Flame,
+  tv: Tv,
+  "smart tv / karaoke": Tv,
+  "kulkas mini": Refrigerator,
+  kulkas: Refrigerator,
+  jendela: Sun,
+  balkon: Sun,
+  "balkon / teras": Sun,
+  "balkon / rooftop": Sun,
+  "teras / halaman": Sun,
+  "handuk & perlengkapan mandi": Sparkles,
+  "handuk & amenities": Sparkles,
+  "toren & pompa air": Droplets,
+  "pdam / air sumur": Droplets,
+  "listrik token": Zap,
+  "private pool": Waves,
+  "view alam": Mountain,
+
+  // Umum
+  "parkir motor": Bike,
+  "parkir sepeda": Bike,
+  "parkir mobil": Car,
+  "parkir mobil luas": Car,
+  "carport / garasi": Car,
+  "akses jalan mobil": Car,
+  "dapur bersama": Utensils,
+  "dapur pribadi": Utensils,
+  "kitchen set lengkap": Utensils,
+  "pantry / dapur bersama": Utensils,
+  "kompor & gas": Flame,
+  "area bbq": Flame,
+  dispenser: Droplets,
+  "dispenser / air mineral": Droplets,
+  "mesin cuci": Shirt,
+  laundry: Shirt,
+  jemuran: Sun,
+  "ruang tamu": Sofa,
+  "ruang tamu bersama": Sofa,
+  "ruang keluarga": Sofa,
+  "ruang santai": Armchair,
+  mushola: Landmark,
+  "dekat masjid / mushola": Landmark,
+  cctv: Camera,
+  "cctv lingkungan": Camera,
+  "penjaga kost": UserCheck,
+  "penjaga / caretaker 24 jam": UserCheck,
+  "security 24 jam": ShieldCheck,
+  "keamanan 24 jam / one gate": ShieldCheck,
+  "bebas banjir": ShieldCheck,
+  "akses 24 jam": KeyRound,
+  "check-in 24 jam": KeyRound,
+  "kolam renang": Waves,
+  "gym / fitness": Dumbbell,
+  taman: Trees,
+  "taman pribadi": Trees,
+  "free listrik": Zap,
+  "free listrik & air": Zap,
+  "free air": Droplets,
+  sarapan: Utensils,
+  "sarapan (opsional)": Utensils,
+};
+
+const KEYWORD_ICON_RULES: Array<[RegExp, LucideIcon]> = [
+  [/wifi|internet/i, Wifi],
+  [/\bac\b|pendingin/i, Wind],
+  [/kipas/i, Fan],
+  [/kasur|tidur|bed/i, BedDouble],
+  [/bantal|guling|sprei/i, Layers],
+  [/lemari|cuci|laundry/i, Shirt],
+  [/meja/i, Laptop],
+  [/kursi|santai/i, Armchair],
+  [/mandi|kloset|toilet|bathtub|wc/i, Bath],
+  [/shower|air|dispenser|pompa|toren|pdam/i, Droplets],
+  [/heater|kompor|gas|bbq/i, Flame],
+  [/tv|karaoke/i, Tv],
+  [/kulkas/i, Refrigerator],
+  [/jendela|balkon|teras|rooftop|jemuran/i, Sun],
+  [/motor|sepeda/i, Bike],
+  [/mobil|carport|garasi|parkir/i, Car],
+  [/dapur|kitchen|pantry|sarapan|makan/i, Utensils],
+  [/tamu|keluarga|sofa/i, Sofa],
+  [/mushola|masjid/i, Landmark],
+  [/cctv|kamera/i, Camera],
+  [/penjaga|caretaker/i, UserCheck],
+  [/security|keamanan|banjir/i, ShieldCheck],
+  [/akses|check-in/i, KeyRound],
+  [/kolam|pool|renang/i, Waves],
+  [/gym|fitness/i, Dumbbell],
+  [/taman|kebun/i, Trees],
+  [/view|alam|gunung/i, Mountain],
+  [/listrik|token/i, Zap],
+  [/cermin|handuk|amenities/i, Sparkles],
+];
+
+export function getFacilityIcon(name: string): LucideIcon {
+  const normalized = name.trim().toLowerCase();
+  if (EXACT_ICON_MAP[normalized]) {
+    return EXACT_ICON_MAP[normalized];
+  }
+  for (const [pattern, icon] of KEYWORD_ICON_RULES) {
+    if (pattern.test(normalized)) {
+      return icon;
+    }
+  }
+  return CheckCircle2;
+}
+
+export function FacilityIcon({
+  name,
+  className = "h-3.5 w-3.5 shrink-0",
+}: {
+  name: string;
+  className?: string;
+}) {
+  const Icon = getFacilityIcon(name);
+  return <Icon className={className} aria-hidden="true" />;
+}

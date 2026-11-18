@@ -7,6 +7,7 @@ import {
   Lock,
   MessageCircle,
   Send,
+  ShieldAlert,
   UserPlus,
   Users,
   UserX,
@@ -848,6 +849,14 @@ export function ChatClient({
                   ))}
                 </div>
               )}
+
+              {/* Peringatan Anti-Penipuan */}
+              <div className="border-b border-amber-200 bg-amber-50/90 px-4 py-2 text-[11px] leading-snug text-amber-950 flex items-center gap-2">
+                <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                <span>
+                  <strong>Keamanan Transaksi:</strong> Dilarang melakukan transfer DP atau sewa ke rekening pemilik di luar platform Keyloka.
+                </span>
+              </div>
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-gray-50/40">

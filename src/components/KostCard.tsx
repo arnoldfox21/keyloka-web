@@ -4,6 +4,7 @@ import Link from "next/link";
 import { BadgeCheck, Heart, MapPin, ShieldCheck, Star, Zap } from "lucide-react";
 import { getKostHref } from "@/lib/seo";
 import { formatCategoryLabel, formatRupiah, getDisplayPrice, resolveImageUrl, type Kost } from "@/lib/types";
+import { FacilityIcon } from "./FacilityIcon";
 
 interface KostCardProps {
   kost: Kost;
@@ -125,8 +126,9 @@ export function KostCard({ kost, isFavorite, onToggleFavorite }: KostCardProps) 
             {(kost.roomFacilities || []).slice(0, 2).map((fac) => (
               <span
                 key={fac}
-                className="rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600"
+                className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600"
               >
+                <FacilityIcon name={fac} className="h-3 w-3 shrink-0 text-gray-500" />
                 {fac}
               </span>
             ))}

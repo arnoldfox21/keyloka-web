@@ -20,6 +20,7 @@ import {
   Phone,
   Reply,
   Share2,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
   Star,
@@ -27,6 +28,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { FacilityIcon } from "./FacilityIcon";
 import {
   calculateBookingBreakdown,
   formatCategoryLabel,
@@ -694,8 +696,9 @@ export function KostDetailClient({
                   {kost.roomFacilities.map((f) => (
                     <span
                       key={f}
-                      className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-semibold text-gray-700"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-semibold text-gray-700"
                     >
+                      <FacilityIcon name={f} className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
                       {f}
                     </span>
                   ))}
@@ -712,8 +715,9 @@ export function KostDetailClient({
                   {kost.publicFacilities.map((f) => (
                     <span
                       key={f}
-                      className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-semibold text-gray-700"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-semibold text-gray-700"
                     >
+                      <FacilityIcon name={f} className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
                       {f}
                     </span>
                   ))}
@@ -1097,9 +1101,17 @@ export function KostDetailClient({
                 </button>
               )}
               {currentUser?.id !== kost.ownerId && (
-                <p className="text-center text-[11px] text-gray-500">
-                  Gratis tanya ketersediaan • Transaksi aman dengan Escrow
-                </p>
+                <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-[11px] leading-relaxed text-amber-950">
+                  <p className="flex items-start gap-2">
+                    <ShieldAlert className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                    <span>
+                      <strong>Peringatan Keamanan:</strong>{" "}
+                      {kost.allowDirectBooking
+                        ? "Dilarang melakukan transfer langsung ke rekening pemilik di luar platform Keyloka. Gunakan pembayaran Escrow resmi agar dana Anda terlindungi."
+                        : "Properti ini belum mengaktifkan pembayaran Escrow. Jangan melakukan transfer DP atau sewa langsung ke pemilik di luar platform sebelum survei di lokasi."}
+                    </span>
+                  </p>
+                </div>
               )}
             </div>
           </div>
@@ -1417,6 +1429,15 @@ export function KostDetailClient({
                     placeholder="Contoh: Rencana tiba sore hari"
                     className="w-full rounded-xl border border-gray-200 px-3.5 py-2 text-sm focus:border-emerald-500 focus:outline-none"
                   />
+                </div>
+
+                <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-2.5 text-[11px] leading-relaxed text-amber-950">
+                  <p className="flex items-start gap-1.5">
+                    <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-amber-600 mt-0.5" />
+                    <span>
+                      <strong>Jangan transfer di luar Keyloka.</strong> Segala pembayaran langsung ke rekening pribadi pemilik berada di luar tanggung jawab kami.
+                    </span>
+                  </p>
                 </div>
 
                 {feedback && (
