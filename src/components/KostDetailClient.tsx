@@ -945,17 +945,25 @@ export function KostDetailClient({
 
       {/* Modal Booking / Survei */}
       {modalMode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-black text-gray-900">
-                {modalMode === "DIRECT"
-                  ? "Booking Langsung (Escrow)"
-                  : "Ajukan Jadwal Survei"}
-              </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-[2px] p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl max-h-[92vh] flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-6 py-4 bg-gray-50/70">
+              <div className="min-w-0">
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                  {modalMode === "DIRECT" ? "Booking Langsung • Escrow" : "Pengajuan Survei"}
+                </span>
+                <h3 className="mt-1 truncate text-base font-black text-gray-900">
+                  {kost.name}
+                </h3>
+                <p className="text-xs text-gray-500">
+                  {formatRupiah(price.amount)} / {isDaily ? "hari" : isYearly ? "tahun" : "bulan"}
+                </p>
+              </div>
               <button
+                type="button"
                 onClick={() => setModalMode(null)}
-                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                className="rounded-xl p-1.5 text-gray-400 hover:bg-gray-200/70 hover:text-gray-700 transition"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -965,52 +973,56 @@ export function KostDetailClient({
               onSubmit={
                 modalMode === "DIRECT" ? handleSubmitDirect : handleSubmitSurvey
               }
-              className="mt-4 space-y-3.5"
+              className="flex-1 overflow-y-auto px-6 py-5 space-y-4"
             >
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Nama Lengkap
-                </label>
-                <input
-                  required
-                  value={tenantName}
-                  onChange={(e) => setTenantName(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Nomor HP / WhatsApp
-                </label>
-                <input
-                  required
-                  value={tenantPhone}
-                  onChange={(e) => setTenantPhone(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  {modalMode === "DIRECT"
-                    ? "Tanggal Mulai Masuk"
-                    : "Tanggal Rencana Survei"}
-                </label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Nama Lengkap
+                  </label>
                   <input
-                    type="date"
                     required
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-3 text-sm"
+                    value={tenantName}
+                    onChange={(e) => setTenantName(e.target.value)}
+                    placeholder="Nama sesuai KTP"
+                    className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Nomor HP / WhatsApp
+                  </label>
+                  <input
+                    required
+                    value={tenantPhone}
+                    onChange={(e) => setTenantPhone(e.target.value)}
+                    placeholder="08xxxxxxxxxx"
+                    className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
                   />
                 </div>
               </div>
 
-              {modalMode === "DIRECT" && (
-                <>
+              <div className={`grid gap-3 ${modalMode === "DIRECT" ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    {modalMode === "DIRECT"
+                      ? "Tanggal Mulai Masuk"
+                      : "Tanggal Rencana Survei"}
+                  </label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                      type="date"
+                      required
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-3 text-sm focus:border-emerald-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {modalMode === "DIRECT" && (
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
                       Durasi ({isDaily ? "Hari" : isYearly ? "Tahun" : "Bulan"})
@@ -1028,9 +1040,14 @@ export function KostDetailClient({
                           ),
                         )
                       }
-                      className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm"
+                      className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
                     />
                   </div>
+                )}
+              </div>
+
+              {modalMode === "DIRECT" && (
+                <>
 
                   {breakdown.canUseDp && (
                     <div className="space-y-1.5">
@@ -1188,13 +1205,24 @@ export function KostDetailClient({
 
               {feedback && (
                 <div
-                  className={`rounded-xl px-3.5 py-2.5 text-xs font-semibold ${
+                  className={`rounded-xl px-3.5 py-2.5 text-xs font-semibold space-y-2 ${
                     feedback.type === "error"
                       ? "bg-red-50 text-red-700 border border-red-200"
                       : "bg-emerald-50 text-emerald-800 border border-emerald-200"
                   }`}
                 >
-                  {feedback.text}
+                  <p>{feedback.text}</p>
+                  {feedback.type === "error" &&
+                    (feedback.text.toLowerCase().includes("menunggu pembayaran") ||
+                      feedback.text.toLowerCase().includes("belum dibayar")) && (
+                      <Link
+                        href="/bookings"
+                        onClick={() => setModalMode(null)}
+                        className="inline-flex items-center justify-center rounded-lg bg-red-700 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-red-800 transition"
+                      >
+                        Buka Halaman Booking
+                      </Link>
+                    )}
                 </div>
               )}
 

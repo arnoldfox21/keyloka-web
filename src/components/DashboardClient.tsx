@@ -1630,6 +1630,15 @@ export function DashboardClient({
               </div>
             </div>
 
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-xs text-emerald-950">
+              <p className="font-bold">Info Biaya Layanan Booking Langsung (Escrow)</p>
+              <p className="mt-0.5 text-[11px] text-emerald-900">
+                Penyewa bebas biaya tambahan. Setiap transaksi Booking Langsung dikenakan potongan{" "}
+                <strong>Biaya Platform 5%</strong> dan{" "}
+                <strong>Biaya Layanan & Payment Gateway 2,5% (min. Rp5.000)</strong> yang otomatis dipotong dari dana bersih pemilik.
+              </p>
+            </div>
+
             {visibleBookings.length === 0 ? (
               <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-500">
                 {onlyDisputedBookings

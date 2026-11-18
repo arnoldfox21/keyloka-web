@@ -266,6 +266,63 @@ export function NewPropertyClient({
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentStep, setCurrentStep] = useState<number>(1);
+
+  const STEPS = [
+    { id: 1, label: "Info Dasar" },
+    { id: 2, label: "Lokasi & Peta" },
+    { id: 3, label: "Harga & Booking" },
+    { id: 4, label: "Fasilitas & Foto" },
+    { id: 5, label: "Kontak & Simpan" },
+  ] as const;
+
+  function validateStep(step: number): string | null {
+    if (step === 1) {
+      if (!name.trim()) return "Nama properti wajib diisi.";
+      if (!description.trim()) return "Deskripsi properti wajib diisi.";
+    }
+    if (step === 2) {
+      if (!city.trim() || !district.trim() || !address.trim()) {
+        return "Kota, kecamatan, dan alamat lengkap wajib diisi.";
+      }
+    }
+    if (step === 3) {
+      const parsedMonth = Math.round(Number(pricePerMonth));
+      const parsedDay = Math.round(Number(pricePerDay));
+      const parsedYear = pricePerYear.trim() ? Math.round(Number(pricePerYear)) : undefined;
+      if (isDailyStay && (!Number.isFinite(parsedDay) || parsedDay <= 0)) {
+        return "Harga per hari wajib diisi untuk hunian harian.";
+      }
+      if (isKontrakan && (!parsedYear || !Number.isFinite(parsedYear) || parsedYear <= 0)) {
+        return "Harga per tahun wajib diisi untuk kontrakan.";
+      }
+      if (!isDailyStay && !isKontrakan && (!Number.isFinite(parsedMonth) || parsedMonth <= 0)) {
+        return "Harga per bulan wajib diisi.";
+      }
+    }
+    return null;
+  }
+
+  function handleNextStep() {
+    const stepErr = validateStep(currentStep);
+    if (stepErr) {
+      setError(stepErr);
+      return;
+    }
+    setError(null);
+    setCurrentStep((s) => Math.min(5, s + 1));
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
+
+  function handlePrevStep() {
+    setError(null);
+    setCurrentStep((s) => Math.max(1, s - 1));
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
 
   const isDailyStay = propertyCategory === "HUNIAN_HARIAN";
   const isKontrakan = propertyCategory === "KONTRAKAN";
@@ -634,8 +691,61 @@ export function NewPropertyClient({
         </div>
       )}
 
+      {/* Stepper */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4">
+        <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+          {STEPS.map((step) => {
+            const isActive = currentStep === step.id;
+            const isDone = currentStep > step.id;
+            return (
+              <button
+                key={step.id}
+                type="button"
+                onClick={() => {
+                  if (step.id < currentStep || isEditMode) {
+                    setError(null);
+                    setCurrentStep(step.id);
+                    return;
+                  }
+                  const stepErr = validateStep(currentStep);
+                  if (stepErr) {
+                    setError(stepErr);
+                    return;
+                  }
+                  setError(null);
+                  setCurrentStep(step.id);
+                }}
+                className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-center transition ${
+                  isActive
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : isDone
+                      ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                      : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                }`}
+              >
+                <span
+                  className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-black ${
+                    isActive
+                      ? "bg-white text-emerald-700"
+                      : isDone
+                        ? "bg-emerald-600 text-white"
+                        : "bg-gray-200 text-gray-600"
+                  }`}
+                >
+                  {step.id}
+                </span>
+                <span className="text-[10px] sm:text-xs font-bold leading-tight line-clamp-1">
+                  {step.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* 1. Informasi Dasar */}
+        {currentStep === 1 && (
         <section className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 space-y-4">
           <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
             <Building2 className="h-5 w-5 text-emerald-600" />
@@ -751,8 +861,10 @@ export function NewPropertyClient({
             />
           </div>
         </section>
+        )}
 
         {/* 2. Lokasi & Alamat */}
+        {currentStep === 2 && (
         <section className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 space-y-4">
           <div className="flex items-center justify-between border-b border-gray-100 pb-3">
             <div className="flex items-center gap-2">
@@ -912,8 +1024,10 @@ export function NewPropertyClient({
             }}
           />
         </section>
+        )}
 
         {/* 3. Harga & Spesifikasi Unit */}
+        {currentStep === 3 && (
         <section className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 space-y-4">
           <div className="border-b border-gray-100 pb-3">
             <h2 className="text-base font-extrabold text-gray-900">
@@ -1118,9 +1232,17 @@ export function NewPropertyClient({
               </span>
             </span>
           </label>
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-3.5 py-2.5 text-[11px] leading-relaxed text-emerald-950">
+            <strong>Ketentuan Fee Pemilik:</strong> Setiap transaksi Booking Langsung dikenakan potongan{" "}
+            <strong>Biaya Platform 5%</strong> dan{" "}
+            <strong>Biaya Layanan & Payment Gateway 2,5% (min. Rp5.000)</strong> yang dipotong otomatis dari dana pemilik. Penyewa bebas biaya tambahan.
+          </div>
         </section>
+        )}
 
         {/* 4. Fasilitas & Peraturan */}
+        {currentStep === 4 && (
+        <>
         <section className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 space-y-5">
           <div className="border-b border-gray-100 pb-3">
             <h2 className="text-base font-extrabold text-gray-900">
@@ -1366,8 +1488,11 @@ export function NewPropertyClient({
             </div>
           )}
         </section>
+        </>
+        )}
 
         {/* 6. Kontak Pengelola */}
+        {currentStep === 5 && (
         <section className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 space-y-4">
           <div className="border-b border-gray-100 pb-3">
             <h2 className="text-base font-extrabold text-gray-900">
@@ -1511,27 +1636,50 @@ export function NewPropertyClient({
             </div>
           </div>
         </section>
+        )}
 
-        {/* Submit Bar */}
-        <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-3 pt-2">
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-5 py-3 text-sm font-bold text-gray-700 hover:bg-gray-50"
-          >
-            Batal
-          </Link>
-          <button
-            type="submit"
-            disabled={submitting}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-extrabold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
-          >
-            {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-            {submitting
-              ? "Menyimpan Properti..."
-              : isEditMode
-                ? "Simpan Perubahan"
-                : "Simpan & Ajukan Properti"}
-          </button>
+        {/* Submit / Step Navigation Bar */}
+        <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 pt-2">
+          <div className="flex items-center gap-2">
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-50"
+            >
+              Batal
+            </Link>
+            {currentStep > 1 && (
+              <button
+                type="button"
+                onClick={handlePrevStep}
+                className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-5 py-3 text-sm font-bold text-gray-700 hover:bg-gray-50"
+              >
+                Kembali
+              </button>
+            )}
+          </div>
+
+          {currentStep < 5 ? (
+            <button
+              type="button"
+              onClick={handleNextStep}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-extrabold text-white shadow-sm hover:bg-emerald-700"
+            >
+              Lanjut ke Step {currentStep + 1}
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={submitting}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-extrabold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {submitting
+                ? "Menyimpan Properti..."
+                : isEditMode
+                  ? "Simpan Perubahan"
+                  : "Simpan & Ajukan Properti"}
+            </button>
+          )}
         </div>
       </form>
     </div>
