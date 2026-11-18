@@ -1681,7 +1681,7 @@ export function DashboardClient({
               <p className="font-bold">Info Biaya Layanan Booking Langsung (Escrow)</p>
               <p className="mt-0.5 text-[11px] text-emerald-900">
                 Penyewa bebas biaya tambahan. Setiap transaksi Booking Langsung dikenakan potongan{" "}
-                <strong>Biaya Platform 5%</strong> dan{" "}
+                <strong>Biaya Platform 1%</strong> dan{" "}
                 <strong>Biaya Layanan & Payment Gateway 2,5% (min. Rp5.000)</strong> yang otomatis dipotong dari dana bersih pemilik.
               </p>
             </div>

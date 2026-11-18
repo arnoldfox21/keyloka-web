@@ -730,8 +730,8 @@ export function HomeExplorer({
             <Clock className="h-4 w-4 text-emerald-600" />
             <h2 className="text-sm font-extrabold text-gray-900">Baru Saja Dilihat</h2>
           </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {recentlyViewed.slice(0, 4).map((k) => (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {recentlyViewed.slice(0, 3).map((k) => (
               <KostCard
                 key={`recent-${k.id}`}
                 kost={k}

@@ -476,7 +476,7 @@ export function calculateBookingBreakdown(params: {
     effectiveScheme === "DP" ? Math.round(baseTotal * 0.3) : baseTotal;
   const remainingRent = Math.max(0, baseTotal - payableRent);
 
-  const platformFee = Math.round(payableRent * 0.05);
+  const platformFee = Math.round(payableRent * 0.01);
   const maxPointDiscount = Math.floor(platformFee * 0.5);
   const pointCapByPayable = Math.max(0, payableRent - 1000);
   const maxUsablePoints = Math.min(

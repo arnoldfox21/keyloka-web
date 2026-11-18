@@ -1307,7 +1307,7 @@ export function NewPropertyClient({
           </div>
           <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-3.5 py-2.5 text-[11px] leading-relaxed text-emerald-950">
             <strong>Ketentuan Fee Pemilik:</strong> Setiap transaksi Booking Langsung dikenakan potongan{" "}
-            <strong>Biaya Platform 5%</strong> dan{" "}
+            <strong>Biaya Platform 1%</strong> dan{" "}
             <strong>Biaya Layanan & Payment Gateway 2,5% (min. Rp5.000)</strong> yang dipotong otomatis dari dana pemilik. Penyewa bebas biaya tambahan.
           </div>
         </section>
