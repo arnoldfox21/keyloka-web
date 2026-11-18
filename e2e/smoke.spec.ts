@@ -16,7 +16,7 @@ test.describe("Smoke & Public Health", () => {
     ).toBeVisible();
     await expect(
       page.getByRole("heading", {
-        name: /Temukan Hunian Nyaman & Booking Langsung dengan Escrow/i,
+        name: /Temukan Hunian Nyaman — Survei Mudah, Booking Aman/i,
       }),
     ).toBeVisible();
 

@@ -5,7 +5,7 @@ export const SITE_NAME = "Keyloka";
 export const DEFAULT_SITE_URL = "https://keyloka.com";
 
 export const DEFAULT_DESCRIPTION =
-  "Platform pencarian & booking hunian kost, apartemen, dan kontrakan dengan pembayaran Escrow aman, survei terverifikasi, dan poin loyalti.";
+  "Platform pencarian & booking hunian kost, apartemen, kontrakan, villa, dan homestay dengan transaksi aman, survei terverifikasi, dan poin loyalti.";
 
 export const DEFAULT_KEYWORDS = [
   "cari kost",
@@ -14,8 +14,11 @@ export const DEFAULT_KEYWORDS = [
   "kost bulanan",
   "apartemen",
   "kontrakan",
+  "sewa villa",
+  "homestay",
+  "hunian harian",
   "kost aman",
-  "booking kost escrow",
+  "booking kost aman",
   "Keyloka",
 ];
 

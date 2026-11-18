@@ -1,9 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
+  ArrowRight,
   Award,
+  Building2,
   CalendarCheck,
   ChevronDown,
   Clock,
@@ -43,7 +46,22 @@ const DAILY_SUBCATEGORIES = [
 ];
 
 const TYPES = ["Semua", "Putra", "Putri", "Campur"];
-const CAMPUS_TAGS = ["UB", "UM", "UIN", "Polinema", "UMM", "Ijen", "Sawojajar"];
+const DEFAULT_POPULAR_AREAS = [
+  "Jakarta",
+  "Bandung",
+  "Yogyakarta",
+  "Malang",
+  "Surabaya",
+  "Bali",
+];
+const POPULAR_AREA_BY_CITY: Record<string, string[]> = {
+  Malang: ["UB", "UM", "UIN", "Polinema", "UMM", "Ijen", "Sawojajar"],
+  Jakarta: ["Kemang", "Kuningan", "Setiabudi", "Menteng", "Tebet", "Senopati"],
+  Bandung: ["Dago", "Setiabudi", "Dipatiukur", "Cihampelas", "Lembang"],
+  Yogyakarta: ["Sleman", "UGM", "Seturan", "Malioboro", "Gejayan"],
+  Surabaya: ["ITS", "Unair", "Gubeng", "Citraland", "Darmo"],
+  Bali: ["Canggu", "Seminyak", "Ubud", "Kuta", "Uluwatu"],
+};
 
 const HISTORY_KEY = "keyloka_search_history";
 const RECENT_KEY = "keyloka_recently_viewed";
@@ -298,9 +316,9 @@ export function HomeExplorer({
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
       {/* Hero + Search */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-600 p-6 sm:p-10 text-white shadow-xl">
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-600 p-5 sm:p-7 text-white shadow-xl">
         <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-teal-300/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-emerald-400/20 blur-3xl" />
 
@@ -308,14 +326,14 @@ export function HomeExplorer({
           <div className="max-w-2xl">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-bold tracking-wide backdrop-blur-xs">
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-200" />
-              Cari Kost, Apartemen, Kontrakan & Villa Aman
+              Cari Kost, Apartemen, Kontrakan, Villa & Homestay
             </span>
-            <h1 className="mt-3 text-2xl sm:text-4xl font-black tracking-tight leading-tight">
-              Temukan Hunian Nyaman & Booking Langsung dengan Escrow
+            <h1 className="mt-2.5 text-2xl sm:text-3xl font-black tracking-tight leading-tight">
+              Temukan Hunian Nyaman — Survei Mudah, Booking Aman
             </h1>
-            <p className="mt-2.5 text-sm sm:text-base text-emerald-50/90 leading-relaxed">
-              Dana booking aman ditahan Keyloka hingga Anda konfirmasi check-in.
-              Kumpulkan poin di setiap transaksi.
+            <p className="mt-2 text-xs sm:text-sm text-emerald-50/90 leading-relaxed">
+              Booking kost, apartemen, kontrakan, hingga villa dan homestay dengan
+              proses transparan. Kumpulkan poin di setiap transaksi.
             </p>
           </div>
 
@@ -328,7 +346,7 @@ export function HomeExplorer({
                 setCategory("SEMUA");
                 fetchList(1, false, { stayMode: "LONG_TERM", category: "SEMUA" });
               }}
-              className={`rounded-xl px-4 py-2 text-xs font-bold transition ${
+              className={`rounded-xl px-3.5 py-2 text-xs font-bold transition ${
                 stayMode === "LONG_TERM"
                   ? "bg-white text-emerald-800 shadow-sm"
                   : "text-white/90 hover:text-white"
@@ -346,20 +364,20 @@ export function HomeExplorer({
                   dailySub: "ALL_DAILY",
                 });
               }}
-              className={`rounded-xl px-4 py-2 text-xs font-bold transition ${
+              className={`rounded-xl px-3.5 py-2 text-xs font-bold transition ${
                 stayMode === "HUNIAN_HARIAN"
                   ? "bg-white text-emerald-800 shadow-sm"
                   : "text-white/90 hover:text-white"
               }`}
             >
-              Hunian Harian
+              Harian (Villa & Homestay)
             </button>
           </div>
         </div>
 
         <form
           onSubmit={handleSearchSubmit}
-          className="relative mt-6 flex flex-col sm:flex-row gap-2.5 rounded-2xl bg-white/10 p-2 backdrop-blur-md border border-white/15"
+          className="relative mt-4 flex flex-col sm:flex-row gap-2.5 rounded-2xl bg-white/10 p-2 backdrop-blur-md border border-white/15"
         >
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -385,7 +403,7 @@ export function HomeExplorer({
             <Sparkles className="h-3 w-3" />
             Area Populer:
           </span>
-          {CAMPUS_TAGS.map((tag) => (
+          {(POPULAR_AREA_BY_CITY[city] || DEFAULT_POPULAR_AREAS).map((tag) => (
             <button
               key={tag}
               type="button"
@@ -430,8 +448,8 @@ export function HomeExplorer({
             <ShieldCheck className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-xs font-extrabold text-gray-900">Escrow Aman</p>
-            <p className="truncate text-[11px] text-gray-500">Dana aman s/d check-in</p>
+            <p className="truncate text-xs font-extrabold text-gray-900">Transaksi Aman</p>
+            <p className="truncate text-[11px] text-gray-500">Terverifikasi & transparan</p>
           </div>
         </div>
         <div className="flex items-center gap-2.5 rounded-2xl border border-gray-200/80 bg-white px-3.5 py-2.5 shadow-2xs">
@@ -463,23 +481,13 @@ export function HomeExplorer({
         </div>
       </section>
 
-      {/* Promotional Web Banner */}
-      <section className="mt-5 overflow-hidden rounded-3xl border border-gray-200/80 bg-white shadow-sm">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="https://media.keyloka.com/web/banner-web.webp"
-          alt="Banner Keyloka"
-          className="block w-full h-auto object-cover"
-          loading="eager"
-        />
-      </section>
-
       {/* Filter Bar */}
-      <section className="mt-5 flex flex-col gap-3.5 rounded-2xl border border-gray-200 bg-white p-4 shadow-xs">
+      <section className="mt-4 flex flex-col gap-3.5 rounded-2xl border border-gray-200 bg-white p-4 shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            {stayMode === "LONG_TERM"
-              ? LONG_TERM_CATEGORIES.map((c) => (
+            {stayMode === "LONG_TERM" ? (
+              <>
+                {LONG_TERM_CATEGORIES.map((c) => (
                   <button
                     key={c.value}
                     onClick={() => {
@@ -494,23 +502,44 @@ export function HomeExplorer({
                   >
                     {c.label}
                   </button>
-                ))
-              : DAILY_SUBCATEGORIES.map((c) => (
+                ))}
+                <span className="h-4 w-px bg-gray-200 mx-0.5 hidden sm:inline-block" />
+                {DAILY_SUBCATEGORIES.filter((c) => c.value !== "ALL_DAILY").map((c) => (
                   <button
                     key={c.value}
+                    type="button"
                     onClick={() => {
+                      setStayMode("HUNIAN_HARIAN");
                       setDailySub(c.value);
-                      fetchList(1, false, { dailySub: c.value });
+                      fetchList(1, false, {
+                        stayMode: "HUNIAN_HARIAN",
+                        dailySub: c.value,
+                      });
                     }}
-                    className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
-                      dailySub === c.value
-                        ? "bg-emerald-600 text-white"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
+                    className="rounded-full border border-emerald-200 bg-emerald-50/70 px-3.5 py-1.5 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
                   >
                     {c.label}
                   </button>
                 ))}
+              </>
+            ) : (
+              DAILY_SUBCATEGORIES.map((c) => (
+                <button
+                  key={c.value}
+                  onClick={() => {
+                    setDailySub(c.value);
+                    fetchList(1, false, { dailySub: c.value });
+                  }}
+                  className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
+                    dailySub === c.value
+                      ? "bg-emerald-600 text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -850,6 +879,41 @@ export function HomeExplorer({
             )}
           </>
         )}
+      </section>
+
+      {/* Promotional Web Banner */}
+      <section className="mt-8 overflow-hidden rounded-3xl border border-gray-200/80 bg-white shadow-sm">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="https://media.keyloka.com/web/banner-web.webp"
+          alt="Banner Keyloka"
+          className="block w-full h-auto object-cover"
+          loading="lazy"
+        />
+      </section>
+
+      {/* Owner Acquisition CTA */}
+      <section className="mt-6 flex flex-col justify-between gap-5 rounded-3xl border border-emerald-200/80 bg-gradient-to-r from-emerald-50 via-white to-teal-50/70 p-6 shadow-xs sm:flex-row sm:items-center sm:p-8">
+        <div className="max-w-2xl space-y-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider text-emerald-800">
+            <Building2 className="h-3.5 w-3.5" />
+            Untuk Pemilik Properti
+          </span>
+          <h2 className="text-lg sm:text-xl font-black tracking-tight text-gray-900">
+            Punya Kost, Kontrakan, Villa, atau Homestay?
+          </h2>
+          <p className="text-xs sm:text-sm leading-relaxed text-gray-600">
+            Pasang iklan properti Anda gratis di Keyloka dan jangkau ribuan calon penyewa potensial.
+            Kelola jadwal survei, booking, dan chat langsung dari satu dashboard.
+          </p>
+        </div>
+        <Link
+          href="/dashboard/new-property"
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700"
+        >
+          <span>Pasang Iklan Properti</span>
+          <ArrowRight className="h-4 w-4" />
+        </Link>
       </section>
 
       {showCompareModal && compareList.length >= 2 && (
