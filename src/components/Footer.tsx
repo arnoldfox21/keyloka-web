@@ -42,24 +42,21 @@ export function Footer({ user }: FooterProps) {
                 <span className="text-lg font-extrabold tracking-tight text-white">
                   Key<span className="text-emerald-400">loka</span>
                 </span>
-                <span className="ml-2 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
-                  Escrow Ready
-                </span>
               </div>
             </Link>
             <p className="text-xs leading-relaxed text-slate-400">
               Platform pencarian dan booking kost, apartemen, kontrakan, serta
-              hunian harian yang aman. Dana sewa ditahan di rekening bersama
-              hingga Anda check-in.
+              hunian harian yang praktis, transparan, dan terpercaya di
+              Indonesia.
             </p>
             <div className="flex flex-wrap gap-2 pt-1">
               <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-300">
                 <ShieldCheck className="h-3.5 w-3.5" />
-                Escrow Protected
+                Hunian Terverifikasi
               </span>
               <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-slate-300">
                 <Lock className="h-3.5 w-3.5 text-emerald-400" />
-                Verified Payment
+                Transaksi Aman
               </span>
             </div>
           </div>
@@ -181,11 +178,11 @@ export function Footer({ user }: FooterProps) {
                 Buka Panduan Pengguna
               </button>
               <a
-                href="mailto:admin@keyloka.com"
+                href="mailto:halo@keyloka.com"
                 className="inline-flex items-center gap-2 text-xs text-slate-400 hover:text-emerald-400 transition"
               >
                 <Mail className="h-3.5 w-3.5 text-slate-500" />
-                admin@keyloka.com
+                halo@keyloka.com
               </a>
             </div>
           </div>
@@ -194,8 +191,7 @@ export function Footer({ user }: FooterProps) {
         {/* Bottom Bar */}
         <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-slate-800/80 pt-6 sm:flex-row">
           <p className="text-xs text-slate-500">
-            © {new Date().getFullYear()} Keyloka. Seluruh transaksi booking
-            langsung dilindungi Escrow Keyloka.
+            © {new Date().getFullYear()} Keyloka. Seluruh hak cipta dilindungi.
           </p>
           <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-400">
             <span className="inline-flex items-center gap-1 text-slate-500 mr-1">

@@ -218,6 +218,14 @@ export function NewPropertyClient({
   const [allowDirectBooking, setAllowDirectBooking] = useState(
     initialKost?.allowDirectBooking ?? isAutoApproved,
   );
+  const [hasDeposit, setHasDeposit] = useState(
+    Boolean(initialKost?.depositAmount && initialKost.depositAmount > 0),
+  );
+  const [depositAmount, setDepositAmount] = useState(
+    initialKost?.depositAmount && initialKost.depositAmount > 0
+      ? String(initialKost.depositAmount)
+      : "",
+  );
 
   const [roomFacilities, setRoomFacilities] = useState<string[]>(
     initialKost?.roomFacilities || [],
@@ -298,6 +306,12 @@ export function NewPropertyClient({
       }
       if (!isDailyStay && !isKontrakan && (!Number.isFinite(parsedMonth) || parsedMonth <= 0)) {
         return "Harga per bulan wajib diisi.";
+      }
+      if (hasDeposit) {
+        const parsedDeposit = Math.round(Number(depositAmount));
+        if (!Number.isFinite(parsedDeposit) || parsedDeposit <= 0) {
+          return "Jumlah deposit keamanan wajib diisi lebih dari 0 jika diaktifkan.";
+        }
       }
     }
     return null;
@@ -543,6 +557,11 @@ export function NewPropertyClient({
     const parsedOriginal = originalPrice.trim()
       ? Math.round(Number(originalPrice))
       : undefined;
+    const parsedDeposit = hasDeposit ? Math.round(Number(depositAmount)) : 0;
+    if (hasDeposit && (!Number.isFinite(parsedDeposit) || parsedDeposit <= 0)) {
+      setError("Jumlah deposit keamanan wajib diisi lebih dari 0 jika diaktifkan.");
+      return;
+    }
     const parsedLat = latitude.trim() ? Number(latitude) : undefined;
     const parsedLng = longitude.trim() ? Number(longitude) : undefined;
 
@@ -575,6 +594,7 @@ export function NewPropertyClient({
       bathrooms: parsedBathrooms,
       electricityIncluded: isDailyStay ? true : electricityIncluded,
       allowDirectBooking: isAutoApproved ? allowDirectBooking : false,
+      depositAmount: parsedDeposit,
       roomFacilities,
       publicFacilities,
       rules,
@@ -1232,6 +1252,59 @@ export function NewPropertyClient({
               </span>
             </span>
           </label>
+
+          <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-3 space-y-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <span className="block text-xs font-bold text-gray-700">
+                  Syaratkan Deposit Keamanan
+                </span>
+                <span className="block text-[11px] text-gray-500">
+                  Opsional. Dibayar terpisah saat Check-In dan dikembalikan saat Check-Out jika tidak ada kerusakan.
+                </span>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={hasDeposit}
+                aria-label="Aktifkan Deposit Keamanan"
+                onClick={() => {
+                  setHasDeposit((prev) => !prev);
+                }}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1 ${
+                  hasDeposit ? "bg-emerald-600" : "bg-gray-300"
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-xs transition duration-200 ease-in-out ${
+                    hasDeposit ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {hasDeposit && (
+              <div className="space-y-1 pt-1 border-t border-gray-200/80">
+                <label
+                  htmlFor="prop-deposit-amount"
+                  className="block text-xs font-bold text-gray-700"
+                >
+                  Jumlah Deposit Keamanan (Rp)
+                </label>
+                <input
+                  id="prop-deposit-amount"
+                  type="number"
+                  min={1}
+                  step="any"
+                  value={depositAmount}
+                  onChange={(e) => setDepositAmount(e.target.value)}
+                  placeholder="Contoh: 500000"
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+            )}
+          </div>
           <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-3.5 py-2.5 text-[11px] leading-relaxed text-emerald-950">
             <strong>Ketentuan Fee Pemilik:</strong> Setiap transaksi Booking Langsung dikenakan potongan{" "}
             <strong>Biaya Platform 5%</strong> dan{" "}
