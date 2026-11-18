@@ -241,7 +241,10 @@ export function KostDetailClient({
     }
   }
 
-  async function syncDirectPayment(bookingId: number) {
+  async function syncDirectPayment(
+    bookingId: number,
+    paymentState: "success" | "pending" = "pending",
+  ) {
     try {
       await fetch(`/api/proxy/bookings/${bookingId}/sync-payment`, {
         method: "POST",
@@ -249,7 +252,7 @@ export function KostDetailClient({
     } catch {
       // Tetap arahkan ke /bookings agar user dapat memeriksa status pembayaran
     }
-    router.push("/bookings");
+    router.push(`/bookings?payment=${paymentState}`);
     router.refresh();
   }
 
@@ -280,9 +283,9 @@ export function KostDetailClient({
       if (window.snap && booking.snapToken) {
         setModalMode(null);
         window.snap.pay(booking.snapToken, {
-          onSuccess: () => syncDirectPayment(booking.id),
-          onPending: () => syncDirectPayment(booking.id),
-          onClose: () => syncDirectPayment(booking.id),
+          onSuccess: () => syncDirectPayment(booking.id, "success"),
+          onPending: () => syncDirectPayment(booking.id, "pending"),
+          onClose: () => syncDirectPayment(booking.id, "pending"),
           onError: () => {
             setFeedback({
               type: "error",
@@ -945,13 +948,18 @@ export function KostDetailClient({
 
       {/* Modal Booking / Survei */}
       {modalMode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-[2px] p-4">
-          <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl max-h-[92vh] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/55 backdrop-blur-[2px] p-0 sm:p-4">
+          <div className="w-full max-w-lg rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl max-h-[92dvh] flex flex-col overflow-hidden">
+            {/* Mobile drag handle */}
+            <div className="sm:hidden flex justify-center pt-2.5 pb-1 bg-gray-50/70">
+              <span className="h-1 w-10 rounded-full bg-gray-300" aria-hidden="true" />
+            </div>
+
             {/* Header */}
-            <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-6 py-4 bg-gray-50/70">
+            <div className="shrink-0 flex items-start justify-between gap-3 border-b border-gray-100 px-4 py-3 sm:px-6 sm:py-4 bg-gray-50/70">
               <div className="min-w-0">
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
-                  {modalMode === "DIRECT" ? "Booking Langsung • Escrow" : "Pengajuan Survei"}
+                  {modalMode === "DIRECT" ? "Booking Langsung" : "Pengajuan Survei"}
                 </span>
                 <h3 className="mt-1 truncate text-base font-black text-gray-900">
                   {kost.name}
@@ -963,6 +971,7 @@ export function KostDetailClient({
               <button
                 type="button"
                 onClick={() => setModalMode(null)}
+                aria-label="Tutup modal"
                 className="rounded-xl p-1.5 text-gray-400 hover:bg-gray-200/70 hover:text-gray-700 transition"
               >
                 <X className="h-5 w-5" />
@@ -973,270 +982,297 @@ export function KostDetailClient({
               onSubmit={
                 modalMode === "DIRECT" ? handleSubmitDirect : handleSubmitSurvey
               }
-              className="flex-1 overflow-y-auto px-6 py-5 space-y-4"
+              className="flex min-h-0 flex-1 flex-col"
             >
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Nama Lengkap
-                  </label>
-                  <input
-                    required
-                    value={tenantName}
-                    onChange={(e) => setTenantName(e.target.value)}
-                    placeholder="Nama sesuai KTP"
-                    className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    Nomor HP / WhatsApp
-                  </label>
-                  <input
-                    required
-                    value={tenantPhone}
-                    onChange={(e) => setTenantPhone(e.target.value)}
-                    placeholder="08xxxxxxxxxx"
-                    className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className={`grid gap-3 ${modalMode === "DIRECT" ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    {modalMode === "DIRECT"
-                      ? "Tanggal Mulai Masuk"
-                      : "Tanggal Rencana Survei"}
-                  </label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Nama Lengkap
+                    </label>
                     <input
-                      type="date"
                       required
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-3 text-sm focus:border-emerald-500 focus:outline-none"
+                      value={tenantName}
+                      onChange={(e) => setTenantName(e.target.value)}
+                      placeholder="Nama sesuai KTP"
+                      className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Nomor HP / WhatsApp
+                    </label>
+                    <input
+                      required
+                      value={tenantPhone}
+                      onChange={(e) => setTenantPhone(e.target.value)}
+                      placeholder="08xxxxxxxxxx"
+                      className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
                     />
                   </div>
                 </div>
 
-                {modalMode === "DIRECT" && (
+                <div className={`grid gap-3 ${modalMode === "DIRECT" ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                      Durasi ({isDaily ? "Hari" : isYearly ? "Tahun" : "Bulan"})
+                      {modalMode === "DIRECT"
+                        ? "Tanggal Mulai Masuk"
+                        : "Tanggal Rencana Survei"}
                     </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={maxDuration}
-                      value={durationCount}
-                      onChange={(e) =>
-                        setDurationCount(
-                          Math.max(
-                            1,
-                            Math.min(maxDuration, Number(e.target.value) || 1),
-                          ),
-                        )
-                      }
-                      className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
-                    />
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        type="date"
+                        required
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-3 text-sm focus:border-emerald-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {modalMode === "DIRECT" && (
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Durasi ({isDaily ? "Hari" : isYearly ? "Tahun" : "Bulan"})
+                      </label>
+                      <div className="flex h-[42px] items-center justify-between rounded-xl border border-gray-200 bg-white px-2">
+                        <button
+                          type="button"
+                          aria-label="Kurangi durasi"
+                          disabled={durationCount <= 1}
+                          onClick={() =>
+                            setDurationCount((d) => Math.max(1, d - 1))
+                          }
+                          className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-base font-bold text-gray-700 transition hover:bg-gray-200 disabled:opacity-40"
+                        >
+                          −
+                        </button>
+                        <span className="text-sm font-bold text-gray-900">
+                          {durationCount} {isDaily ? "Hari" : isYearly ? "Tahun" : "Bulan"}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label="Tambah durasi"
+                          disabled={durationCount >= maxDuration}
+                          onClick={() =>
+                            setDurationCount((d) => Math.min(maxDuration, d + 1))
+                          }
+                          className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-base font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-40"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {modalMode === "DIRECT" && (
+                  <>
+                    {breakdown.canUseDp && (
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-gray-700">
+                          Skema Pembayaran
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setPaymentScheme("FULL")}
+                            className={`rounded-xl border p-2.5 text-left transition ${
+                              breakdown.effectiveScheme === "FULL"
+                                ? "border-emerald-600 bg-emerald-50 ring-1 ring-emerald-600"
+                                : "border-gray-200 bg-white hover:bg-gray-50"
+                            }`}
+                          >
+                            <p className="text-xs font-extrabold text-gray-900">
+                              Bayar Penuh (100%)
+                            </p>
+                            <p className="mt-0.5 text-[11px] text-gray-500">
+                              Langsung lunas tanpa sisa tagihan
+                            </p>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPaymentScheme("DP")}
+                            className={`rounded-xl border p-2.5 text-left transition ${
+                              breakdown.effectiveScheme === "DP"
+                                ? "border-emerald-600 bg-emerald-50 ring-1 ring-emerald-600"
+                                : "border-gray-200 bg-white hover:bg-gray-50"
+                            }`}
+                          >
+                            <p className="text-xs font-extrabold text-gray-900">
+                              DP 30% (Booking Fee)
+                            </p>
+                            <p className="mt-0.5 text-[11px] text-gray-500">
+                              Kunci unit, lunasi sisa saat check-in
+                            </p>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {maxUsablePoints > 0 && (
+                      <label className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs cursor-pointer">
+                        <span className="flex items-center gap-2 font-bold text-amber-900">
+                          <Sparkles className="h-4 w-4 shrink-0 text-amber-600" />
+                          Pakai {maxUsablePoints} Poin (-
+                          {formatRupiah(maxUsablePoints * 50)})
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={usePoints}
+                          onChange={(e) => setUsePoints(e.target.checked)}
+                          className="h-4 w-4 accent-emerald-600"
+                        />
+                      </label>
+                    )}
+
+                    <div className="rounded-xl bg-gray-50 p-3.5 text-xs space-y-1.5 border border-gray-100">
+                      <div className="flex justify-between text-gray-600">
+                        <span>Subtotal Sewa ({durationCount} {isDaily ? "Hari" : isYearly ? "Tahun" : "Bulan"})</span>
+                        <span className="font-semibold text-gray-800">{formatRupiah(breakdown.baseTotal)}</span>
+                      </div>
+
+                      {breakdown.effectiveScheme === "DP" && (
+                        <>
+                          <div className="flex justify-between text-emerald-700 font-semibold">
+                            <span>Tagihan DP Sekarang (30%)</span>
+                            <span>{formatRupiah(breakdown.payableRent)}</span>
+                          </div>
+                          <div className="flex justify-between text-gray-500">
+                            <span>Sisa Pelunasan (saat Check-In)</span>
+                            <span>{formatRupiah(breakdown.remainingRent)}</span>
+                          </div>
+                        </>
+                      )}
+
+                      {appliedDiscount > 0 && (
+                        <div className="flex justify-between text-emerald-700 font-semibold">
+                          <span>Potongan Poin Loyalti</span>
+                          <span>-{formatRupiah(appliedDiscount)}</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between text-gray-600">
+                        <button
+                          type="button"
+                          onClick={() => setShowFeeInfo((v) => !v)}
+                          className="inline-flex items-center gap-1 text-left hover:text-emerald-700 transition"
+                          title="Klik untuk penjelasan biaya layanan"
+                        >
+                          <span>Biaya Layanan & Transaksi</span>
+                          <Info className="h-3.5 w-3.5 text-gray-400" />
+                        </button>
+                        <span className="font-semibold text-emerald-700">Gratis</span>
+                      </div>
+
+                      {showFeeInfo && (
+                        <p className="rounded-lg bg-white border border-gray-200 p-2 text-[11px] leading-relaxed text-gray-600">
+                          Gratis biaya layanan untuk penyewa. Seluruh biaya pemrosesan pembayaran ditanggung oleh pemilik properti.
+                        </p>
+                      )}
+
+                      <div className="flex justify-between border-t border-gray-200 pt-2 text-sm font-black text-gray-900">
+                        <span>{breakdown.effectiveScheme === "DP" ? "Total Bayar DP" : "Total Bayar Sekarang"}</span>
+                        <span className="text-emerald-700">
+                          {formatRupiah(breakdown.finalPayNow)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Info Penting untuk Penyewa (Keamanan, Deposit, Listrik) */}
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-[11px] leading-relaxed text-emerald-950 space-y-1.5">
+                      <p className="flex items-start gap-1.5 font-semibold">
+                        <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600 mt-0.5" />
+                        <span>
+                          <strong>Pembayaran Terlindungi:</strong> Transaksi diproses aman dan diteruskan ke pemilik setelah Anda konfirmasi Check-In.
+                        </span>
+                      </p>
+                      {breakdown.depositAmount > 0 && (
+                        <p className="flex items-start gap-1.5">
+                          <Info className="h-3.5 w-3.5 shrink-0 text-amber-600 mt-0.5" />
+                          <span>
+                            <strong>Info Deposit Keamanan:</strong> Pemilik mensyaratkan deposit{" "}
+                            <span className="font-bold">{formatRupiah(breakdown.depositAmount)}</span>{" "}
+                            yang dibayar terpisah saat Check-In dan dikembalikan saat Check-Out jika tidak ada kerusakan.
+                          </span>
+                        </p>
+                      )}
+                      <p className="flex items-start gap-1.5 text-emerald-900">
+                        <Info className="h-3.5 w-3.5 shrink-0 text-emerald-600 mt-0.5" />
+                        <span>
+                          <strong>Listrik:</strong>{" "}
+                          {kost.electricityIncluded
+                            ? "Sudah termasuk dalam harga sewa."
+                            : "Belum termasuk harga sewa (dibayar terpisah sesuai pemakaian/token)."}
+                        </span>
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Catatan (opsional)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Contoh: Rencana tiba sore hari"
+                    className="w-full rounded-xl border border-gray-200 px-3.5 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                {feedback && (
+                  <div
+                    className={`rounded-xl px-3.5 py-2.5 text-xs font-semibold space-y-2 ${
+                      feedback.type === "error"
+                        ? "bg-red-50 text-red-700 border border-red-200"
+                        : "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                    }`}
+                  >
+                    <p>{feedback.text}</p>
+                    {feedback.type === "error" &&
+                      (feedback.text.toLowerCase().includes("menunggu pembayaran") ||
+                        feedback.text.toLowerCase().includes("belum dibayar")) && (
+                        <Link
+                          href="/bookings"
+                          onClick={() => setModalMode(null)}
+                          className="inline-flex items-center justify-center rounded-lg bg-red-700 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-red-800 transition"
+                        >
+                          Buka Halaman Booking
+                        </Link>
+                      )}
                   </div>
                 )}
               </div>
 
-              {modalMode === "DIRECT" && (
-                <>
-
-                  {breakdown.canUseDp && (
-                    <div className="space-y-1.5">
-                      <label className="block text-xs font-bold text-gray-700">
-                        Skema Pembayaran
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setPaymentScheme("FULL")}
-                          className={`rounded-xl border p-2.5 text-left transition ${
-                            breakdown.effectiveScheme === "FULL"
-                              ? "border-emerald-600 bg-emerald-50 ring-1 ring-emerald-600"
-                              : "border-gray-200 bg-white hover:bg-gray-50"
-                          }`}
-                        >
-                          <p className="text-xs font-extrabold text-gray-900">
-                            Bayar Penuh (100%)
-                          </p>
-                          <p className="mt-0.5 text-[11px] text-gray-500">
-                            Langsung lunas tanpa sisa tagihan
-                          </p>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setPaymentScheme("DP")}
-                          className={`rounded-xl border p-2.5 text-left transition ${
-                            breakdown.effectiveScheme === "DP"
-                              ? "border-emerald-600 bg-emerald-50 ring-1 ring-emerald-600"
-                              : "border-gray-200 bg-white hover:bg-gray-50"
-                          }`}
-                        >
-                          <p className="text-xs font-extrabold text-gray-900">
-                            DP 30% (Booking Fee)
-                          </p>
-                          <p className="mt-0.5 text-[11px] text-gray-500">
-                            Kunci unit, lunasi sisa saat check-in
-                          </p>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {maxUsablePoints > 0 && (
-                    <label className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs cursor-pointer">
-                      <span className="flex items-center gap-2 font-bold text-amber-900">
-                        <Sparkles className="h-4 w-4 text-amber-600" />
-                        Pakai {maxUsablePoints} Poin (-
-                        {formatRupiah(maxUsablePoints * 50)})
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={usePoints}
-                        onChange={(e) => setUsePoints(e.target.checked)}
-                        className="h-4 w-4 accent-emerald-600"
-                      />
-                    </label>
-                  )}
-
-                  <div className="rounded-xl bg-gray-50 p-3.5 text-xs space-y-1.5 border border-gray-100">
-                    <div className="flex justify-between text-gray-600">
-                      <span>Subtotal Sewa ({durationCount} {isDaily ? "Hari" : isYearly ? "Tahun" : "Bulan"})</span>
-                      <span className="font-semibold text-gray-800">{formatRupiah(breakdown.baseTotal)}</span>
-                    </div>
-
-                    {breakdown.effectiveScheme === "DP" && (
-                      <>
-                        <div className="flex justify-between text-emerald-700 font-semibold">
-                          <span>Tagihan DP Sekarang (30%)</span>
-                          <span>{formatRupiah(breakdown.payableRent)}</span>
-                        </div>
-                        <div className="flex justify-between text-gray-500">
-                          <span>Sisa Pelunasan (saat Check-In)</span>
-                          <span>{formatRupiah(breakdown.remainingRent)}</span>
-                        </div>
-                      </>
-                    )}
-
-                    {appliedDiscount > 0 && (
-                      <div className="flex justify-between text-emerald-700 font-semibold">
-                        <span>Potongan Poin Loyalti</span>
-                        <span>-{formatRupiah(appliedDiscount)}</span>
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between text-gray-600">
-                      <button
-                        type="button"
-                        onClick={() => setShowFeeInfo((v) => !v)}
-                        className="inline-flex items-center gap-1 text-left hover:text-emerald-700 transition"
-                        title="Klik untuk penjelasan biaya layanan"
-                      >
-                        <span>Biaya Layanan & Transaksi</span>
-                        <Info className="h-3.5 w-3.5 text-gray-400" />
-                      </button>
-                      <span className="font-semibold text-emerald-700">Gratis</span>
-                    </div>
-
-                    {showFeeInfo && (
-                      <p className="rounded-lg bg-white border border-gray-200 p-2 text-[11px] leading-relaxed text-gray-600">
-                        Gratis biaya layanan untuk penyewa. Seluruh biaya pemrosesan pembayaran & perlindungan rekening bersama (Escrow) ditanggung oleh pemilik properti.
-                      </p>
-                    )}
-
-                    <div className="flex justify-between border-t border-gray-200 pt-2 text-sm font-black text-gray-900">
-                      <span>{breakdown.effectiveScheme === "DP" ? "Total Bayar DP" : "Total Bayar Sekarang"}</span>
-                      <span className="text-emerald-700">
-                        {formatRupiah(breakdown.finalPayNow)}
-                      </span>
-                    </div>
+              {/* Sticky Footer */}
+              <div className="shrink-0 border-t border-gray-100 bg-white px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
+                {modalMode === "DIRECT" && (
+                  <div className="mb-2.5 flex items-center justify-between text-xs sm:hidden">
+                    <span className="font-semibold text-gray-500">
+                      {breakdown.effectiveScheme === "DP" ? "Total Bayar DP" : "Total Bayar"}
+                    </span>
+                    <span className="text-sm font-black text-emerald-700">
+                      {formatRupiah(breakdown.finalPayNow)}
+                    </span>
                   </div>
-
-                  {/* Info Penting untuk Penyewa (Escrow, Deposit, Listrik) */}
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-[11px] leading-relaxed text-emerald-950 space-y-1.5">
-                    <p className="flex items-start gap-1.5 font-semibold">
-                      <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600 mt-0.5" />
-                      <span>
-                        <strong>Dilindungi Escrow:</strong> Dana Anda ditahan aman di rekening bersama dan baru diteruskan ke pemilik setelah Anda konfirmasi Check-In.
-                      </span>
-                    </p>
-                    {breakdown.depositAmount > 0 && (
-                      <p className="flex items-start gap-1.5">
-                        <Info className="h-3.5 w-3.5 shrink-0 text-amber-600 mt-0.5" />
-                        <span>
-                          <strong>Info Deposit Keamanan:</strong> Pemilik mensyaratkan deposit{" "}
-                          <span className="font-bold">{formatRupiah(breakdown.depositAmount)}</span>{" "}
-                          yang dibayar terpisah saat Check-In dan dikembalikan saat Check-Out jika tidak ada kerusakan.
-                        </span>
-                      </p>
-                    )}
-                    <p className="flex items-start gap-1.5 text-emerald-900">
-                      <Info className="h-3.5 w-3.5 shrink-0 text-emerald-600 mt-0.5" />
-                      <span>
-                        <strong>Listrik:</strong>{" "}
-                        {kost.electricityIncluded
-                          ? "Sudah termasuk dalam harga sewa."
-                          : "Belum termasuk harga sewa (dibayar terpisah sesuai pemakaian/token)."}
-                      </span>
-                    </p>
-                  </div>
-                </>
-              )}
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Catatan (opsional)
-                </label>
-                <textarea
-                  rows={2}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2 text-sm"
-                />
-              </div>
-
-              {feedback && (
-                <div
-                  className={`rounded-xl px-3.5 py-2.5 text-xs font-semibold space-y-2 ${
-                    feedback.type === "error"
-                      ? "bg-red-50 text-red-700 border border-red-200"
-                      : "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                  }`}
+                )}
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-extrabold text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50 transition"
                 >
-                  <p>{feedback.text}</p>
-                  {feedback.type === "error" &&
-                    (feedback.text.toLowerCase().includes("menunggu pembayaran") ||
-                      feedback.text.toLowerCase().includes("belum dibayar")) && (
-                      <Link
-                        href="/bookings"
-                        onClick={() => setModalMode(null)}
-                        className="inline-flex items-center justify-center rounded-lg bg-red-700 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-red-800 transition"
-                      >
-                        Buka Halaman Booking
-                      </Link>
-                    )}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-extrabold text-white hover:bg-emerald-700 disabled:opacity-50 transition"
-              >
-                {submitting
-                  ? "Memproses..."
-                  : modalMode === "DIRECT"
-                    ? "Lanjut Pembayaran"
-                    : "Kirim Jadwal Survei"}
-              </button>
+                  {submitting
+                    ? "Memproses..."
+                    : modalMode === "DIRECT"
+                      ? "Lanjut Pembayaran"
+                      : "Kirim Jadwal Survei"}
+                </button>
+              </div>
             </form>
           </div>
         </div>

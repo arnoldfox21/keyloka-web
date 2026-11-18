@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   Award,
@@ -27,18 +27,37 @@ import {
 interface BookingsClientProps {
   initialBookings: Booking[];
   loyalty: LoyaltySummary | null;
+  initialPaymentStatus?: string;
 }
 
 export function BookingsClient({
   initialBookings,
   loyalty,
+  initialPaymentStatus,
 }: BookingsClientProps) {
   const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("SEMUA");
   const [busyId, setBusyId] = useState<number | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(() => {
+    if (initialPaymentStatus === "success") {
+      return "Pembayaran berhasil! Status booking Anda telah diperbarui.";
+    }
+    if (initialPaymentStatus === "pending") {
+      return "Pembayaran masih menunggu penyelesaian. Klik 'Cek Status Bayar' jika Anda sudah membayar.";
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    if (
+      typeof window !== "undefined" &&
+      (initialPaymentStatus === "success" || initialPaymentStatus === "pending")
+    ) {
+      window.history.replaceState({}, "", "/bookings");
+    }
+  }, [initialPaymentStatus]);
 
   async function refreshAll() {
     const res = await fetch("/api/proxy/bookings");
@@ -77,6 +96,9 @@ export function BookingsClient({
           void handleSyncPayment(booking.id);
         },
         onPending: () => {
+          void handleSyncPayment(booking.id);
+        },
+        onClose: () => {
           void handleSyncPayment(booking.id);
         },
         onError: () => {
