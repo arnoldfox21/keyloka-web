@@ -182,6 +182,12 @@ export function NewPropertyClient({
 
   const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
   const [districtSuggestions, setDistrictSuggestions] = useState<string[]>([]);
+  const [selectedOwnerId, setSelectedOwnerId] = useState<number | null>(null);
+  const [ownerSearch, setOwnerSearch] = useState("");
+  const [ownerOptions, setOwnerOptions] = useState<
+    Array<{ id: number; name: string; email: string; phone?: string; role: string }>
+  >([]);
+  const [ownerSearching, setOwnerSearching] = useState(false);
 
   const [pricePerMonth, setPricePerMonth] = useState(
     initialKost?.pricePerMonth ? String(initialKost.pricePerMonth) : "",
@@ -324,7 +330,6 @@ export function NewPropertyClient({
   }, [city, district]);
 
   function toggleFacility(
-    list: string[],
     setList: React.Dispatch<React.SetStateAction<string[]>>,
     item: string,
   ) {
@@ -517,6 +522,9 @@ export function NewPropertyClient({
       rules,
       ownerName: ownerName.trim() || currentUser.name,
       ownerPhone: ownerPhone.trim() || currentUser.phone,
+      ...(!isEditMode && isAutoApproved && selectedOwnerId
+        ? { ownerId: selectedOwnerId }
+        : {}),
       ...(parsedLat !== undefined && Number.isFinite(parsedLat)
         ? { latitude: parsedLat }
         : {}),
@@ -896,6 +904,11 @@ export function NewPropertyClient({
               setLatitude(lat);
               setLongitude(lng);
             }}
+            onLocationResolved={({ city: c, district: d, address: a }) => {
+              if (c) setCity(c);
+              if (d) setDistrict(d);
+              if (a) setAddress(a);
+            }}
           />
         </section>
 
@@ -1112,7 +1125,7 @@ export function NewPropertyClient({
                     key={fac}
                     type="button"
                     onClick={() =>
-                      toggleFacility(roomFacilities, setRoomFacilities, fac)
+                      toggleFacility(setRoomFacilities, fac)
                     }
                     className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold transition ${
                       selected
@@ -1180,7 +1193,7 @@ export function NewPropertyClient({
                     key={fac}
                     type="button"
                     onClick={() =>
-                      toggleFacility(publicFacilities, setPublicFacilities, fac)
+                      toggleFacility(setPublicFacilities, fac)
                     }
                     className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold transition ${
                       selected
@@ -1340,6 +1353,110 @@ export function NewPropertyClient({
               6. Kontak Pengelola
             </h2>
           </div>
+
+          {!isEditMode && isAutoApproved && (
+            <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-bold text-blue-900">
+                  Pilih Pemilik Properti (Opsional — khusus Staff/Admin)
+                </p>
+                {selectedOwnerId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedOwnerId(null);
+                      setOwnerSearch("");
+                      setOwnerName(currentUser.name || "");
+                      setOwnerPhone(currentUser.phone || "");
+                    }}
+                    className="text-[11px] font-bold text-red-600 hover:underline"
+                  >
+                    Reset ke Akun Saya
+                  </button>
+                )}
+              </div>
+              <p className="text-[11px] text-blue-800/80">
+                Kosongkan jika properti diposting atas nama Staff (nantinya dapat diklaim pemilik asli).
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={ownerSearch}
+                  onChange={(e) => setOwnerSearch(e.target.value)}
+                  onKeyDown={async (e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      setOwnerSearching(true);
+                      try {
+                        const res = await fetch(
+                          `/api/proxy/auth/users?search=${encodeURIComponent(ownerSearch.trim())}&limit=10`,
+                        );
+                        if (res.ok) {
+                          const list = await res.json();
+                          setOwnerOptions(Array.isArray(list) ? list : []);
+                        }
+                      } finally {
+                        setOwnerSearching(false);
+                      }
+                    }
+                  }}
+                  placeholder="Cari nama atau email pemilik..."
+                  className="flex-1 rounded-xl border border-blue-200 bg-white px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  disabled={ownerSearching}
+                  onClick={async () => {
+                    setOwnerSearching(true);
+                    try {
+                      const res = await fetch(
+                        `/api/proxy/auth/users?search=${encodeURIComponent(ownerSearch.trim())}&limit=10`,
+                      );
+                      if (res.ok) {
+                        const list = await res.json();
+                        setOwnerOptions(Array.isArray(list) ? list : []);
+                      }
+                    } finally {
+                      setOwnerSearching(false);
+                    }
+                  }}
+                  className="rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {ownerSearching ? "Mencari..." : "Cari Pemilik"}
+                </button>
+              </div>
+              {ownerOptions.length > 0 && (
+                <div className="max-h-44 overflow-y-auto divide-y divide-gray-100 rounded-xl border border-blue-200 bg-white">
+                  {ownerOptions.map((u) => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedOwnerId(u.id);
+                        setOwnerSearch(`${u.name} (${u.email})`);
+                        setOwnerOptions([]);
+                        setOwnerName(u.name);
+                        if (u.phone) setOwnerPhone(u.phone);
+                      }}
+                      className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs hover:bg-blue-50 ${
+                        selectedOwnerId === u.id ? "bg-blue-50 font-bold" : ""
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-bold text-gray-900">{u.name}</p>
+                        <p className="truncate text-[11px] text-gray-500">
+                          {u.email} • {u.role}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-[11px] font-bold text-blue-700">
+                        Pilih
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">

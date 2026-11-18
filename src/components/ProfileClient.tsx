@@ -17,6 +17,7 @@ import {
   ShieldAlert,
   Trash2,
   User as UserIcon,
+  Users,
   Wallet,
 } from "lucide-react";
 import { compressImageToDataUrl } from "@/lib/image-compress";
@@ -507,7 +508,7 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
           <span className="text-xs font-bold text-emerald-600">Lihat →</span>
         </Link>
 
-        {isOwnerOrAdmin && (
+        {role === "PEMILIK_KOST" && (
           <Link
             href="/dashboard?tab=WALLET"
             className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-5 hover:border-emerald-300 transition"
@@ -524,6 +525,56 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
               </div>
             </div>
             <span className="text-xs font-bold text-emerald-600">Top Up →</span>
+          </Link>
+        )}
+
+        {isOwnerOrAdmin && (
+          <Link
+            href="/dashboard?tab=PROPERTIES"
+            className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-5 hover:border-emerald-300 transition"
+          >
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-emerald-50 p-3 text-emerald-600">
+                <Building2 className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-500">Manajemen Properti</p>
+                <p className="text-sm font-extrabold text-gray-900">
+                  Buka Kelola Properti
+                </p>
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  {isStaffOrAdmin
+                    ? "Kelola & setujui pengajuan kost, apartemen, dan kontrakan."
+                    : "Kelola unit kost, apartemen, dan kontrakan Anda."}
+                </p>
+              </div>
+            </div>
+            <span className="shrink-0 text-xs font-bold text-emerald-600">Buka →</span>
+          </Link>
+        )}
+
+        {isStaffOrAdmin && (
+          <Link
+            href="/dashboard?tab=USERS"
+            className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-5 hover:border-gray-400 transition"
+          >
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-gray-900 p-3 text-white">
+                <Users className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-500">
+                  {role === "ADMINISTRATOR" ? "Panel Administrator" : "Panel Staff"}
+                </p>
+                <p className="text-sm font-extrabold text-gray-900">Kelola Pengguna</p>
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  {role === "ADMINISTRATOR"
+                    ? "Kelola akun pengguna, ubah role, atau ban akun."
+                    : "Pantau akun pengguna, verifikasi, dan blokir (ban) pelanggar."}
+                </p>
+              </div>
+            </div>
+            <span className="shrink-0 text-xs font-bold text-gray-900">Buka →</span>
           </Link>
         )}
       </div>

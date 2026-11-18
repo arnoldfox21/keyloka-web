@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   Calendar,
   CheckCircle2,
+  Edit3,
   ExternalLink,
   Flag,
   Heart,
@@ -860,6 +861,18 @@ export function KostDetailClient({
                   Grup Penghuni Kost
                 </Link>
               )}
+              {currentUser &&
+                (currentUser.id === kost.ownerId ||
+                  currentUserRole === "STAFF" ||
+                  currentUserRole === "ADMINISTRATOR") && (
+                  <Link
+                    href={`/dashboard/edit-property/${kost.id}`}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-600 bg-emerald-50 py-2.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition"
+                  >
+                    <Edit3 className="h-4 w-4" />
+                    Kelola / Edit Properti
+                  </Link>
+                )}
               {currentUser?.id === kost.ownerId ? (
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-3.5 text-center text-xs font-bold text-gray-600">
                   Ini adalah properti milik Anda.

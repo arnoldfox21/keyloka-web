@@ -31,6 +31,7 @@ import {
   formatBookingTypeLabel,
   formatCategoryLabel,
   formatEscrowStatusLabel,
+  formatRoleLabel,
   formatRupiah,
   getDisplayPrice,
   type BoostPackageOption,
@@ -142,11 +143,7 @@ export function DashboardClient({
   const resolvedInitialTab: TabKey =
     initialTab && validTabs.includes(initialTab as TabKey)
       ? (initialTab as TabKey)
-      : initialCreated || initialUpdated
-        ? "PROPERTIES"
-        : isStaffOrAdmin
-          ? "APPROVAL"
-          : "PROPERTIES";
+      : "PROPERTIES";
 
   const [tab, setTab] = useState<TabKey>(resolvedInitialTab);
   const [myKosts, setMyKosts] = useState<DashboardKostItem[]>(initialMyKosts);
@@ -196,6 +193,13 @@ export function DashboardClient({
     null,
   );
   const [boostPackages, setBoostPackages] = useState<BoostPackageOption[]>([]);
+  const [transferTargetKost, setTransferTargetKost] =
+    useState<DashboardKostItem | null>(null);
+  const [transferSearch, setTransferSearch] = useState("");
+  const [transferCandidates, setTransferCandidates] = useState<
+    DashboardUserItem[]
+  >([]);
+  const [transferLoading, setTransferLoading] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{
@@ -448,6 +452,27 @@ export function DashboardClient({
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d?.message || "Gagal memperbarui status.");
       setNotice({ type: "ok", text: `Status booking diubah ke ${status}.` });
+      await refreshDashboardData();
+    } catch (e) {
+      setNotice({
+        type: "err",
+        text: e instanceof Error ? e.message : "Terjadi kesalahan.",
+      });
+      setBusy(false);
+    }
+  }
+
+  async function handleCancelBooking(bookingId: number) {
+    if (!window.confirm("Batalkan booking yang sudah disetujui ini?")) return;
+    setBusy(true);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/proxy/bookings/${bookingId}/cancel`, {
+        method: "PATCH",
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d?.message || "Gagal membatalkan booking.");
+      setNotice({ type: "ok", text: "Booking berhasil dibatalkan." });
       await refreshDashboardData();
     } catch (e) {
       setNotice({
@@ -830,26 +855,53 @@ export function DashboardClient({
     }
   }
 
+  async function loadTransferCandidates(query = "") {
+    setTransferLoading(true);
+    try {
+      const params = new URLSearchParams({ page: "1", limit: "20" });
+      if (query.trim()) params.set("search", query.trim());
+      const res = await fetch(`/api/proxy/auth/users?${params.toString()}`);
+      if (res.ok) {
+        const list: DashboardUserItem[] = await res.json();
+        setTransferCandidates(Array.isArray(list) ? list : []);
+      }
+    } finally {
+      setTransferLoading(false);
+    }
+  }
+
   async function handleTransferOwner(kost: DashboardKostItem) {
-    const newOwnerIdStr = window.prompt(
-      `Masukkan ID User pemilik baru untuk "${kost.name}":`,
-    );
-    if (!newOwnerIdStr) return;
-    const newOwnerId = Number(newOwnerIdStr);
-    if (!Number.isFinite(newOwnerId)) return;
+    setTransferTargetKost(kost);
+    setTransferSearch("");
+    setTransferCandidates([]);
+    await loadTransferCandidates("");
+  }
+
+  async function submitTransferOwner(targetOwnerId: number) {
+    if (!transferTargetKost) return;
     setBusy(true);
     try {
-      const res = await fetch(`/api/proxy/kosts/${kost.id}/transfer-owner`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ newOwnerId }),
-      });
+      const res = await fetch(
+        `/api/proxy/kosts/${transferTargetKost.id}/transfer-owner`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ targetOwnerId }),
+        },
+      );
       if (res.ok) {
-        setNotice({ type: "ok", text: "Kepemilikan properti berhasil dipindahkan." });
+        setNotice({
+          type: "ok",
+          text: "Kepemilikan properti berhasil dipindahkan.",
+        });
+        setTransferTargetKost(null);
         await loadKosts(1, false);
       } else {
         const d = await res.json().catch(() => ({}));
-        setNotice({ type: "err", text: d?.message || "Gagal memindahkan pemilik." });
+        setNotice({
+          type: "err",
+          text: d?.message || "Gagal memindahkan pemilik.",
+        });
       }
     } finally {
       setBusy(false);
@@ -949,6 +1001,11 @@ export function DashboardClient({
   const tabs: Array<{ key: TabKey; label: string; badge?: number }> = isStaffOrAdmin
     ? [
         {
+          key: "PROPERTIES",
+          label: "Kelola Semua Properti",
+          badge: kostsTotal,
+        },
+        {
           key: "APPROVAL",
           label: "Approval & Moderasi",
           badge: moderationCount,
@@ -964,11 +1021,6 @@ export function DashboardClient({
           badge: pendingWithdrawCount,
         },
         { key: "USERS", label: "Kelola Pengguna" },
-        {
-          key: "PROPERTIES",
-          label: "Semua Properti",
-          badge: kostsTotal,
-        },
       ]
     : [
         { key: "PROPERTIES", label: "Properti Saya", badge: kostsTotal },
@@ -1087,7 +1139,7 @@ export function DashboardClient({
       )}
 
       {/* Tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="flex flex-wrap gap-2 pb-1">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -1599,6 +1651,18 @@ export function DashboardClient({
                       className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-100"
                     >
                       Tolak
+                    </button>
+                  </div>
+                )}
+
+                {b.status === "DISETUJUI" && (
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+                    <button
+                      disabled={busy}
+                      onClick={() => handleCancelBooking(b.id)}
+                      className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-100"
+                    >
+                      Batalkan Booking
                     </button>
                   </div>
                 )}
@@ -2345,6 +2409,98 @@ export function DashboardClient({
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Transfer Owner Modal */}
+      {transferTargetKost && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-extrabold text-gray-900 flex items-center gap-2">
+                <UserCheck className="h-5 w-5 text-blue-600" />
+                Pindahkan Pemilik Properti
+              </h3>
+              <button
+                type="button"
+                onClick={() => setTransferTargetKost(null)}
+                className="rounded-full bg-gray-100 p-1.5 text-gray-600 hover:bg-gray-200"
+              >
+                <XCircle className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-xs text-gray-600">
+              Properti:{" "}
+              <span className="font-bold text-gray-900">
+                {transferTargetKost.name}
+              </span>
+              {transferTargetKost.ownerName && (
+                <>
+                  <br />
+                  Pemilik saat ini:{" "}
+                  <span className="font-semibold text-gray-800">
+                    {transferTargetKost.ownerName}
+                  </span>
+                </>
+              )}
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={transferSearch}
+                onChange={(e) => setTransferSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    loadTransferCandidates(transferSearch);
+                  }
+                }}
+                placeholder="Cari nama atau email pemilik baru..."
+                className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
+              />
+              <button
+                type="button"
+                disabled={transferLoading}
+                onClick={() => loadTransferCandidates(transferSearch)}
+                className="rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                Cari
+              </button>
+            </div>
+            <div className="max-h-64 overflow-y-auto divide-y divide-gray-100 rounded-2xl border border-gray-200">
+              {transferLoading ? (
+                <p className="p-4 text-center text-xs text-gray-500">
+                  Memuat daftar pengguna...
+                </p>
+              ) : transferCandidates.length === 0 ? (
+                <p className="p-4 text-center text-xs text-gray-500">
+                  Pengguna tidak ditemukan.
+                </p>
+              ) : (
+                transferCandidates.map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    disabled={busy || u.id === transferTargetKost.ownerId}
+                    onClick={() => submitTransferOwner(u.id)}
+                    className="flex w-full items-center justify-between px-3.5 py-2.5 text-left hover:bg-blue-50/60 disabled:opacity-45"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-bold text-gray-900">
+                        {u.name}
+                      </p>
+                      <p className="truncate text-[11px] text-gray-500">
+                        {u.email} • {formatRoleLabel(u.role)}
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-lg bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">
+                      {u.id === transferTargetKost.ownerId ? "Saat Ini" : "Pilih"}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}
