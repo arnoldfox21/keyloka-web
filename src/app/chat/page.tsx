@@ -51,6 +51,7 @@ export default async function ChatPage({
   return (
     <ChatClient
       currentUser={user}
+      socketToken={token}
       initialConversations={conversations}
       initialGroups={groups}
       initialKostId={sp.kostId ? Number(sp.kostId) : undefined}

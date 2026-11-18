@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useState } from "react";
 import {
   Banknote,
+  BarChart3,
   Building2,
   CalendarClock,
   CheckCircle2,
+  Download,
   Edit3,
   Flag,
   Gavel,
@@ -18,6 +20,7 @@ import {
   ShieldAlert,
   Star,
   Trash2,
+  TrendingUp,
   UserCheck,
   UserPlus,
   Users,
@@ -25,6 +28,62 @@ import {
   XCircle,
   Zap,
 } from "lucide-react";
+
+const INDONESIAN_BANKS = [
+  "BCA",
+  "BRI",
+  "BNI",
+  "Bank Mandiri",
+  "BSI (Bank Syariah Indonesia)",
+  "BTN",
+  "CIMB Niaga",
+  "Bank Danamon",
+  "Bank Permata",
+  "OCBC NISP",
+  "Panin Bank",
+  "Maybank Indonesia",
+  "Bank Mega",
+  "Bank Sinarmas",
+  "BTPN / Jenius",
+  "SeaBank",
+  "Bank Jago",
+  "Bank Neo Commerce (BNC)",
+  "Blu by BCA Digital",
+  "Allo Bank",
+  "Superbank",
+  "Krom Bank",
+  "Bank Muamalat",
+  "BCA Syariah",
+  "Bank Mega Syariah",
+  "Bank DKI",
+  "Bank BJB",
+  "Bank Jateng",
+  "Bank Jatim",
+  "Bank Sumut",
+  "Bank Nagari",
+  "Bank Riau Kepri",
+  "Bank Sumsel Babel",
+  "Bank Lampung",
+  "Bank Kalbar",
+  "Bank Kalsel",
+  "Bank Kaltimtara",
+  "Bank Sulselbar",
+  "BPD Bali",
+  "Bank Aceh Syariah",
+  "Bank NTB Syariah",
+  "Bank Victoria",
+  "Bank Ina Perdana",
+  "Bank Nobu",
+  "Bank Sahabat Sampoerna",
+  "Bank Mestika",
+  "Bank Ganesha",
+  "Bank Index",
+  "Bank Bumi Arta",
+  "Standard Chartered",
+  "HSBC Indonesia",
+  "Citibank",
+  "UOB Indonesia",
+];
 import {
   formatApprovalStatusLabel,
   formatBookingStatusLabel,
@@ -127,6 +186,7 @@ interface DashboardClientProps {
 type TabKey =
   | "PROPERTIES"
   | "BOOKINGS"
+  | "FINANCE"
   | "WALLET"
   | "APPROVAL"
   | "WITHDRAWALS"
@@ -157,7 +217,7 @@ export function DashboardClient({
 
   const validTabs: TabKey[] = isStaffOrAdmin
     ? ["PROPERTIES", "BOOKINGS", "APPROVAL", "WITHDRAWALS", "USERS"]
-    : ["PROPERTIES", "BOOKINGS", "WALLET"];
+    : ["PROPERTIES", "BOOKINGS", "FINANCE", "WALLET"];
   const resolvedInitialTab: TabKey =
     initialTab && validTabs.includes(initialTab as TabKey)
       ? (initialTab as TabKey)
@@ -187,6 +247,13 @@ export function DashboardClient({
   const [withdrawStatusFilter, setWithdrawStatusFilter] = useState("SEMUA");
   const [creditBalance, setCreditBalance] = useState(initialCreditBalance);
   const [payoutBalance, setPayoutBalance] = useState(initialPayoutBalance);
+  const [walletTransactions, setWalletTransactions] = useState<WalletTransaction[]>(
+    initialWalletTransactions,
+  );
+  const [financePeriod, setFinancePeriod] = useState<
+    "ALL" | "THIS_MONTH" | "LAST_3_MONTHS" | "THIS_YEAR"
+  >("ALL");
+  const [financeKostId, setFinanceKostId] = useState<string>("ALL");
   const [myPayouts, setMyPayouts] = useState<PayoutItem[]>(initialMyPayouts);
   const [pendingKosts, setPendingKosts] =
     useState<DashboardKostItem[]>(initialPendingKosts);
@@ -204,9 +271,14 @@ export function DashboardClient({
   const [usersHasMore, setUsersHasMore] = useState(false);
 
   const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawMethod, setWithdrawMethod] = useState<"BANK" | "EWALLET">("BANK");
   const [bankName, setBankName] = useState("");
+  const [bankDropdownOpen, setBankDropdownOpen] = useState(false);
   const [accountNumber, setAccountNumber] = useState("");
   const [accountHolder, setAccountHolder] = useState(currentUser.name || "");
+  const [reviewingPayout, setReviewingPayout] = useState<PayoutItem | null>(null);
+  const [reviewRevisedAmount, setReviewRevisedAmount] = useState("");
+  const [reviewAdminNote, setReviewAdminNote] = useState("");
 
   const [topupAmount, setTopupAmount] = useState("50000");
   const [boostTargetKost, setBoostTargetKost] = useState<DashboardKostItem | null>(
@@ -377,6 +449,9 @@ export function DashboardClient({
         const d = await responses[2].json();
         setCreditBalance(Number(d.creditBalance ?? 0));
         setPayoutBalance(Number(d.payoutBalance ?? 0));
+        if (Array.isArray(d.transactions)) {
+          setWalletTransactions(d.transactions);
+        }
       }
       if (responses[3]?.ok) {
         const d = await responses[3].json();
@@ -586,6 +661,12 @@ export function DashboardClient({
       setNotice({ type: "err", text: "Minimal penarikan dana Rp10.000." });
       return;
     }
+    const resolvedBankName =
+      withdrawMethod === "EWALLET" ? "ShopeePay" : bankName.trim();
+    if (!resolvedBankName) {
+      setNotice({ type: "err", text: "Nama bank wajib diisi." });
+      return;
+    }
     setBusy(true);
     setNotice(null);
     try {
@@ -594,9 +675,9 @@ export function DashboardClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amount,
-          bankName,
-          accountNumber,
-          accountHolder,
+          bankName: resolvedBankName,
+          accountNumber: accountNumber.trim(),
+          accountHolder: accountHolder.trim(),
         }),
       });
       const d = await res.json().catch(() => ({}));
@@ -651,26 +732,35 @@ export function DashboardClient({
     }
   }
 
+  function openPayoutReviewModal(p: PayoutItem) {
+    setReviewingPayout(p);
+    setReviewRevisedAmount(String(p.amount));
+    setReviewAdminNote(p.adminNote || "");
+  }
+
   async function handleProcessPayout(
     id: number,
     action: "APPROVE" | "REJECT",
+    adminNote = "",
+    revisedAmount?: number,
   ) {
-    const adminNote =
-      prompt(
-        action === "APPROVE"
-          ? "Catatan transfer (opsional):"
-          : "Alasan penolakan (opsional):",
-      ) || "";
     setBusy(true);
     setNotice(null);
     try {
       const res = await fetch(`/api/proxy/wallet/payout-requests/${id}/process`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, adminNote }),
+        body: JSON.stringify({
+          action,
+          adminNote,
+          ...(action === "APPROVE" && revisedAmount !== undefined
+            ? { revisedAmount }
+            : {}),
+        }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d?.message || "Gagal memproses withdraw.");
+      setReviewingPayout(null);
       setNotice({
         type: "ok",
         text:
@@ -1111,6 +1201,7 @@ export function DashboardClient({
           label: "Booking Masuk",
           badge: bookings.length,
         },
+        { key: "FINANCE", label: "Keuangan" },
         { key: "WALLET", label: "Dompet & Tarik Dana" },
       ];
 
@@ -1961,25 +2052,106 @@ export function DashboardClient({
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">
-                Nama Bank / E-Wallet
+              <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                Metode Penarikan
               </label>
-              <input
-                required
-                value={bankName}
-                onChange={(e) => setBankName(e.target.value)}
-                placeholder="Contoh: BCA / Mandiri / BRI"
-                className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm"
-              />
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWithdrawMethod("BANK");
+                    if (bankName === "ShopeePay") setBankName("");
+                  }}
+                  className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${
+                    withdrawMethod === "BANK"
+                      ? "border-emerald-600 bg-emerald-50 text-emerald-800"
+                      : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  Transfer Bank
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWithdrawMethod("EWALLET");
+                    setBankName("ShopeePay");
+                    setBankDropdownOpen(false);
+                  }}
+                  className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${
+                    withdrawMethod === "EWALLET"
+                      ? "border-emerald-600 bg-emerald-50 text-emerald-800"
+                      : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  E-Wallet (ShopeePay)
+                </button>
+              </div>
             </div>
+
+            {withdrawMethod === "BANK" ? (
+              <div className="relative">
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Nama Bank
+                </label>
+                <input
+                  required
+                  value={bankName}
+                  onFocus={() => setBankDropdownOpen(true)}
+                  onBlur={() => setTimeout(() => setBankDropdownOpen(false), 150)}
+                  onChange={(e) => {
+                    setBankName(e.target.value);
+                    setBankDropdownOpen(true);
+                  }}
+                  placeholder="Ketik nama bank (mis. BCA, Mandiri, SeaBank...)"
+                  autoComplete="off"
+                  className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
+                />
+                {bankDropdownOpen && (() => {
+                  const qBank = bankName.trim().toLowerCase();
+                  const matches = INDONESIAN_BANKS.filter((b) =>
+                    !qBank ? true : b.toLowerCase().includes(qBank),
+                  ).slice(0, 8);
+                  if (matches.length === 0) return null;
+                  return (
+                    <div className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+                      {matches.map((b) => (
+                        <button
+                          key={b}
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setBankName(b);
+                            setBankDropdownOpen(false);
+                          }}
+                          className="block w-full px-3.5 py-2 text-left text-xs font-semibold text-gray-800 hover:bg-emerald-50 hover:text-emerald-800"
+                        >
+                          {b}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-orange-200 bg-orange-50/70 px-3.5 py-2.5 text-xs text-orange-900">
+                E-Wallet dipilih: <strong>ShopeePay</strong>{" "}
+                <span className="text-orange-700/80">(opsi E-Wallet sementara khusus ShopeePay)</span>
+              </div>
+            )}
+
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1">
-                Nomor Rekening / Akun
+                {withdrawMethod === "EWALLET"
+                  ? "Nomor HP ShopeePay"
+                  : "Nomor Rekening"}
               </label>
               <input
                 required
                 value={accountNumber}
                 onChange={(e) => setAccountNumber(e.target.value)}
+                placeholder={
+                  withdrawMethod === "EWALLET" ? "08xxxxxxxxxx" : "Nomor rekening bank"
+                }
                 className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm"
               />
             </div>
@@ -2050,15 +2222,15 @@ export function DashboardClient({
 
           <div className="rounded-2xl border border-gray-200 bg-white p-6 space-y-3">
             <h2 className="text-lg font-black text-gray-900">
-              Riwayat Transaksi Kredit ({initialWalletTransactions.length})
+              Riwayat Transaksi Kredit ({walletTransactions.length})
             </h2>
-            {initialWalletTransactions.length === 0 ? (
+            {walletTransactions.length === 0 ? (
               <p className="text-sm text-gray-500">
                 Belum ada riwayat transaksi kredit atau boost iklan.
               </p>
             ) : (
               <div className="space-y-2.5">
-                {initialWalletTransactions.map((tx) => {
+                {walletTransactions.map((tx) => {
                   const isPositive = tx.amount > 0;
                   return (
                     <div
@@ -2091,6 +2263,415 @@ export function DashboardClient({
         </div>
         </div>
       )}
+
+      {/* Tab Content: FINANCE (Pemilik Properti) */}
+      {tab === "FINANCE" && !isStaffOrAdmin && (() => {
+        const now = new Date();
+        const paidBookings = bookings.filter((b) => {
+          const isPaidOrEscrow =
+            (b.paymentStatus || "").toUpperCase() === "PAID" ||
+            ["HELD", "RELEASED", "DISPUTED", "REFUNDED"].includes(
+              (b.escrowStatus || "").toUpperCase(),
+            );
+          if (!isPaidOrEscrow) return false;
+          if (financeKostId !== "ALL" && String(b.kostId) !== financeKostId) {
+            return false;
+          }
+          const created = new Date(b.createdAt);
+          if (financePeriod === "THIS_MONTH") {
+            return (
+              created.getFullYear() === now.getFullYear() &&
+              created.getMonth() === now.getMonth()
+            );
+          }
+          if (financePeriod === "LAST_3_MONTHS") {
+            const cutoff = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+            return created >= cutoff;
+          }
+          if (financePeriod === "THIS_YEAR") {
+            return created.getFullYear() === now.getFullYear();
+          }
+          return true;
+        });
+
+        const settledBookings = paidBookings.filter(
+          (b) => (b.escrowStatus || "").toUpperCase() !== "REFUNDED",
+        );
+
+        const totalGross = settledBookings.reduce(
+          (acc, b) => acc + Number(b.paidAmount ?? b.totalAmount ?? 0),
+          0,
+        );
+        const totalFees = settledBookings.reduce(
+          (acc, b) => acc + Number(b.platformFee ?? 0) + Number(b.serviceFee ?? 0),
+          0,
+        );
+        const totalNet = settledBookings.reduce(
+          (acc, b) => acc + Number(b.ownerNetAmount ?? 0),
+          0,
+        );
+        const heldAmount = settledBookings
+          .filter((b) => (b.escrowStatus || "").toUpperCase() === "HELD")
+          .reduce((acc, b) => acc + Number(b.ownerNetAmount ?? 0), 0);
+        const releasedAmount = settledBookings
+          .filter((b) => (b.escrowStatus || "").toUpperCase() === "RELEASED")
+          .reduce((acc, b) => acc + Number(b.ownerNetAmount ?? 0), 0);
+        const withdrawnAmount = myPayouts
+          .filter((p) => (p.status || "").toUpperCase() === "APPROVED")
+          .reduce((acc, p) => acc + Number(p.amount ?? 0), 0);
+
+        // Breakdown per property
+        const propertyMap = new Map<
+          number,
+          { kostId: number; name: string; count: number; gross: number; net: number }
+        >();
+        for (const b of settledBookings) {
+          const prev = propertyMap.get(b.kostId) || {
+            kostId: b.kostId,
+            name: b.kost?.name || `Properti #${b.kostId}`,
+            count: 0,
+            gross: 0,
+            net: 0,
+          };
+          prev.count += 1;
+          prev.gross += Number(b.paidAmount ?? b.totalAmount ?? 0);
+          prev.net += Number(b.ownerNetAmount ?? 0);
+          propertyMap.set(b.kostId, prev);
+        }
+        const propertyBreakdown = Array.from(propertyMap.values()).sort(
+          (a, b) => b.net - a.net,
+        );
+
+        // Breakdown per month (YYYY-MM)
+        const monthMap = new Map<
+          string,
+          { key: string; label: string; count: number; gross: number; net: number }
+        >();
+        for (const b of settledBookings) {
+          const d = new Date(b.createdAt);
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+          const label = d.toLocaleDateString("id-ID", {
+            month: "short",
+            year: "numeric",
+          });
+          const prev = monthMap.get(key) || { key, label, count: 0, gross: 0, net: 0 };
+          prev.count += 1;
+          prev.gross += Number(b.paidAmount ?? b.totalAmount ?? 0);
+          prev.net += Number(b.ownerNetAmount ?? 0);
+          monthMap.set(key, prev);
+        }
+        const monthlyBreakdown = Array.from(monthMap.values()).sort((a, b) =>
+          b.key.localeCompare(a.key),
+        );
+        const maxMonthlyNet = Math.max(
+          1,
+          ...monthlyBreakdown.map((m) => m.net),
+        );
+
+        function handleExportFinanceCsv() {
+          const headers = [
+            "Tanggal",
+            "ID Booking",
+            "Properti",
+            "Penyewa",
+            "Skema",
+            "Pendapatan Kotor (Rp)",
+            "Potongan Fee (Rp)",
+            "Pendapatan Bersih (Rp)",
+            "Status Escrow",
+          ];
+          const escapeCell = (val: string | number) =>
+            `"${String(val).replace(/"/g, '""')}"`;
+          const rows = paidBookings.map((b) => {
+            const gross = Number(b.paidAmount ?? b.totalAmount ?? 0);
+            const fee = Number(b.platformFee ?? 0) + Number(b.serviceFee ?? 0);
+            const net = Number(b.ownerNetAmount ?? 0);
+            return [
+              new Date(b.createdAt).toLocaleDateString("id-ID"),
+              b.id,
+              b.kost?.name || `Properti #${b.kostId}`,
+              b.tenantName,
+              b.paymentScheme === "DP" ? "DP 30%" : "Full",
+              gross,
+              fee,
+              net,
+              b.escrowStatus || b.paymentStatus,
+            ]
+              .map(escapeCell)
+              .join(",");
+          });
+          const csvContent = `\uFEFF${[headers.map(escapeCell).join(","), ...rows].join("\n")}`;
+          const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = `laporan-keuangan-keyloka-${new Date().toISOString().slice(0, 10)}.csv`;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(url);
+        }
+
+        return (
+          <div className="space-y-6">
+            {/* Filter & Export Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white p-4">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <select
+                  value={financePeriod}
+                  onChange={(e) =>
+                    setFinancePeriod(
+                      e.target.value as "ALL" | "THIS_MONTH" | "LAST_3_MONTHS" | "THIS_YEAR",
+                    )
+                  }
+                  className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-bold text-gray-800"
+                >
+                  <option value="ALL">Semua Periode</option>
+                  <option value="THIS_MONTH">Bulan Ini</option>
+                  <option value="LAST_3_MONTHS">3 Bulan Terakhir</option>
+                  <option value="THIS_YEAR">Tahun Ini</option>
+                </select>
+                <select
+                  value={financeKostId}
+                  onChange={(e) => setFinanceKostId(e.target.value)}
+                  className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-bold text-gray-800"
+                >
+                  <option value="ALL">Semua Properti ({myKosts.length})</option>
+                  {myKosts.map((k) => (
+                    <option key={k.id} value={String(k.id)}>
+                      {k.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                disabled={paidBookings.length === 0}
+                onClick={handleExportFinanceCsv}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-600 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 disabled:opacity-40 transition"
+              >
+                <Download className="h-4 w-4" />
+                Unduh Laporan CSV
+              </button>
+            </div>
+
+            {/* 4 Finance KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="rounded-2xl border border-gray-200 bg-white p-5">
+                <div className="flex items-center justify-between text-xs font-semibold text-gray-500">
+                  <span>Pendapatan Kotor</span>
+                  <TrendingUp className="h-4 w-4 text-emerald-600" />
+                </div>
+                <p className="mt-2 text-2xl font-black text-gray-900">
+                  {formatRupiah(totalGross)}
+                </p>
+                <p className="mt-1 text-[11px] text-gray-500">
+                  Dari {settledBookings.length} transaksi sewa
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-gray-200 bg-white p-5">
+                <div className="flex items-center justify-between text-xs font-semibold text-gray-500">
+                  <span>Potongan Fee (1% + PG)</span>
+                  <BarChart3 className="h-4 w-4 text-slate-500" />
+                </div>
+                <p className="mt-2 text-2xl font-black text-slate-700">
+                  {formatRupiah(totalFees)}
+                </p>
+                <p className="mt-1 text-[11px] text-gray-500">
+                  Biaya platform 1% + payment gateway
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5">
+                <div className="flex items-center justify-between text-xs font-semibold text-emerald-800">
+                  <span>Pendapatan Bersih</span>
+                  <Banknote className="h-4 w-4 text-emerald-600" />
+                </div>
+                <p className="mt-2 text-2xl font-black text-emerald-700">
+                  {formatRupiah(totalNet)}
+                </p>
+                <p className="mt-1 text-[11px] text-emerald-700/80">
+                  Cair: {formatRupiah(releasedAmount)} • Tertahan: {formatRupiah(heldAmount)}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-gray-200 bg-white p-5">
+                <div className="flex items-center justify-between text-xs font-semibold text-gray-500">
+                  <span>Sudah Ditarik</span>
+                  <Wallet className="h-4 w-4 text-blue-600" />
+                </div>
+                <p className="mt-2 text-2xl font-black text-blue-700">
+                  {formatRupiah(withdrawnAmount)}
+                </p>
+                <p className="mt-1 text-[11px] text-gray-500">
+                  Saldo siap tarik: {formatRupiah(payoutBalance)}
+                </p>
+              </div>
+            </div>
+
+            {/* Rekap per Properti & Rekap Bulanan */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 space-y-4">
+                <h2 className="text-base font-black text-gray-900">
+                  Pendapatan per Properti
+                </h2>
+                {propertyBreakdown.length === 0 ? (
+                  <p className="text-sm text-gray-500">
+                    Belum ada pemasukan sewa pada periode ini.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {propertyBreakdown.map((item) => (
+                      <div
+                        key={item.kostId}
+                        className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50 p-3.5"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold text-gray-900">
+                            {item.name}
+                          </p>
+                          <p className="text-[11px] text-gray-500">
+                            {item.count} transaksi • Kotor {formatRupiah(item.gross)}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-sm font-black text-emerald-700">
+                          {formatRupiah(item.net)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 space-y-4">
+                <h2 className="text-base font-black text-gray-900">
+                  Rekap Pendapatan Bulanan
+                </h2>
+                {monthlyBreakdown.length === 0 ? (
+                  <p className="text-sm text-gray-500">
+                    Belum ada transaksi bulanan untuk ditampilkan.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {monthlyBreakdown.map((m) => (
+                      <div key={m.key} className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-bold text-gray-800">
+                            {m.label} ({m.count} trx)
+                          </span>
+                          <span className="font-black text-emerald-700">
+                            {formatRupiah(m.net)}
+                          </span>
+                        </div>
+                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100">
+                          <div
+                            className="h-full rounded-full bg-emerald-500"
+                            style={{
+                              width: `${Math.max(4, Math.round((m.net / maxMonthlyNet) * 100))}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Mutasi Pemasukan Sewa (Revenue Ledger) */}
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 space-y-4">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-base font-black text-gray-900">
+                  Mutasi Pemasukan Sewa ({paidBookings.length})
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setTab("WALLET")}
+                  className="text-xs font-bold text-emerald-700 hover:underline"
+                >
+                  Tarik Dana di Dompet →
+                </button>
+              </div>
+              {paidBookings.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  Belum ada mutasi pemasukan sewa pada filter yang dipilih.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[680px] text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-gray-200 text-[11px] font-extrabold uppercase tracking-wider text-gray-500">
+                        <th className="py-2.5 pr-3">Tanggal</th>
+                        <th className="py-2.5 pr-3">Properti & Penyewa</th>
+                        <th className="py-2.5 pr-3">Skema</th>
+                        <th className="py-2.5 pr-3 text-right">Kotor</th>
+                        <th className="py-2.5 pr-3 text-right">Fee</th>
+                        <th className="py-2.5 pr-3 text-right">Bersih</th>
+                        <th className="py-2.5 text-right">Escrow</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {paidBookings.map((b) => {
+                        const gross = Number(b.paidAmount ?? b.totalAmount ?? 0);
+                        const fee =
+                          Number(b.platformFee ?? 0) + Number(b.serviceFee ?? 0);
+                        const net = Number(b.ownerNetAmount ?? 0);
+                        return (
+                          <tr key={b.id} className="hover:bg-gray-50/70">
+                            <td className="py-3 pr-3 whitespace-nowrap text-gray-500">
+                              {new Date(b.createdAt).toLocaleDateString("id-ID", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                            </td>
+                            <td className="py-3 pr-3">
+                              <p className="font-bold text-gray-900">
+                                {b.kost?.name || `Properti #${b.kostId}`}
+                              </p>
+                              <p className="text-[11px] text-gray-500">
+                                {b.tenantName}
+                              </p>
+                            </td>
+                            <td className="py-3 pr-3 whitespace-nowrap">
+                              <span className="rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-700">
+                                {b.paymentScheme === "DP" ? "DP 30%" : "Full"}
+                              </span>
+                            </td>
+                            <td className="py-3 pr-3 whitespace-nowrap text-right font-semibold text-gray-700">
+                              {formatRupiah(gross)}
+                            </td>
+                            <td className="py-3 pr-3 whitespace-nowrap text-right text-gray-500">
+                              -{formatRupiah(fee)}
+                            </td>
+                            <td className="py-3 pr-3 whitespace-nowrap text-right font-black text-emerald-700">
+                              {formatRupiah(net)}
+                            </td>
+                            <td className="py-3 whitespace-nowrap text-right">
+                              <span
+                                className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                                  b.escrowStatus === "RELEASED"
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : b.escrowStatus === "HELD"
+                                      ? "bg-amber-100 text-amber-800"
+                                      : "bg-red-100 text-red-700"
+                                }`}
+                              >
+                                {formatEscrowStatusLabel(b.escrowStatus)}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Tab Content: APPROVAL & MODERATION (Staff/Admin) */}
       {tab === "APPROVAL" && isStaffOrAdmin && (
@@ -2401,22 +2982,20 @@ export function DashboardClient({
                     <p className="text-xs text-gray-600">
                       {p.bankName} • {p.accountNumber} ({p.accountHolder})
                     </p>
+                    {p.adminNote && (
+                      <p className="mt-1 text-xs italic text-gray-500">
+                        Catatan staff: {p.adminNote}
+                      </p>
+                    )}
                   </div>
                   {p.status === "PENDING" && (
                     <div className="flex gap-2">
                       <button
                         disabled={busy}
-                        onClick={() => handleProcessPayout(p.id, "REJECT")}
-                        className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-100"
-                      >
-                        Tolak
-                      </button>
-                      <button
-                        disabled={busy}
-                        onClick={() => handleProcessPayout(p.id, "APPROVE")}
+                        onClick={() => openPayoutReviewModal(p)}
                         className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700"
                       >
-                        Setujui
+                        Review & Proses
                       </button>
                     </div>
                   )}
@@ -2755,6 +3334,119 @@ export function DashboardClient({
                   </button>
                 ))
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Review & Revisi Withdraw (Staff/Admin) */}
+      {reviewingPayout && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-black text-gray-900">
+                Review Pengajuan Withdraw #{reviewingPayout.id}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setReviewingPayout(null)}
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100"
+              >
+                <XCircle className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="rounded-2xl border border-gray-100 bg-gray-50 p-3.5 text-xs space-y-1">
+              <p className="font-bold text-gray-900">
+                {reviewingPayout.ownerName} ({reviewingPayout.ownerEmail})
+              </p>
+              <p className="text-gray-600">
+                Tujuan:{" "}
+                <span className="font-semibold text-gray-900">
+                  {reviewingPayout.bankName} • {reviewingPayout.accountNumber}
+                </span>
+              </p>
+              <p className="text-gray-600">
+                Atas Nama:{" "}
+                <span className="font-semibold text-gray-900">
+                  {reviewingPayout.accountHolder}
+                </span>
+              </p>
+              <p className="text-gray-600">
+                Nominal Diajukan:{" "}
+                <span className="font-black text-emerald-700">
+                  {formatRupiah(reviewingPayout.amount)}
+                </span>
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">
+                Nominal Disetujui / Revisi (Rp)
+              </label>
+              <input
+                type="number"
+                min={10000}
+                value={reviewRevisedAmount}
+                onChange={(e) => setReviewRevisedAmount(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm font-bold"
+              />
+              <p className="mt-1 text-[11px] text-gray-500">
+                Jika nominal dikurangi, selisihnya otomatis dikembalikan ke saldo pemilik.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">
+                Catatan Staff / Referensi Transfer (Opsional)
+              </label>
+              <textarea
+                rows={2}
+                value={reviewAdminNote}
+                onChange={(e) => setReviewAdminNote(e.target.value)}
+                placeholder="Mis. Sudah ditransfer via BCA / Alasan revisi atau penolakan..."
+                className="w-full rounded-xl border border-gray-200 px-3.5 py-2 text-sm"
+              />
+            </div>
+
+            <div className="flex flex-col-reverse sm:flex-row gap-2 pt-1">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  handleProcessPayout(
+                    reviewingPayout.id,
+                    "REJECT",
+                    reviewAdminNote,
+                  )
+                }
+                className="flex-1 rounded-xl border border-red-200 bg-red-50 py-2.5 text-xs font-bold text-red-700 hover:bg-red-100 disabled:opacity-50"
+              >
+                Tolak & Kembalikan Saldo
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  const parsed = Math.round(Number(reviewRevisedAmount));
+                  if (!Number.isFinite(parsed) || parsed < 10000) {
+                    setNotice({
+                      type: "err",
+                      text: "Nominal revisi minimal Rp10.000.",
+                    });
+                    return;
+                  }
+                  void handleProcessPayout(
+                    reviewingPayout.id,
+                    "APPROVE",
+                    reviewAdminNote,
+                    parsed,
+                  );
+                }}
+                className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-xs font-extrabold text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {busy ? "Memproses..." : "Setujui Penarikan"}
+              </button>
             </div>
           </div>
         </div>

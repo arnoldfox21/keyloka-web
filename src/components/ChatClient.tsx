@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import {
+  ArrowLeft,
   Lock,
   MessageCircle,
   Send,
@@ -21,6 +22,7 @@ import {
 
 interface ChatClientProps {
   currentUser: UserProfile;
+  socketToken?: string;
   initialConversations: ChatMessage[];
   initialGroups: KostGroupRoom[];
   initialKostId?: number;
@@ -36,6 +38,7 @@ const QUICK_REPLIES = [
 
 export function ChatClient({
   currentUser,
+  socketToken,
   initialConversations,
   initialGroups,
   initialKostId,
@@ -51,10 +54,22 @@ export function ChatClient({
     title: string;
   } | null>(() => {
     if (initialKostId && initialPeerId) {
+      const existing = initialConversations.find((c) => {
+        const pId = c.senderId === currentUser.id ? c.receiverId : c.senderId;
+        return c.kostId === initialKostId && pId === initialPeerId;
+      });
+      const peerName =
+        existing?.peerUser?.name ||
+        (existing
+          ? existing.senderId === currentUser.id
+            ? `Pengguna #${existing.receiverId}`
+            : existing.senderName
+          : null);
+      const kostTitle = existing?.kost?.name || `Properti #${initialKostId}`;
       return {
         kostId: initialKostId,
         peerId: initialPeerId,
-        title: `Chat Properti #${initialKostId}`,
+        title: peerName ? `${peerName} • ${kostTitle}` : kostTitle,
       };
     }
     return null;
@@ -71,6 +86,7 @@ export function ChatClient({
   const [loadingRoom, setLoadingRoom] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [socketConnected, setSocketConnected] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
   const [candidateQuery, setCandidateQuery] = useState("");
   const [candidates, setCandidates] = useState<
     Array<{ id: number; name: string; email?: string }>
@@ -78,25 +94,60 @@ export function ChatClient({
   const [searchingCandidates, setSearchingCandidates] = useState(false);
 
   const socketRef = useRef<Socket | null>(null);
+  const activeDirectRef = useRef(activeDirect);
+  const activeGroupRef = useRef(activeGroupKostId);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
-  // Connect Socket.IO if NEXT_PUBLIC_API_URL is configured
+  useEffect(() => {
+    activeDirectRef.current = activeDirect;
+  }, [activeDirect]);
+
+  useEffect(() => {
+    activeGroupRef.current = activeGroupKostId;
+  }, [activeGroupKostId]);
+
+  // Connect Socket.IO with JWT token
   useEffect(() => {
     const socketBase = getSocketBaseUrl();
-    if (!socketBase) return;
+    if (!socketBase || !socketToken) return;
     const socket = io(socketBase, {
+      auth: { token: socketToken },
       transports: ["websocket", "polling"],
     });
     socketRef.current = socket;
 
-    socket.on("connect", () => setSocketConnected(true));
+    socket.on("connect", () => {
+      setSocketConnected(true);
+      socket.emit("joinUserRoom", { userId: currentUser.id });
+      if (activeDirectRef.current) {
+        socket.emit("joinKostChat", {
+          kostId: activeDirectRef.current.kostId,
+          userId: currentUser.id,
+          peerId: activeDirectRef.current.peerId,
+        });
+      }
+      if (activeGroupRef.current) {
+        socket.emit("joinGroupChat", {
+          kostId: activeGroupRef.current,
+          userId: currentUser.id,
+        });
+      }
+    });
     socket.on("disconnect", () => setSocketConnected(false));
 
     socket.on("newMessage", (msg: ChatMessage) => {
-      setDirectMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev;
-        return [...prev, msg];
-      });
+      const currentRoom = activeDirectRef.current;
+      if (
+        currentRoom &&
+        msg.kostId === currentRoom.kostId &&
+        (msg.senderId === currentRoom.peerId ||
+          msg.receiverId === currentRoom.peerId)
+      ) {
+        setDirectMessages((prev) => {
+          if (prev.some((m) => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
+      }
       setConversations((prev) =>
         prev.map((c) => {
           const peerId = c.senderId === currentUser.id ? c.receiverId : c.senderId;
@@ -133,7 +184,7 @@ export function ChatClient({
       socketRef.current = null;
       setSocketConnected(false);
     };
-  }, [currentUser.id]);
+  }, [currentUser.id, socketToken]);
 
   // Load 1-on-1 chat messages
   useEffect(() => {
@@ -150,7 +201,14 @@ export function ChatClient({
         const res = await fetch(`/api/proxy/chats?${params.toString()}`);
         if (res.ok && active) {
           const data = await res.json();
-          setDirectMessages(Array.isArray(data) ? data : data?.data || []);
+          const list: ChatMessage[] = Array.isArray(data) ? data : data?.data || [];
+          const filtered = list.filter(
+            (m) =>
+              m.kostId === activeDirect!.kostId &&
+              (m.senderId === activeDirect!.peerId ||
+                m.receiverId === activeDirect!.peerId),
+          );
+          setDirectMessages(filtered);
         }
         await fetch("/api/proxy/chats/read", {
           method: "PATCH",
@@ -224,7 +282,15 @@ export function ChatClient({
         );
         if (res?.ok) {
           const data = await res.json();
-          setDirectMessages(Array.isArray(data) ? data : data?.data || []);
+          const list: ChatMessage[] = Array.isArray(data) ? data : data?.data || [];
+          setDirectMessages(
+            list.filter(
+              (m) =>
+                m.kostId === activeDirect.kostId &&
+                (m.senderId === activeDirect.peerId ||
+                  m.receiverId === activeDirect.peerId),
+            ),
+          );
         }
       } else if (activeGroupKostId) {
         const res = await fetch(
@@ -244,6 +310,7 @@ export function ChatClient({
     const content = (textToSend ?? input).trim();
     if (!content) return;
     setSending(true);
+    setChatError(null);
     try {
       if (activeDirect) {
         const res = await fetch("/api/proxy/chats", {
@@ -257,7 +324,11 @@ export function ChatClient({
           }),
         });
         const data = await res.json().catch(() => null);
-        if (res.ok && data) {
+        if (!res.ok) {
+          setChatError(data?.message || "Gagal mengirim pesan.");
+          return;
+        }
+        if (data) {
           setDirectMessages((prev) =>
             prev.some((m) => m.id === data.id) ? prev : [...prev, data],
           );
@@ -283,7 +354,11 @@ export function ChatClient({
           },
         );
         const data = await res.json().catch(() => null);
-        if (res.ok && data) {
+        if (!res.ok) {
+          setChatError(data?.message || "Gagal mengirim pesan grup.");
+          return;
+        }
+        if (data) {
           setGroupDetail((prev) =>
             prev
               ? {
@@ -311,31 +386,33 @@ export function ChatClient({
 
   async function handleAddPeerToGroup() {
     if (!activeDirect) return;
+    setChatError(null);
     const res = await fetch(
       `/api/proxy/chats/groups/${activeDirect.kostId}/members`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: activeDirect.peerId }),
+        body: JSON.stringify({ targetUserId: activeDirect.peerId }),
       },
     );
     if (res.ok) {
       alert("Pengguna berhasil ditambahkan ke Grup Penghuni Kost!");
     } else {
       const data = await res.json().catch(() => ({}));
-      alert(data?.message || "Gagal menambahkan ke grup.");
+      setChatError(data?.message || "Gagal menambahkan ke grup.");
     }
   }
 
   async function handleKickMember(userId: number) {
     if (!activeGroupKostId) return;
     if (!window.confirm("Keluarkan anggota ini dari grup?")) return;
+    setChatError(null);
     const res = await fetch(
       `/api/proxy/chats/groups/${activeGroupKostId}/kick`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ targetUserId: userId }),
       },
     );
     if (res.ok) {
@@ -344,6 +421,9 @@ export function ChatClient({
           ? { ...prev, members: prev.members.filter((m) => m.userId !== userId) }
           : prev,
       );
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setChatError(data?.message || "Gagal mengeluarkan anggota.");
     }
   }
 
@@ -368,12 +448,13 @@ export function ChatClient({
 
   async function handleAddMemberToGroup(userId: number) {
     if (!activeGroupKostId) return;
+    setChatError(null);
     const res = await fetch(
       `/api/proxy/chats/groups/${activeGroupKostId}/members`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ targetUserId: userId }),
       },
     );
     if (res.ok) {
@@ -384,17 +465,16 @@ export function ChatClient({
         setGroupDetail(await detailRes.json());
       }
       setCandidates((prev) => prev.filter((c) => c.id !== userId));
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setChatError(data?.message || "Gagal menambahkan anggota.");
     }
   }
 
-  function handleToggleAdminOnly() {
+  async function handleToggleAdminOnly() {
     if (!activeGroupKostId || !groupDetail) return;
+    setChatError(null);
     const nextAdminOnly = !groupDetail.settings?.adminOnly;
-    socketRef.current?.emit("updateGroupSettings", {
-      kostId: activeGroupKostId,
-      userId: currentUser.id,
-      adminOnly: nextAdminOnly,
-    });
     setGroupDetail((prev) =>
       prev
         ? {
@@ -403,6 +483,31 @@ export function ChatClient({
           }
         : prev,
     );
+
+    const res = await fetch(
+      `/api/proxy/chats/groups/${activeGroupKostId}/settings`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          adminOnly: nextAdminOnly,
+        }),
+      },
+    );
+    if (!res.ok) {
+      // Revert optimistic update on failure
+      setGroupDetail((prev) =>
+        prev
+          ? {
+              ...prev,
+              settings: { ...prev.settings, adminOnly: !nextAdminOnly },
+            }
+          : prev,
+      );
+      const data = await res.json().catch(() => ({}));
+      setChatError(data?.message || "Gagal memperbarui pengaturan grup.");
+    }
   }
 
   const isGroupOwner =
@@ -410,14 +515,37 @@ export function ChatClient({
     (groupDetail.ownerId === currentUser.id ||
       currentUser.role === "ADMINISTRATOR");
 
+  const hasActiveRoom = Boolean(activeDirect || activeGroupKostId);
+
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-      <div className="grid h-[calc(100vh-9.5rem)] min-h-[540px] grid-cols-1 overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm md:grid-cols-3">
-        {/* Left Sidebar: Inbox */}
-        <aside className="flex flex-col border-r border-gray-200 bg-gray-50/50 overflow-y-auto">
-          <div className="border-b border-gray-200 bg-white p-4">
-            <h1 className="text-lg font-extrabold text-gray-900">Kotak Pesan</h1>
-            <p className="text-xs text-gray-500">Chat Pribadi & Grup Penghuni</p>
+    <div className="mx-auto max-w-7xl px-2 py-3 sm:px-6 sm:py-6 lg:px-8">
+      <div className="grid h-[calc(100dvh-5.5rem)] md:h-[calc(100vh-8.5rem)] min-h-[480px] grid-cols-1 overflow-hidden rounded-2xl sm:rounded-3xl border border-gray-200 bg-white shadow-sm md:grid-cols-3">
+        {/* Left Sidebar: Inbox (hidden on mobile when a room is active) */}
+        <aside
+          className={`${
+            hasActiveRoom ? "hidden md:flex" : "flex"
+          } min-h-0 flex-col border-r border-gray-200 bg-gray-50/50 overflow-y-auto`}
+        >
+          <div className="flex items-center justify-between border-b border-gray-200 bg-white p-4">
+            <div>
+              <h1 className="text-lg font-extrabold text-gray-900">Kotak Pesan</h1>
+              <p className="text-xs text-gray-500">Chat Pribadi & Grup Penghuni</p>
+            </div>
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                socketConnected
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-gray-100 text-gray-500"
+              }`}
+              title={socketConnected ? "Terhubung real-time" : "Mode sinkronisasi berkala"}
+            >
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  socketConnected ? "bg-emerald-500" : "bg-gray-400"
+                }`}
+              />
+              {socketConnected ? "Live" : "Sync"}
+            </span>
           </div>
 
           <div className="p-3 space-y-4">
@@ -562,8 +690,12 @@ export function ChatClient({
           </div>
         </aside>
 
-        {/* Right: Active Chat Room */}
-        <section className="flex flex-col md:col-span-2 bg-white">
+        {/* Right: Active Chat Room (hidden on mobile when no room is active) */}
+        <section
+          className={`${
+            hasActiveRoom ? "flex" : "hidden md:flex"
+          } min-h-0 flex-col md:col-span-2 bg-white`}
+        >
           {!activeDirect && !activeGroupKostId ? (
             <div className="flex flex-1 flex-col items-center justify-center p-8 text-center text-gray-400">
               <MessageCircle className="h-12 w-12 text-gray-300" />
@@ -577,18 +709,33 @@ export function ChatClient({
           ) : (
             <>
               {/* Room Header */}
-              <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3.5">
-                <div>
-                  <h2 className="text-sm font-extrabold text-gray-900">
-                    {activeDirect
-                      ? activeDirect.title
-                      : groupDetail?.kostName || `Grup Properti #${activeGroupKostId}`}
-                  </h2>
-                  {groupDetail?.settings?.pinnedAnnouncement && (
-                    <p className="text-xs text-emerald-700 font-semibold mt-0.5">
-                      Pengumuman: {groupDetail.settings.pinnedAnnouncement}
-                    </p>
-                  )}
+              <div className="flex items-center justify-between gap-2 border-b border-gray-200 px-3 py-3 sm:px-5 sm:py-3.5">
+                <div className="flex min-w-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveDirect(null);
+                      setActiveGroupKostId(null);
+                      setShowMembers(false);
+                      setChatError(null);
+                    }}
+                    aria-label="Kembali ke daftar chat"
+                    className="md:hidden shrink-0 rounded-xl p-1.5 text-gray-600 hover:bg-gray-100"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </button>
+                  <div className="min-w-0">
+                    <h2 className="truncate text-sm font-extrabold text-gray-900">
+                      {activeDirect
+                        ? activeDirect.title
+                        : groupDetail?.kostName || `Grup Properti #${activeGroupKostId}`}
+                    </h2>
+                    {groupDetail?.settings?.pinnedAnnouncement && (
+                      <p className="truncate text-xs text-emerald-700 font-semibold mt-0.5">
+                        Pengumuman: {groupDetail.settings.pinnedAnnouncement}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 {activeDirect &&
@@ -597,10 +744,11 @@ export function ChatClient({
                     <button
                       type="button"
                       onClick={handleAddPeerToGroup}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
+                      className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-2.5 py-1.5 sm:px-3 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
                     >
                       <UserPlus className="h-3.5 w-3.5" />
-                      Masukkan ke Grup
+                      <span className="hidden sm:inline">Masukkan ke Grup</span>
+                      <span className="sm:hidden">Grup</span>
                     </button>
                   )}
 
@@ -608,13 +756,19 @@ export function ChatClient({
                   <button
                     type="button"
                     onClick={() => setShowMembers((v) => !v)}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50"
+                    className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-2.5 py-1.5 sm:px-3 text-xs font-bold text-gray-700 hover:bg-gray-50"
                   >
                     <Users className="h-3.5 w-3.5" />
-                    Anggota ({groupDetail.members?.length || 0})
+                    <span>Anggota ({groupDetail.members?.length || 0})</span>
                   </button>
                 )}
               </div>
+
+              {chatError && (
+                <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold text-red-700">
+                  {chatError}
+                </div>
+              )}
 
               {/* Group Members Drawer */}
               {showMembers && groupDetail && (
@@ -758,6 +912,18 @@ export function ChatClient({
                             </p>
                           )}
                           <p className="whitespace-pre-line">{m.message}</p>
+                          {m.createdAt && (
+                            <p
+                              className={`mt-1 text-[10px] ${
+                                isMe ? "text-emerald-100" : "text-gray-400"
+                              }`}
+                            >
+                              {new Date(m.createdAt).toLocaleTimeString("id-ID", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </p>
+                          )}
                         </div>
                       </div>
                     );
@@ -768,7 +934,7 @@ export function ChatClient({
 
               {/* Quick Replies (for 1-on-1) */}
               {activeDirect && (
-                <div className="flex gap-1.5 overflow-x-auto border-t border-gray-100 px-4 py-2 bg-white">
+                <div className="flex gap-1.5 overflow-x-auto border-t border-gray-100 px-3 py-2 sm:px-4 bg-white">
                   {QUICK_REPLIES.map((qr) => (
                     <button
                       key={qr}
@@ -796,22 +962,23 @@ export function ChatClient({
                     e.preventDefault();
                     handleSend();
                   }}
-                  className="flex gap-2 border-t border-gray-200 bg-white p-3.5"
+                  className="flex gap-2 border-t border-gray-200 bg-white p-2.5 sm:p-3.5"
                 >
                   <input
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder="Tulis pesan..."
-                    className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm outline-none focus:border-emerald-500"
+                    className="min-w-0 flex-1 rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm outline-none focus:border-emerald-500"
                   />
                   <button
                     type="submit"
                     disabled={sending || !input.trim()}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                    aria-label="Kirim pesan"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 sm:px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
                   >
                     <Send className="h-4 w-4" />
-                    Kirim
+                    <span className="hidden sm:inline">Kirim</span>
                   </button>
                 </form>
               )}
