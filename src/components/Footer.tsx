@@ -177,6 +177,18 @@ export function Footer({ user }: FooterProps) {
                 <HelpCircle className="h-3.5 w-3.5 text-emerald-400" />
                 Buka Panduan Pengguna
               </button>
+              <Link
+                href="/faq"
+                className="inline-flex items-center gap-2 text-xs text-slate-400 hover:text-emerald-400 transition"
+              >
+                FAQ & Transaksi Escrow
+              </Link>
+              <Link
+                href="/gabung-pemilik"
+                className="inline-flex items-center gap-2 text-xs text-slate-400 hover:text-emerald-400 transition"
+              >
+                Gabung Jadi Pemilik Properti
+              </Link>
               <a
                 href="mailto:halo@keyloka.com"
                 className="inline-flex items-center gap-2 text-xs text-slate-400 hover:text-emerald-400 transition"

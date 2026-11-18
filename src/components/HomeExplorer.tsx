@@ -886,7 +886,7 @@ export function HomeExplorer({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="https://media.keyloka.com/web/banner-web.webp"
-          alt="Banner Keyloka"
+          alt="Keyloka — Platform Cari Kost, Apartemen, Kontrakan, Villa & Homestay Aman dengan Escrow"
           className="block w-full h-auto object-cover"
           loading="lazy"
         />
@@ -904,16 +904,24 @@ export function HomeExplorer({
           </h2>
           <p className="text-xs sm:text-sm leading-relaxed text-gray-600">
             Pasang iklan properti Anda gratis di Keyloka dan jangkau ribuan calon penyewa potensial.
-            Kelola jadwal survei, booking, dan chat langsung dari satu dashboard.
+            Kelola pertanyaan ketersediaan, survei, booking, dan chat langsung dari satu dashboard.
           </p>
         </div>
-        <Link
-          href="/dashboard/new-property"
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700"
-        >
-          <span>Pasang Iklan Properti</span>
-          <ArrowRight className="h-4 w-4" />
-        </Link>
+        <div className="flex shrink-0 flex-wrap items-center gap-2.5">
+          <Link
+            href="/gabung-pemilik"
+            className="inline-flex items-center justify-center rounded-2xl border border-emerald-600 bg-white px-4 py-3 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50"
+          >
+            Pelajari Benefit
+          </Link>
+          <Link
+            href="/dashboard/new-property"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700"
+          >
+            <span>Pasang Iklan Properti</span>
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
       </section>
 
       {showCompareModal && compareList.length >= 2 && (

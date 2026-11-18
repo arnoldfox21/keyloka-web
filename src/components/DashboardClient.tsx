@@ -88,6 +88,22 @@ interface ReviewReportItem {
   createdAt: string;
 }
 
+interface KostReportItem {
+  id: number;
+  kostId: number;
+  kostName: string;
+  kostCity?: string;
+  kostDistrict?: string;
+  kostOwnerName?: string;
+  reporterId?: number | null;
+  reporterName?: string | null;
+  reporterEmail?: string | null;
+  reason: string;
+  details?: string | null;
+  status: string;
+  createdAt: string;
+}
+
 interface DashboardClientProps {
   currentUser: UserProfile;
   initialMyKosts: DashboardKostItem[];
@@ -102,6 +118,7 @@ interface DashboardClientProps {
   initialPendingKosts: DashboardKostItem[];
   initialAllPayouts: PayoutItem[];
   initialReviewReports: ReviewReportItem[];
+  initialKostReports?: KostReportItem[];
   initialCreated?: boolean;
   initialUpdated?: boolean;
   initialTab?: string;
@@ -129,6 +146,7 @@ export function DashboardClient({
   initialPendingKosts,
   initialAllPayouts,
   initialReviewReports,
+  initialKostReports = [],
   initialCreated = false,
   initialUpdated = false,
   initialTab,
@@ -175,6 +193,8 @@ export function DashboardClient({
   const [allPayouts, setAllPayouts] = useState<PayoutItem[]>(initialAllPayouts);
   const [reviewReports, setReviewReports] =
     useState<ReviewReportItem[]>(initialReviewReports);
+  const [kostReports, setKostReports] =
+    useState<KostReportItem[]>(initialKostReports);
 
   const [users, setUsers] = useState<DashboardUserItem[]>([]);
   const [usersLoaded, setUsersLoaded] = useState(false);
@@ -333,6 +353,7 @@ export function DashboardClient({
           fetch("/api/proxy/kosts?approvalStatus=PENDING&includePending=true"),
           fetch("/api/proxy/wallet/payout-requests"),
           fetch("/api/proxy/reviews/reports"),
+          fetch("/api/proxy/kosts/reports"),
         );
       }
 
@@ -373,6 +394,10 @@ export function DashboardClient({
         if (responses[6]?.ok) {
           const d = await responses[6].json();
           setReviewReports(Array.isArray(d) ? d : []);
+        }
+        if (responses[7]?.ok) {
+          const d = await responses[7].json();
+          setKostReports(Array.isArray(d) ? d : []);
         }
       }
     } finally {
@@ -1029,9 +1054,31 @@ export function DashboardClient({
     }
   }
 
+  async function handleDismissKostReport(reportId: number) {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/proxy/kosts/reports/${reportId}/dismiss`, {
+        method: "PATCH",
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d?.message || "Gagal menandai laporan.");
+      setKostReports((prev) => prev.filter((r) => r.id !== reportId));
+      setNotice({ type: "ok", text: "Laporan properti ditandai selesai." });
+    } catch (e) {
+      setNotice({
+        type: "err",
+        text: e instanceof Error ? e.message : "Terjadi kesalahan.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const disputedCount = bookings.filter((b) => b.escrowStatus === "DISPUTED").length;
   const pendingWithdrawCount = allPayouts.filter((p) => p.status === "PENDING").length;
-  const moderationCount = pendingKosts.length + reviewReports.length;
+  const moderationCount =
+    pendingKosts.length + reviewReports.length + kostReports.length;
 
   const tabs: Array<{ key: TabKey; label: string; badge?: number }> = isStaffOrAdmin
     ? [
@@ -2048,6 +2095,90 @@ export function DashboardClient({
       {/* Tab Content: APPROVAL & MODERATION (Staff/Admin) */}
       {tab === "APPROVAL" && isStaffOrAdmin && (
         <div className="space-y-6">
+          {/* Laporan Properti Masuk */}
+          <div className="space-y-3">
+            <h2 className="text-sm font-extrabold uppercase tracking-wider text-gray-700">
+              Laporan Properti ({kostReports.length})
+            </h2>
+            {kostReports.length === 0 ? (
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+                Tidak ada laporan properti yang menunggu peninjauan.
+              </div>
+            ) : (
+              kostReports.map((r) => (
+                <div
+                  key={r.id}
+                  className="rounded-2xl border border-rose-100 bg-white p-5 space-y-3"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                    <div>
+                      <span className="inline-block rounded-lg bg-rose-50 px-2.5 py-0.5 text-[11px] font-bold text-rose-700">
+                        {r.reason}
+                      </span>
+                      <h3 className="mt-1 text-base font-extrabold text-gray-900">
+                        <Link
+                          href={`/kost/${r.kostId}`}
+                          target="_blank"
+                          className="hover:text-emerald-700 hover:underline"
+                        >
+                          {r.kostName || `Properti #${r.kostId}`}
+                        </Link>
+                      </h3>
+                      <p className="text-xs text-gray-500">
+                        {[r.kostDistrict, r.kostCity].filter(Boolean).join(", ")}
+                        {r.kostOwnerName ? ` • Pemilik: ${r.kostOwnerName}` : ""}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-600">
+                        Pengirim:{" "}
+                        {r.reporterName ? (
+                          <span className="font-semibold text-gray-900">
+                            {r.reporterName}
+                            {r.reporterEmail ? ` (${r.reporterEmail})` : ""}
+                          </span>
+                        ) : (
+                          <span className="italic text-gray-500">
+                            Pengunjung (Anonim)
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <span className="text-[11px] text-gray-400 shrink-0">
+                      {new Date(r.createdAt).toLocaleDateString("id-ID", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </span>
+                  </div>
+
+                  {r.details && (
+                    <div className="rounded-xl border border-gray-100 bg-gray-50 p-3.5 text-xs text-gray-700">
+                      <span className="font-bold text-gray-900">Catatan pelapor: </span>
+                      {r.details}
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-2">
+                    <Link
+                      href={`/kost/${r.kostId}`}
+                      target="_blank"
+                      className="rounded-xl border border-emerald-600 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition"
+                    >
+                      Lihat Properti
+                    </Link>
+                    <button
+                      disabled={busy}
+                      onClick={() => handleDismissKostReport(r.id)}
+                      className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                    >
+                      Tandai Selesai
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
           {/* Laporan Ulasan Terbuka */}
           <div className="space-y-3">
             <h2 className="text-sm font-extrabold uppercase tracking-wider text-gray-700">

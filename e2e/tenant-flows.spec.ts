@@ -121,13 +121,13 @@ test.describe("Tenant & Interactive Public Flows", () => {
     await firstCard.click();
 
     const surveyBtn = page
-      .getByRole("button", { name: "Ajukan Survei Lokasi" })
+      .getByRole("button", { name: "Tanyakan Ketersediaan" })
       .first();
     await expect(surveyBtn).toBeVisible();
     await surveyBtn.click();
 
     await expect(
-      page.getByRole("heading", { name: "Ajukan Jadwal Survei" }),
+      page.getByText("Tanya Ketersediaan & Survei"),
     ).toBeVisible();
     const phoneInput = page
       .locator("form")
@@ -135,11 +135,11 @@ test.describe("Tenant & Interactive Public Flows", () => {
       .locator("input")
       .nth(1);
     await phoneInput.fill("081234567890");
-    await page.getByRole("button", { name: "Kirim Jadwal Survei" }).click();
+    await page.getByRole("button", { name: "Kirim ke Pemilik" }).click();
 
     await expect(
       page.getByText(
-        /Jadwal survei berhasil dikirim|Anda sudah memiliki jadwal survei yang masih dalam proses/i,
+        /Pertanyaan ketersediaan & survei berhasil dikirim|Jadwal survei berhasil dikirim|Anda sudah memiliki jadwal survei yang masih dalam proses/i,
       ),
     ).toBeVisible({ timeout: 10000 });
   });

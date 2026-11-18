@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   Calendar,
@@ -16,6 +16,7 @@ import {
   MapPin,
   Maximize2,
   MessageCircle,
+  MoreHorizontal,
   Phone,
   Reply,
   Share2,
@@ -37,6 +38,7 @@ import {
   type UserProfile,
 } from "@/lib/types";
 import { getSiteUrl } from "@/lib/seo";
+import { KostCard } from "./KostCard";
 
 declare global {
   interface Window {
@@ -51,6 +53,18 @@ declare global {
         },
       ) => void;
     };
+    grecaptcha?: {
+      ready: (cb: () => void) => void;
+      render: (
+        container: HTMLElement,
+        params: {
+          sitekey: string;
+          callback: (token: string) => void;
+          "expired-callback"?: () => void;
+        },
+      ) => number;
+      reset: (widgetId?: number) => void;
+    };
   }
 }
 
@@ -58,12 +72,14 @@ interface KostDetailClientProps {
   kost: Kost;
   reviews: ReviewItem[];
   currentUser: UserProfile | null;
+  recommendedKosts?: Kost[];
 }
 
 export function KostDetailClient({
   kost,
   reviews: initialReviews,
   currentUser,
+  recommendedKosts = [],
 }: KostDetailClientProps) {
   const router = useRouter();
   const [activePhoto, setActivePhoto] = useState(0);
@@ -111,6 +127,104 @@ export function KostDetailClient({
   } | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [propertyActionOpen, setPropertyActionOpen] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [reportPropertyOpen, setReportPropertyOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("Informasi atau harga tidak sesuai");
+  const [reportDetails, setReportDetails] = useState("");
+  const [reportSubmitted, setReportSubmitted] = useState(false);
+  const [submittingReport, setSubmittingReport] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [recaptchaToken, setRecaptchaToken] = useState("");
+  const recaptchaContainerRef = useRef<HTMLDivElement | null>(null);
+  const recaptchaWidgetIdRef = useRef<number | null>(null);
+  const recaptchaSiteKey = (process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "").trim();
+
+  useEffect(() => {
+    if (!reportPropertyOpen || !recaptchaSiteKey) return;
+
+    let cancelled = false;
+    const renderWidget = () => {
+      if (cancelled || !recaptchaContainerRef.current || !window.grecaptcha) return;
+      window.grecaptcha.ready(() => {
+        if (cancelled || !recaptchaContainerRef.current || !window.grecaptcha) return;
+        if (recaptchaContainerRef.current.childElementCount > 0) return;
+        recaptchaWidgetIdRef.current = window.grecaptcha.render(
+          recaptchaContainerRef.current,
+          {
+            sitekey: recaptchaSiteKey,
+            callback: (token) => {
+              setRecaptchaToken(token);
+              setReportError(null);
+            },
+            "expired-callback": () => {
+              setRecaptchaToken("");
+            },
+          },
+        );
+      });
+    };
+
+    if (window.grecaptcha) {
+      renderWidget();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const scriptId = "google-recaptcha-script";
+    let script = document.getElementById(scriptId) as HTMLScriptElement | null;
+    if (!script) {
+      script = document.createElement("script");
+      script.id = scriptId;
+      script.src = "https://www.google.com/recaptcha/api.js?render=explicit";
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
+    script.addEventListener("load", renderWidget);
+    return () => {
+      cancelled = true;
+      script?.removeEventListener("load", renderWidget);
+    };
+  }, [reportPropertyOpen, recaptchaSiteKey]);
+
+  async function handleSubmitKostReport(e: React.FormEvent) {
+    e.preventDefault();
+    setReportError(null);
+    if (recaptchaSiteKey && !recaptchaToken) {
+      setReportError("Harap selesaikan verifikasi reCAPTCHA terlebih dahulu.");
+      return;
+    }
+
+    setSubmittingReport(true);
+    try {
+      const res = await fetch(`/api/proxy/kosts/${kost.id}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reason: reportReason,
+          details: reportDetails.trim() || undefined,
+          recaptchaToken: recaptchaToken || undefined,
+        }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(d?.message || "Gagal mengirim laporan properti.");
+      }
+      setReportSubmitted(true);
+      setReportDetails("");
+      setRecaptchaToken("");
+      if (recaptchaWidgetIdRef.current !== null && window.grecaptcha) {
+        window.grecaptcha.reset(recaptchaWidgetIdRef.current);
+      }
+    } catch (err) {
+      setReportError(
+        err instanceof Error ? err.message : "Gagal mengirim laporan properti.",
+      );
+    } finally {
+      setSubmittingReport(false);
+    }
+  }
   const [propertyActionTab, setPropertyActionTab] = useState<"CLAIM" | "DELETE">("CLAIM");
   const [claimPhone, setClaimPhone] = useState(currentUser?.phone || "");
   const [claimNotes, setClaimNotes] = useState("");
@@ -221,11 +335,11 @@ export function KostDetailClient({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data?.message || "Gagal mengirim pengajuan survei.");
+        throw new Error(data?.message || "Gagal mengirim pertanyaan ketersediaan.");
       }
       setFeedback({
         type: "success",
-        text: "Jadwal survei berhasil dikirim! Cek menu Booking & Poin.",
+        text: "Pertanyaan ketersediaan & survei berhasil dikirim! Cek menu Booking & Poin.",
       });
       setTimeout(() => {
         setModalMode(null);
@@ -426,21 +540,87 @@ export function KostDetailClient({
 
           {/* Info Card */}
           <div className="rounded-3xl border border-gray-200 bg-white p-6 space-y-5">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
-                {formatCategoryLabel(kost.propertyCategory)} • {kost.type}
-              </span>
-              {kost.isVerified && (
-                <span className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  Terverifikasi
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
+                  {formatCategoryLabel(kost.propertyCategory)} • {kost.type}
                 </span>
-              )}
-              {kost.allowDirectBooking && (
-                <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white">
-                  <ShieldCheck className="h-3.5 w-3.5" />
-                  Direct Booking + Escrow
-                </span>
+                {kost.isVerified && (
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Terverifikasi
+                  </span>
+                )}
+                {kost.allowDirectBooking && (
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white">
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    Direct Booking + Escrow
+                  </span>
+                )}
+              </div>
+
+              {(canShowClaim || currentUser?.id !== kost.ownerId) && (
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setMoreMenuOpen((prev) => !prev)}
+                    aria-label="Opsi properti lainnya"
+                    aria-expanded={moreMenuOpen}
+                    className={`rounded-full p-1.5 transition ${
+                      claimSubmitted
+                        ? "bg-amber-50 text-amber-600 hover:bg-amber-100"
+                        : "text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                    }`}
+                  >
+                    <MoreHorizontal className="h-5 w-5" />
+                  </button>
+                  {moreMenuOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-20"
+                        onClick={() => setMoreMenuOpen(false)}
+                      />
+                      <div className="absolute right-0 z-30 mt-1.5 w-56 rounded-2xl border border-gray-200 bg-white p-1.5 shadow-lg">
+                        {canShowClaim && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMoreMenuOpen(false);
+                              openPropertyActionModal();
+                            }}
+                            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-gray-50 transition"
+                          >
+                            <KeyRound
+                              className={`h-4 w-4 shrink-0 ${
+                                claimSubmitted ? "text-amber-600" : "text-gray-500"
+                              }`}
+                            />
+                            <span>
+                              {claimSubmitted
+                                ? "Klaim Properti (Diproses)"
+                                : "Klaim atau Hapus Properti"}
+                            </span>
+                          </button>
+                        )}
+                        {currentUser?.id !== kost.ownerId && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMoreMenuOpen(false);
+                              setReportSubmitted(false);
+                              setReportDetails("");
+                              setReportPropertyOpen(true);
+                            }}
+                            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 transition"
+                          >
+                            <Flag className="h-4 w-4 shrink-0 text-rose-500" />
+                            <span>Laporkan Properti</span>
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
               )}
             </div>
 
@@ -897,7 +1077,7 @@ export function KostDetailClient({
                       onClick={() => openModal("SURVEI")}
                       className="w-full rounded-xl border border-emerald-600 py-3 text-sm font-bold text-emerald-700 hover:bg-emerald-50 transition"
                     >
-                      Ajukan Survei Lokasi
+                      Tanyakan Ketersediaan
                     </button>
                   </>
                 ) : (
@@ -913,38 +1093,52 @@ export function KostDetailClient({
                   onClick={() => openModal("SURVEI")}
                   className="w-full rounded-xl bg-emerald-600 py-3.5 text-sm font-extrabold text-white shadow-sm hover:bg-emerald-700 transition"
                 >
-                  Ajukan Survei Lokasi
+                  Tanyakan Ketersediaan
                 </button>
               )}
-              {canShowClaim && (
-                <div className="pt-1 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={openPropertyActionModal}
-                    aria-label={
-                      claimSubmitted
-                        ? "Klaim properti sedang diproses"
-                        : "Klaim atau hapus properti"
-                    }
-                    title={
-                      claimSubmitted
-                        ? "Klaim properti sedang diproses"
-                        : "Klaim atau hapus properti"
-                    }
-                    className={`rounded-full p-2 transition ${
-                      claimSubmitted
-                        ? "bg-amber-50 text-amber-600 hover:bg-amber-100"
-                        : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                    }`}
-                  >
-                    <KeyRound className="h-4 w-4" />
-                  </button>
-                </div>
+              {currentUser?.id !== kost.ownerId && (
+                <p className="text-center text-[11px] text-gray-500">
+                  Gratis tanya ketersediaan • Transaksi aman dengan Escrow
+                </p>
               )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Rekomendasi Properti Serupa */}
+      {recommendedKosts.length > 0 && (() => {
+        const recCategoryLabel = formatCategoryLabel(kost.propertyCategory);
+        return (
+          <section className="mt-10 border-t border-gray-200/80 pt-8">
+            <div className="mb-5 flex items-end justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-black tracking-tight text-gray-900">
+                  Rekomendasi {recCategoryLabel} Lainnya
+                </h2>
+                <p className="mt-0.5 text-xs sm:text-sm text-gray-500">
+                  Pilihan {recCategoryLabel.toLowerCase()} lain yang mungkin cocok untuk Anda
+                </p>
+              </div>
+              <Link
+                href={
+                  isDaily
+                    ? "/?stayMode=HUNIAN_HARIAN"
+                    : `/?category=${encodeURIComponent(kost.propertyCategory || "KOST")}`
+                }
+                className="shrink-0 text-xs sm:text-sm font-bold text-emerald-700 hover:text-emerald-800 hover:underline"
+              >
+                Lihat Semua →
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {recommendedKosts.map((item) => (
+                <KostCard key={item.id} kost={item} />
+              ))}
+            </div>
+          </section>
+        );
+      })()}
 
       {/* Modal Booking / Survei */}
       {modalMode && (
@@ -959,7 +1153,7 @@ export function KostDetailClient({
             <div className="shrink-0 flex items-start justify-between gap-3 border-b border-gray-100 px-4 py-3 sm:px-6 sm:py-4 bg-gray-50/70">
               <div className="min-w-0">
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
-                  {modalMode === "DIRECT" ? "Booking Langsung" : "Pengajuan Survei"}
+                  {modalMode === "DIRECT" ? "Booking Langsung" : "Tanya Ketersediaan & Survei"}
                 </span>
                 <h3 className="mt-1 truncate text-base font-black text-gray-900">
                   {kost.name}
@@ -1018,7 +1212,7 @@ export function KostDetailClient({
                     <label className="block text-xs font-bold text-gray-700 mb-1">
                       {modalMode === "DIRECT"
                         ? "Tanggal Mulai Masuk"
-                        : "Tanggal Rencana Survei"}
+                        : "Rencana Tanggal Masuk / Survei"}
                     </label>
                     <div className="relative">
                       <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -1270,7 +1464,7 @@ export function KostDetailClient({
                     ? "Memproses..."
                     : modalMode === "DIRECT"
                       ? "Lanjut Pembayaran"
-                      : "Kirim Jadwal Survei"}
+                      : "Kirim ke Pemilik"}
                 </button>
               </div>
             </form>
@@ -1474,6 +1668,110 @@ export function KostDetailClient({
           </div>
         );
       })()}
+
+      {/* Modal Laporkan Properti */}
+      {reportPropertyOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Flag className="h-5 w-5 text-rose-600" />
+                <h3 className="text-lg font-black text-gray-900">
+                  Laporkan Properti
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReportPropertyOpen(false)}
+                aria-label="Tutup modal laporan"
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="mt-2 text-xs text-gray-500">
+              Bantu kami menjaga kualitas listing di Keyloka. Laporan Anda akan langsung masuk ke tim Staff untuk ditinjau.
+            </p>
+
+            {reportSubmitted ? (
+              <div className="mt-4 space-y-4">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-semibold text-emerald-700 leading-relaxed">
+                  Terima kasih! Laporan Anda untuk <strong>{kost.name}</strong> telah berhasil dikirim dan akan ditinjau oleh tim Staff Keyloka.
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReportPropertyOpen(false)}
+                  className="w-full rounded-xl bg-gray-900 py-2.5 text-xs font-bold text-white hover:bg-gray-800 transition"
+                >
+                  Tutup
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitKostReport} className="mt-4 space-y-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                    Alasan Pelaporan
+                  </label>
+                  <select
+                    value={reportReason}
+                    onChange={(e) => setReportReason(e.target.value)}
+                    className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 focus:border-rose-500 focus:outline-none"
+                  >
+                    <option value="Informasi atau harga tidak sesuai">
+                      Informasi atau harga tidak sesuai
+                    </option>
+                    <option value="Properti fiktif atau indikasi penipuan">
+                      Properti fiktif atau indikasi penipuan
+                    </option>
+                    <option value="Properti sudah tutup / tidak beroperasi">
+                      Properti sudah tutup / tidak beroperasi
+                    </option>
+                    <option value="Foto tidak pantas atau melanggar aturan">
+                      Foto tidak pantas atau melanggar aturan
+                    </option>
+                    <option value="Lainnya">Lainnya</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                    Keterangan Tambahan (Opsional)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={reportDetails}
+                    onChange={(e) => setReportDetails(e.target.value)}
+                    placeholder="Jelaskan detail masalah yang Anda temukan..."
+                    className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:border-rose-500 focus:outline-none"
+                  />
+                </div>
+
+                {recaptchaSiteKey && (
+                  <div className="pt-1">
+                    <div ref={recaptchaContainerRef} />
+                  </div>
+                )}
+
+                {reportError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">
+                    {reportError}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={submittingReport}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-rose-600 py-3 text-sm font-extrabold text-white hover:bg-rose-700 disabled:opacity-50 transition"
+                >
+                  <Flag className="h-4 w-4" />
+                  {submittingReport ? "Mengirim..." : "Kirim Laporan"}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Lightbox Fullscreen Image Viewer */}
       {lightboxOpen && photos[activePhoto] && (

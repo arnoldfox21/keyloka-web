@@ -88,16 +88,34 @@ export default async function KostDetailPage({
   const kost = await fetchKostDetail(id);
   if (!kost) notFound();
 
-  const [reviewsRes, currentUser] = await Promise.all([
+  const categoryParam = kost.propertyCategory || "KOST";
+
+  const [reviewsRes, currentUser, recRes] = await Promise.all([
     fetch(`${API_BASE_URL}/reviews?kostId=${kost.id}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : []))
       .catch(() => []),
     getServerToken().then((t) =>
       t ? serverFetch<UserProfile>("/auth/me").catch(() => null) : null,
     ),
+    fetch(
+      `${API_BASE_URL}/kosts?propertyCategory=${encodeURIComponent(categoryParam)}&sortBy=recommended&page=1&limit=12`,
+      { cache: "no-store" },
+    )
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .catch(() => ({ data: [] })),
   ]);
 
   const reviews: ReviewItem[] = Array.isArray(reviewsRes) ? reviewsRes : [];
+  const rawRecs: Kost[] = Array.isArray(recRes) ? recRes : recRes?.data || [];
+  const currentCity = (kost.city || "").trim().toLowerCase();
+  const recommendedKosts = rawRecs
+    .filter((item) => item?.id && item.id !== kost.id)
+    .sort((a, b) => {
+      const aSameCity = (a.city || "").trim().toLowerCase() === currentCity ? 1 : 0;
+      const bSameCity = (b.city || "").trim().toLowerCase() === currentCity ? 1 : 0;
+      return bSameCity - aSameCity;
+    })
+    .slice(0, 4);
   const siteUrl = getSiteUrl();
   const pageUrl = `${siteUrl}/kost/${kost.id}`;
   const price = getDisplayPrice(kost);
@@ -184,6 +202,7 @@ export default async function KostDetailPage({
         kost={kost}
         reviews={reviews}
         currentUser={currentUser}
+        recommendedKosts={recommendedKosts}
       />
     </>
   );

@@ -35,7 +35,7 @@ export default async function DashboardPage({
     redirect("/bookings");
   }
 
-  const [myKostsRes, bookingsRes, walletRes, myPayoutsRes, pendingRes, allPayoutsRes, reviewReportsRes] =
+  const [myKostsRes, bookingsRes, walletRes, myPayoutsRes, pendingRes, allPayoutsRes, reviewReportsRes, kostReportsRes] =
     await Promise.all([
       serverFetch<Kost[] | { data: Kost[]; total?: number; hasMore?: boolean }>(
         isStaffOrAdmin
@@ -108,6 +108,23 @@ export default async function DashboardPage({
             createdAt: string;
           }>>("/reviews/reports").catch(() => [])
         : Promise.resolve([]),
+      isStaffOrAdmin
+        ? serverFetch<Array<{
+            id: number;
+            kostId: number;
+            kostName: string;
+            kostCity?: string;
+            kostDistrict?: string;
+            kostOwnerName?: string;
+            reporterId?: number | null;
+            reporterName?: string | null;
+            reporterEmail?: string | null;
+            reason: string;
+            details?: string | null;
+            status: string;
+            createdAt: string;
+          }>>("/kosts/reports").catch(() => [])
+        : Promise.resolve([]),
     ]);
 
   const initialMyKosts = Array.isArray(myKostsRes)
@@ -139,6 +156,7 @@ export default async function DashboardPage({
       initialPendingKosts={initialPendingKosts}
       initialAllPayouts={allPayoutsRes}
       initialReviewReports={reviewReportsRes}
+      initialKostReports={kostReportsRes}
       initialCreated={initialCreated}
       initialUpdated={initialUpdated}
       initialTab={initialTab}
