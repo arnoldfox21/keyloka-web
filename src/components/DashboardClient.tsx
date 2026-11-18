@@ -412,6 +412,41 @@ export function DashboardClient({
     }
   }
 
+  async function handleToggleDirectBooking(kost: DashboardKostItem) {
+    const nextAllow = !kost.allowDirectBooking;
+    setBusy(true);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/proxy/kosts/${kost.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ allowDirectBooking: nextAllow }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(d?.message || "Gagal memperbarui status Booking Langsung.");
+      }
+      setMyKosts((prev) =>
+        prev.map((k) =>
+          k.id === kost.id ? { ...k, allowDirectBooking: nextAllow } : k,
+        ),
+      );
+      setNotice({
+        type: "ok",
+        text: nextAllow
+          ? `Booking Langsung untuk "${kost.name}" diaktifkan.`
+          : `Booking Langsung untuk "${kost.name}" dinonaktifkan.`,
+      });
+    } catch (e) {
+      setNotice({
+        type: "err",
+        text: e instanceof Error ? e.message : "Gagal memperbarui Booking Langsung.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleQuickUpdateRooms(kost: DashboardKostItem, delta: number) {
     const nextRooms = Math.max(0, Number(kost.availableRooms) + delta);
     setBusy(true);
@@ -1392,6 +1427,25 @@ export function DashboardClient({
                             >
                               +
                             </button>
+                            <button
+                              type="button"
+                              disabled={busy || (!isStaffOrAdmin && !currentUser.isVerified)}
+                              onClick={() => handleToggleDirectBooking(k)}
+                              title={
+                                !isStaffOrAdmin && !currentUser.isVerified
+                                  ? "Khusus pemilik terverifikasi"
+                                  : k.allowDirectBooking
+                                    ? "Nonaktifkan Booking Langsung"
+                                    : "Aktifkan Booking Langsung"
+                              }
+                              className={`inline-flex h-7 items-center gap-1 rounded-lg border px-2 text-[11px] font-bold transition disabled:opacity-40 ${
+                                k.allowDirectBooking
+                                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                  : "border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100"
+                              }`}
+                            >
+                              {k.allowDirectBooking ? "Booking: ON" : "Booking: OFF"}
+                            </button>
                             <Link
                               href={`/dashboard/edit-property/${k.id}`}
                               title="Edit Properti"
@@ -1620,6 +1674,11 @@ export function DashboardClient({
                       {b.platformFee > 0 && (
                         <p className="text-[11px] text-gray-500">
                           Potongan Platform: -{formatRupiah(b.platformFee)}
+                        </p>
+                      )}
+                      {(b.serviceFee ?? 0) > 0 && (
+                        <p className="text-[11px] text-gray-500">
+                          Biaya Layanan & Escrow: -{formatRupiah(b.serviceFee!)}
                         </p>
                       )}
                       {b.ownerNetAmount > 0 && (

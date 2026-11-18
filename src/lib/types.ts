@@ -486,9 +486,9 @@ export function calculateBookingBreakdown(params: {
   const appliedDiscount = params.usePoints ? maxUsablePoints * 50 : 0;
 
   const netRentPayNow = Math.max(1000, payableRent - appliedDiscount);
-  // Minimal Rp5.000 atau 2,5% untuk menutup fee VA/QRIS/E-Wallet tanpa menggerus margin platform
-  const serviceFee = Math.max(5000, Math.round(netRentPayNow * 0.025));
-  const finalPayNow = netRentPayNow + serviceFee;
+  // Biaya layanan & transaksi ditanggung oleh pemilik properti, penyewa bebas biaya tambahan
+  const serviceFee = 0;
+  const finalPayNow = netRentPayNow;
 
   return {
     baseTotal,

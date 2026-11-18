@@ -242,9 +242,13 @@ export function KostDetailClient({
   }
 
   async function syncDirectPayment(bookingId: number) {
-    await fetch(`/api/proxy/bookings/${bookingId}/sync-payment`, {
-      method: "POST",
-    });
+    try {
+      await fetch(`/api/proxy/bookings/${bookingId}/sync-payment`, {
+        method: "POST",
+      });
+    } catch {
+      // Tetap arahkan ke /bookings agar user dapat memeriksa status pembayaran
+    }
     router.push("/bookings");
     router.refresh();
   }
@@ -1122,12 +1126,12 @@ export function KostDetailClient({
                         <span>Biaya Layanan & Transaksi</span>
                         <Info className="h-3.5 w-3.5 text-gray-400" />
                       </button>
-                      <span className="font-semibold text-gray-800">{formatRupiah(breakdown.serviceFee)}</span>
+                      <span className="font-semibold text-emerald-700">Gratis</span>
                     </div>
 
                     {showFeeInfo && (
                       <p className="rounded-lg bg-white border border-gray-200 p-2 text-[11px] leading-relaxed text-gray-600">
-                        Biaya layanan (min. Rp5.000 atau 2,5%) digunakan untuk biaya pemrosesan pembayaran & perlindungan rekening bersama (Escrow). Biaya ini tidak terpotong oleh poin.
+                        Gratis biaya layanan untuk penyewa. Seluruh biaya pemrosesan pembayaran & perlindungan rekening bersama (Escrow) ditanggung oleh pemilik properti.
                       </p>
                     )}
 

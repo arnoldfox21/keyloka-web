@@ -154,8 +154,9 @@ export function NewPropertyClient({
   const router = useRouter();
   const isEditMode = Boolean(initialKost);
   const role = (currentUser.role || "").toUpperCase();
-  const isAutoApproved = role === "STAFF" || role === "ADMINISTRATOR";
-  const needsSlotFee = !isEditMode && !isAutoApproved && existingPropertyCount >= FREE_PROPERTY_QUOTA;
+  const isStaffOrAdmin = role === "STAFF" || role === "ADMINISTRATOR";
+  const isAutoApproved = isStaffOrAdmin || Boolean(currentUser.isVerified);
+  const needsSlotFee = !isEditMode && !isStaffOrAdmin && existingPropertyCount >= FREE_PROPERTY_QUOTA;
 
   const [propertyCategory, setPropertyCategory] = useState<string>(
     initialKost?.propertyCategory || "KOST",
@@ -213,6 +214,9 @@ export function NewPropertyClient({
   );
   const [electricityIncluded, setElectricityIncluded] = useState(
     initialKost?.electricityIncluded ?? false,
+  );
+  const [allowDirectBooking, setAllowDirectBooking] = useState(
+    initialKost?.allowDirectBooking ?? isAutoApproved,
   );
 
   const [roomFacilities, setRoomFacilities] = useState<string[]>(
@@ -513,16 +517,13 @@ export function NewPropertyClient({
       bedrooms: parsedBedrooms,
       bathrooms: parsedBathrooms,
       electricityIncluded: isDailyStay ? true : electricityIncluded,
-      allowDirectBooking:
-        isEditMode && initialKost
-          ? initialKost.allowDirectBooking
-          : isAutoApproved,
+      allowDirectBooking: isAutoApproved ? allowDirectBooking : false,
       roomFacilities,
       publicFacilities,
       rules,
       ownerName: ownerName.trim() || currentUser.name,
       ownerPhone: ownerPhone.trim() || currentUser.phone,
-      ...(!isEditMode && isAutoApproved && selectedOwnerId
+      ...(!isEditMode && isStaffOrAdmin && selectedOwnerId
         ? { ownerId: selectedOwnerId }
         : {}),
       ...(parsedLat !== undefined && Number.isFinite(parsedLat)
@@ -1097,6 +1098,26 @@ export function NewPropertyClient({
               </span>
             </label>
           )}
+
+          <label className="flex items-start gap-2.5 cursor-pointer pt-1">
+            <input
+              type="checkbox"
+              disabled={!isAutoApproved}
+              checked={isAutoApproved ? allowDirectBooking : false}
+              onChange={(e) => setAllowDirectBooking(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-50"
+            />
+            <span className="text-xs">
+              <span className="block font-bold text-gray-700">
+                Aktifkan Booking Langsung (Escrow)
+              </span>
+              <span className="block text-[11px] text-gray-500">
+                {isAutoApproved
+                  ? "Penyewa dapat langsung membayar booking melalui Midtrans dengan sistem Escrow."
+                  : "Khusus pemilik terverifikasi. Lakukan verifikasi akun untuk mengaktifkan fitur booking."}
+              </span>
+            </span>
+          </label>
         </section>
 
         {/* 4. Fasilitas & Peraturan */}
@@ -1354,7 +1375,7 @@ export function NewPropertyClient({
             </h2>
           </div>
 
-          {!isEditMode && isAutoApproved && (
+          {!isEditMode && isStaffOrAdmin && (
             <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 space-y-2.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs font-bold text-blue-900">
