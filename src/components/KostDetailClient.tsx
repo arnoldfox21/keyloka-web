@@ -395,6 +395,13 @@ export function KostDetailClient({
 
   async function handleSubmitDirect(e: React.FormEvent) {
     e.preventDefault();
+    if (!startDate || startDate < minSurveyDate) {
+      setFeedback({
+        type: "error",
+        text: "Tanggal mulai masuk harus setelah hari ini (minimal besok).",
+      });
+      return;
+    }
     setSubmitting(true);
     setFeedback(null);
     try {
@@ -1273,7 +1280,7 @@ export function KostDetailClient({
                       <input
                         type="date"
                         required
-                        min={modalMode === "SURVEI" ? minSurveyDate : undefined}
+                        min={minSurveyDate}
                         value={startDate}
                         onChange={(e) => setStartDate(e.target.value)}
                         className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-3 text-sm focus:border-emerald-500 focus:outline-none"
