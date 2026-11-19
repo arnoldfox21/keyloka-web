@@ -902,6 +902,20 @@ export function NewPropertyClient({
             </button>
           </div>
 
+          <KostLocationPicker
+            latitude={latitude}
+            longitude={longitude}
+            onChange={(lat, lng) => {
+              setLatitude(lat);
+              setLongitude(lng);
+            }}
+            onLocationResolved={({ city: c, district: d, address: a }) => {
+              if (c) setCity(c);
+              if (d) setDistrict(d);
+              if (a) setAddress(a);
+            }}
+          />
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label
@@ -1028,20 +1042,6 @@ export function NewPropertyClient({
               />
             </div>
           </div>
-
-          <KostLocationPicker
-            latitude={latitude}
-            longitude={longitude}
-            onChange={(lat, lng) => {
-              setLatitude(lat);
-              setLongitude(lng);
-            }}
-            onLocationResolved={({ city: c, district: d, address: a }) => {
-              if (c) setCity(c);
-              if (d) setDistrict(d);
-              if (a) setAddress(a);
-            }}
-          />
         </section>
         )}
 

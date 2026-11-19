@@ -90,6 +90,30 @@ export function KostLocationPicker({
     }, 350);
   }, []);
 
+  const handleSelectSearchResult = useCallback(
+    (item: SearchResultItem) => {
+      const latStr = item.lat.toFixed(6);
+      const lngStr = item.lng.toFixed(6);
+      setSearchQuery(item.title);
+      setSearchResults([]);
+      setHasSearched(false);
+      setDetectedAddress(item.subtitle || item.title);
+      onChangeRef.current(latStr, lngStr);
+      mapRef.current?.setView([item.lat, item.lng], 16, { animate: true });
+
+      if (item.city || item.district || item.address) {
+        onResolvedRef.current?.({
+          city: item.city,
+          district: item.district,
+          address: item.address || item.subtitle,
+        });
+      } else {
+        triggerReverseGeocode(item.lat, item.lng);
+      }
+    },
+    [triggerReverseGeocode],
+  );
+
   const performSearch = useCallback(
     async (rawQuery: string) => {
       const q = rawQuery.trim();
@@ -111,8 +135,16 @@ export function KostLocationPicker({
           setSearchResults([]);
           return;
         }
-        const data = (await res.json()) as { results?: SearchResultItem[] };
-        setSearchResults(Array.isArray(data.results) ? data.results : []);
+        const data = (await res.json()) as {
+          autoSelect?: boolean;
+          results?: SearchResultItem[];
+        };
+        const items = Array.isArray(data.results) ? data.results : [];
+        if (data.autoSelect && items.length > 0) {
+          handleSelectSearchResult(items[0]);
+          return;
+        }
+        setSearchResults(items);
         setHasSearched(true);
       } catch {
         setSearchResults([]);
@@ -120,7 +152,7 @@ export function KostLocationPicker({
         setSearching(false);
       }
     },
-    [hasCoords, parsedLat, parsedLng],
+    [handleSelectSearchResult, hasCoords, parsedLat, parsedLng],
   );
 
   function handleSearchInput(val: string) {
@@ -135,27 +167,6 @@ export function KostLocationPicker({
     searchTimerRef.current = setTimeout(() => {
       performSearch(val);
     }, 450);
-  }
-
-  function handleSelectSearchResult(item: SearchResultItem) {
-    const latStr = item.lat.toFixed(6);
-    const lngStr = item.lng.toFixed(6);
-    setSearchQuery(item.title);
-    setSearchResults([]);
-    setHasSearched(false);
-    setDetectedAddress(item.subtitle || item.title);
-    onChangeRef.current(latStr, lngStr);
-    mapRef.current?.setView([item.lat, item.lng], 16, { animate: true });
-
-    if (item.city || item.district || item.address) {
-      onResolvedRef.current?.({
-        city: item.city,
-        district: item.district,
-        address: item.address || item.subtitle,
-      });
-    } else {
-      triggerReverseGeocode(item.lat, item.lng);
-    }
   }
 
   useEffect(() => {
@@ -305,7 +316,7 @@ export function KostLocationPicker({
               performSearch(searchQuery);
             }
           }}
-          placeholder="Cari nama jalan, kampus, atau area (cth: Jl. Soekarno Hatta Malang)..."
+          placeholder="Cari jalan, area, atau tempel link Google Maps / koordinat..."
           className="w-full rounded-xl border border-gray-200 bg-white pl-9 pr-16 py-2 text-xs font-medium text-gray-900 focus:border-emerald-500 focus:outline-none"
         />
         <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -331,8 +342,9 @@ export function KostLocationPicker({
         {(searchResults.length > 0 || (hasSearched && !searching)) && (
           <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
             {searchResults.length === 0 ? (
-              <p className="px-3.5 py-2.5 text-xs text-gray-500">
-                Lokasi tidak ditemukan. Coba kata kunci jalan atau kota lain.
+              <p className="px-3.5 py-2.5 text-xs text-gray-500 leading-relaxed">
+                Lokasi tidak ditemukan. Coba ketik nama jalan/kecamatan, atau buka Google Maps →{" "}
+                <strong>Bagikan</strong> → <strong>Salin Link</strong> lalu tempel di kolom ini.
               </p>
             ) : (
               searchResults.map((item, idx) => (
@@ -357,6 +369,10 @@ export function KostLocationPicker({
           </div>
         )}
       </div>
+
+      <p className="text-[11px] text-gray-500">
+        Tips: Jika nama properti tidak muncul, buka Google Maps → <strong>Bagikan</strong> → <strong>Salin Link</strong> lalu tempel di kolom pencarian di atas.
+      </p>
 
       <div
         ref={containerRef}
