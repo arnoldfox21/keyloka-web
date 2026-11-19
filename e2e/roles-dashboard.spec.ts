@@ -38,6 +38,17 @@ test.describe("Role-based Dashboard Flows (Owner, Staff, Administrator)", () => 
       page.getByPlaceholder("Contoh: Kost Eksklusif Melati Lowokwaru"),
     ).toBeVisible();
 
+    // Isi field wajib Step 1 agar bisa pindah ke Step 4 (Fasilitas & Foto)
+    await page
+      .getByPlaceholder("Contoh: Kost Eksklusif Melati Lowokwaru")
+      .fill("Kost E2E Test");
+    await page
+      .getByPlaceholder(
+        "Ceritakan keunggulan lokasi, suasana lingkungan, akses jalan, dan detail kamar...",
+      )
+      .fill("Deskripsi singkat untuk pengujian upload foto properti.");
+    await page.getByRole("button", { name: /4\s*Fasilitas & Foto/i }).click();
+
     // Pastikan tidak ada teks teknikal dan pilih foto tidak langsung upload ke R2
     await expect(page.getByText("Pilih Foto Properti")).toBeVisible();
     await expect(page.getByText(/WebP|kompres/i)).toHaveCount(0);
