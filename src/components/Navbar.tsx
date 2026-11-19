@@ -73,13 +73,16 @@ export function Navbar({ user }: NavbarProps) {
     async function fetchUnreadCount() {
       try {
         const [inboxRes, groupsRes] = await Promise.all([
-          fetch("/api/proxy/chats/inbox"),
-          fetch("/api/proxy/chats/groups"),
+          fetch(`/api/proxy/chats/conversations/${user!.id}`),
+          fetch(`/api/proxy/chats/groups/user/${user!.id}`),
         ]);
         if (cancelled) return;
         let total = 0;
         if (inboxRes.ok) {
-          const inboxData = await inboxRes.json().catch(() => []);
+          const inboxJson = await inboxRes.json().catch(() => []);
+          const inboxData = Array.isArray(inboxJson)
+            ? inboxJson
+            : inboxJson?.data || [];
           if (Array.isArray(inboxData)) {
             total += inboxData.reduce(
               (sum, c) => sum + (Number(c?.unreadCount) || 0),
@@ -88,7 +91,10 @@ export function Navbar({ user }: NavbarProps) {
           }
         }
         if (groupsRes.ok) {
-          const groupsData = await groupsRes.json().catch(() => []);
+          const groupsJson = await groupsRes.json().catch(() => []);
+          const groupsData = Array.isArray(groupsJson)
+            ? groupsJson
+            : groupsJson?.data || [];
           if (Array.isArray(groupsData)) {
             total += groupsData.reduce(
               (sum, g) => sum + (Number(g?.unreadCount) || 0),
