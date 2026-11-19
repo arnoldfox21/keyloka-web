@@ -938,46 +938,76 @@ export function DashboardClient({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setNotice({ type: "err", text: data?.message || "Gagal membuat transaksi top-up." });
+        const msg = Array.isArray(data?.message) ? data.message.join(", ") : data?.message;
+        setNotice({ type: "err", text: msg || "Gagal membuat transaksi top-up." });
         return;
       }
-      const orderId = data.orderId || data.paymentOrderId;
+      const orderId = data.transaction?.orderId || data.orderId || data.paymentOrderId;
       const paymentReference = data.paymentReference;
       const syncTopup = async () => {
         if (!orderId) return;
-        const sRes = await fetch(`/api/proxy/wallet/topup/${orderId}/sync`, {
-          method: "POST",
-        });
-        const sData = await sRes.json().catch(() => ({}));
-        if (sRes.ok && typeof sData?.creditBalance === "number") {
-          setCreditBalance(sData.creditBalance);
-          if (sData?.transaction?.status === "PAID") {
-            setNotice({ type: "ok", text: "Saldo kredit berhasil ditambahkan!" });
-          }
-          const wRes = await fetch("/api/proxy/wallet/me");
-          if (wRes.ok) {
-            const wData = await wRes.json().catch(() => ({}));
-            if (Array.isArray(wData?.transactions)) {
-              setWalletTransactions(wData.transactions);
+        try {
+          const sRes = await fetch(`/api/proxy/wallet/topup/${encodeURIComponent(orderId)}/sync`, {
+            method: "POST",
+          });
+          const sData = await sRes.json().catch(() => ({}));
+          if (sRes.ok && typeof sData?.creditBalance === "number") {
+            setCreditBalance(sData.creditBalance);
+            if (sData?.transaction?.status === "PAID") {
+              setNotice({ type: "ok", text: "Saldo kredit berhasil ditambahkan!" });
+            } else if (sData?.transaction?.status === "FAILED" || sData?.transaction?.status === "EXPIRED") {
+              setNotice({ type: "err", text: `Pembayaran top-up ${sData.transaction.status.toLowerCase()}.` });
             }
+            const wRes = await fetch("/api/proxy/wallet/me");
+            if (wRes.ok) {
+              const wData = await wRes.json().catch(() => ({}));
+              if (Array.isArray(wData?.transactions)) {
+                setWalletTransactions(wData.transactions);
+              }
+            }
+          } else if (!sRes.ok) {
+            setNotice({
+              type: "err",
+              text: sData?.message || "Gagal menyinkronkan status top-up.",
+            });
           }
+        } catch {
+          setNotice({ type: "err", text: "Gagal memeriksa status pembayaran top-up." });
         }
       };
 
       if (paymentReference && typeof window !== "undefined" && window.checkout) {
         window.checkout.process(paymentReference, {
           defaultLanguage: "id",
-          successEvent: syncTopup,
-          pendingEvent: syncTopup,
-          closeEvent: syncTopup,
+          successEvent: () => {
+            void syncTopup();
+          },
+          pendingEvent: () => {
+            void syncTopup();
+          },
+          closeEvent: () => {
+            void syncTopup();
+          },
+          errorEvent: () => {
+            void syncTopup();
+            setNotice({
+              type: "err",
+              text: "Pembayaran top-up gagal atau dibatalkan.",
+            });
+          },
         });
       } else if (data.paymentUrl) {
-        window.open(data.paymentUrl, "_blank");
+        window.open(data.paymentUrl, "_blank", "noopener,noreferrer");
         setNotice({
           type: "ok",
-          text: `Invoice top-up dibuat (${orderId}). Selesaikan pembayaran lalu muat ulang.`,
+          text: `Invoice top-up dibuat (${orderId || "-"}). Selesaikan pembayaran lalu muat ulang.`,
         });
       }
+    } catch (err) {
+      setNotice({
+        type: "err",
+        text: err instanceof Error ? err.message : "Terjadi kesalahan saat membuat top-up.",
+      });
     } finally {
       setBusy(false);
     }
