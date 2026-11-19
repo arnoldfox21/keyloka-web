@@ -5,7 +5,7 @@ import { JsonLd } from "@/components/JsonLd";
 import { KostDetailClient } from "@/components/KostDetailClient";
 import { getKostHref, getSiteUrl, parseKostIdFromParam, toAbsoluteImageUrl, truncateDescription } from "@/lib/seo";
 import { API_BASE_URL, getServerToken, serverFetch } from "@/lib/server-api";
-import { formatCategoryLabel, formatRupiah, getDisplayPrice, type Kost, type ReviewItem, type UserProfile } from "@/lib/types";
+import { formatCategoryLabel, formatRupiah, getDisplayPrice, type Booking, type Kost, type ReviewItem, type UserProfile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -92,13 +92,13 @@ export default async function KostDetailPage({
 
   const categoryParam = kost.propertyCategory || "KOST";
 
-  const [reviewsRes, currentUser, recRes] = await Promise.all([
+  const token = await getServerToken();
+  const [reviewsRes, currentUser, myBookings, recRes] = await Promise.all([
     fetch(`${API_BASE_URL}/reviews?kostId=${kost.id}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : []))
       .catch(() => []),
-    getServerToken().then((t) =>
-      t ? serverFetch<UserProfile>("/auth/me").catch(() => null) : null,
-    ),
+    token ? serverFetch<UserProfile>("/auth/me").catch(() => null) : null,
+    token ? serverFetch<Booking[]>("/bookings").catch(() => [] as Booking[]) : ([] as Booking[]),
     fetch(
       `${API_BASE_URL}/kosts?propertyCategory=${encodeURIComponent(categoryParam)}&sortBy=recommended&page=1&limit=12`,
       { cache: "no-store" },
@@ -106,6 +106,15 @@ export default async function KostDetailPage({
       .then((r) => (r.ok ? r.json() : { data: [] }))
       .catch(() => ({ data: [] })),
   ]);
+
+  const activeBooking = (Array.isArray(myBookings) ? myBookings : []).find(
+    (b) =>
+      b.kostId === kost.id &&
+      b.bookingType === "SEWA" &&
+      ["MENUNGGU_PEMBAYARAN", "TERKIRIM", "DIBAYAR"].includes(
+        (b.status || "").toUpperCase(),
+      ),
+  );
 
   const reviews: ReviewItem[] = Array.isArray(reviewsRes) ? reviewsRes : [];
   const rawRecs: Kost[] = Array.isArray(recRes) ? recRes : recRes?.data || [];
@@ -205,6 +214,7 @@ export default async function KostDetailPage({
         reviews={reviews}
         currentUser={currentUser}
         recommendedKosts={recommendedKosts}
+        activeBookingStatus={activeBooking?.status || null}
       />
     </>
   );

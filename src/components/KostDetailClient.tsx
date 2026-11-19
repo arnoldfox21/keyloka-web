@@ -77,6 +77,7 @@ interface KostDetailClientProps {
   reviews: ReviewItem[];
   currentUser: UserProfile | null;
   recommendedKosts?: Kost[];
+  activeBookingStatus?: string | null;
 }
 
 export function KostDetailClient({
@@ -84,6 +85,7 @@ export function KostDetailClient({
   reviews: initialReviews,
   currentUser,
   recommendedKosts = [],
+  activeBookingStatus = null,
 }: KostDetailClientProps) {
   const router = useRouter();
   const [activePhoto, setActivePhoto] = useState(0);
@@ -114,11 +116,18 @@ export function KostDetailClient({
     }
   }, [kost]);
 
+  const minSurveyDate = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  })();
+
   const [tenantName, setTenantName] = useState(currentUser?.name || "");
   const [tenantPhone, setTenantPhone] = useState(currentUser?.phone || "");
-  const [startDate, setStartDate] = useState(() =>
-    new Date(Date.now() + 86400000).toISOString().slice(0, 10),
-  );
+  const [startDate, setStartDate] = useState(minSurveyDate);
   const [durationCount, setDurationCount] = useState(1);
   const [paymentScheme, setPaymentScheme] = useState<"FULL" | "DP">("FULL");
   const [usePoints, setUsePoints] = useState(false);
@@ -324,6 +333,13 @@ export function KostDetailClient({
 
   async function handleSubmitSurvey(e: React.FormEvent) {
     e.preventDefault();
+    if (!startDate || startDate < minSurveyDate) {
+      setFeedback({
+        type: "error",
+        text: "Tanggal survei harus setelah hari ini (minimal besok).",
+      });
+      return;
+    }
     setSubmitting(true);
     setFeedback(null);
     try {
@@ -1077,6 +1093,23 @@ export function KostDetailClient({
                 <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 text-center text-xs font-semibold text-amber-900">
                   Akun Pemilik Properti tidak dapat melakukan booking atau tanya ketersediaan. Gunakan akun Penyewa untuk memesan hunian.
                 </div>
+              ) : activeBookingStatus ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-center space-y-2">
+                  <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-[11px] font-extrabold text-amber-900 border border-amber-300">
+                    {activeBookingStatus.toUpperCase() === "DIBAYAR"
+                      ? "Sudah Dibooking (Menunggu Check-in)"
+                      : "Dalam Proses Booking (Menunggu Pembayaran)"}
+                  </span>
+                  <p className="text-xs text-amber-900">
+                    Properti ini masih dalam proses booking Anda.
+                  </p>
+                  <Link
+                    href="/bookings"
+                    className="inline-flex items-center justify-center rounded-lg bg-amber-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-amber-700 transition"
+                  >
+                    Lihat di Menu Booking
+                  </Link>
+                </div>
               ) : kost.allowDirectBooking ? (
                 kost.availableRooms > 0 ? (
                   <>
@@ -1240,6 +1273,7 @@ export function KostDetailClient({
                       <input
                         type="date"
                         required
+                        min={modalMode === "SURVEI" ? minSurveyDate : undefined}
                         value={startDate}
                         onChange={(e) => setStartDate(e.target.value)}
                         className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-3 text-sm focus:border-emerald-500 focus:outline-none"
