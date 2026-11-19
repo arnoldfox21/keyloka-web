@@ -856,10 +856,13 @@ export function DashboardClient({
       const res = await fetch(`/api/proxy/auth/users/${u.id}/role`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: nextRole }),
+        body: JSON.stringify({ role: nextRole, requesterId: currentUser.id }),
       });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(d?.message || "Gagal mengubah role.");
+      if (!res.ok) {
+        const msg = Array.isArray(d?.message) ? d.message.join(", ") : d?.message;
+        throw new Error(msg || "Gagal mengubah role.");
+      }
       setUsers((prev) =>
         prev.map((item) => (item.id === u.id ? { ...item, role: nextRole } : item)),
       );
