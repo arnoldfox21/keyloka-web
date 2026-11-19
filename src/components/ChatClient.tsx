@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { io, type Socket } from "socket.io-client";
 import {
   ArrowLeft,
+  Building2,
   CalendarCheck,
   Check,
   CheckCheck,
+  ExternalLink,
   Lock,
   MessageCircle,
   Search,
@@ -18,6 +21,7 @@ import {
   UserX,
   X,
 } from "lucide-react";
+import { getKostHref } from "@/lib/seo";
 import {
   formatBookingStatusLabel,
   formatBookingTypeLabel,
@@ -97,7 +101,9 @@ export function ChatClient({
   const [activeDirect, setActiveDirect] = useState<{
     kostId: number;
     peerId: number;
-    title: string;
+    peerName?: string | null;
+    kostName: string;
+    kostSlug?: string | null;
     propertyCategory?: string | null;
   } | null>(() => {
     if (initialKostId && initialPeerId) {
@@ -112,11 +118,13 @@ export function ChatClient({
             ? `Pengguna #${existing.receiverId}`
             : existing.senderName
           : null);
-      const kostTitle = existing?.kost?.name || `Properti #${initialKostId}`;
+      const kostName = existing?.kost?.name || `Properti #${initialKostId}`;
       return {
         kostId: initialKostId,
         peerId: initialPeerId,
-        title: peerName ? `${peerName} • ${kostTitle}` : kostTitle,
+        peerName,
+        kostName,
+        kostSlug: existing?.kost?.slug ?? null,
         propertyCategory: existing?.kost?.propertyCategory ?? null,
       };
     }
@@ -341,10 +349,10 @@ export function ChatClient({
       return;
     }
     let active = true;
-    const { kostId, peerId, propertyCategory } = activeDirect;
+    const { kostId, peerId, propertyCategory, kostName } = activeDirect;
 
     async function loadMeta() {
-      if (propertyCategory == null) {
+      if (propertyCategory == null || kostName.startsWith("Properti #")) {
         try {
           const kRes = await fetch(`/api/proxy/kosts/${kostId}`);
           if (kRes.ok && active) {
@@ -353,7 +361,12 @@ export function ChatClient({
               prev && prev.kostId === kostId
                 ? {
                     ...prev,
-                    propertyCategory: kostData?.propertyCategory ?? "KOST",
+                    kostName: kostData?.name || prev.kostName,
+                    kostSlug: kostData?.slug ?? prev.kostSlug,
+                    propertyCategory:
+                      kostData?.propertyCategory ??
+                      prev.propertyCategory ??
+                      "KOST",
                   }
                 : prev,
             );
@@ -748,6 +761,11 @@ export function ChatClient({
     (groupDetail.ownerId === currentUser.id ||
       currentUser.role === "ADMINISTRATOR");
 
+  const isTenantView =
+    (currentUser.role || "").toUpperCase() === "PENYEWA" &&
+    activeDirectBooking?.kost?.ownerId !== currentUser.id &&
+    groupDetail?.ownerId !== currentUser.id;
+
   const hasActiveRoom = Boolean(activeDirect || activeGroupKostId);
 
   return (
@@ -918,7 +936,9 @@ export function ChatClient({
                           setActiveDirect({
                             kostId: c.kostId,
                             peerId,
-                            title: `${peerName} • ${c.kost?.name || `Properti #${c.kostId}`}`,
+                            peerName,
+                            kostName: c.kost?.name || `Properti #${c.kostId}`,
+                            kostSlug: c.kost?.slug ?? null,
                             propertyCategory: c.kost?.propertyCategory ?? null,
                           });
                           setConversations((prev) =>
@@ -963,6 +983,11 @@ export function ChatClient({
                               </span>
                             )}
                           </div>
+                          {c.kost?.name && (
+                            <p className="truncate text-[11px] font-semibold text-emerald-700">
+                              {c.kost.name}
+                            </p>
+                          )}
                           <p className="truncate text-xs text-gray-500">{c.message}</p>
                         </div>
                       </button>
@@ -1012,15 +1037,43 @@ export function ChatClient({
                     <ArrowLeft className="h-5 w-5" />
                   </button>
                   <div className="min-w-0">
-                    <h2 className="truncate text-sm font-extrabold text-gray-900">
-                      {activeDirect
-                        ? activeDirect.title
-                        : groupDetail?.kostName || `Grup Properti #${activeGroupKostId}`}
-                    </h2>
-                    {groupDetail?.settings?.pinnedAnnouncement && (
-                      <p className="truncate text-xs text-emerald-700 font-semibold mt-0.5">
-                        Pengumuman: {groupDetail.settings.pinnedAnnouncement}
-                      </p>
+                    {activeDirect ? (
+                      <>
+                        <h2 className="truncate text-sm font-extrabold text-gray-900">
+                          {activeDirect.peerName || activeDirect.kostName}
+                        </h2>
+                        <Link
+                          href={getKostHref({
+                            id: activeDirect.kostId,
+                            slug: activeDirect.kostSlug,
+                          })}
+                          className="mt-0.5 inline-flex max-w-full items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline"
+                          title="Lihat detail properti"
+                        >
+                          <Building2 className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{activeDirect.kostName}</span>
+                          <ExternalLink className="h-3 w-3 shrink-0" />
+                        </Link>
+                      </>
+                    ) : (
+                      <>
+                        <Link
+                          href={getKostHref({ id: activeGroupKostId! })}
+                          className="inline-flex max-w-full items-center gap-1.5 text-sm font-extrabold text-gray-900 hover:text-emerald-700 hover:underline"
+                          title="Lihat detail properti"
+                        >
+                          <span className="truncate">
+                            {groupDetail?.kostName ||
+                              `Grup Properti #${activeGroupKostId}`}
+                          </span>
+                          <ExternalLink className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                        </Link>
+                        {groupDetail?.settings?.pinnedAnnouncement && (
+                          <p className="truncate text-xs text-emerald-700 font-semibold mt-0.5">
+                            Pengumuman: {groupDetail.settings.pinnedAnnouncement}
+                          </p>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -1138,13 +1191,15 @@ export function ChatClient({
                 </div>
               )}
 
-              {/* Peringatan Anti-Penipuan */}
-              <div className="border-b border-amber-200 bg-amber-50/90 px-4 py-2 text-[11px] leading-snug text-amber-950 flex items-center gap-2">
-                <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-amber-600" />
-                <span>
-                  <strong>Keamanan Transaksi:</strong> Dilarang melakukan transfer DP atau sewa ke rekening pemilik di luar platform Keyloka.
-                </span>
-              </div>
+              {/* Peringatan Anti-Penipuan (hanya untuk sisi penyewa) */}
+              {isTenantView && (
+                <div className="border-b border-amber-200 bg-amber-50/90 px-4 py-2 text-[11px] leading-snug text-amber-950 flex items-center gap-2">
+                  <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                  <span>
+                    <strong>Keamanan Transaksi:</strong> Dilarang melakukan transfer DP atau sewa ke rekening pemilik di luar platform Keyloka.
+                  </span>
+                </div>
+              )}
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-gray-50/40">
