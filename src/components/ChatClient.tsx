@@ -362,6 +362,7 @@ export function ChatClient({
     if (!activeDirect && !activeGroupKostId) return;
 
     const timer = setInterval(async () => {
+      if (typeof document !== "undefined" && document.hidden) return;
       if (activeDirect) {
         const params = new URLSearchParams({
           kostId: String(activeDirect.kostId),

@@ -38,10 +38,15 @@ async function forward(
     headers.set("Authorization", `Bearer ${token}`);
   }
 
+  const isUpload =
+    (path[0] === "kosts" && path[1] === "upload-image") ||
+    Boolean(contentType?.includes("multipart/form-data"));
+
   const init: RequestInit = {
     method: req.method,
     headers,
     cache: "no-store",
+    signal: AbortSignal.timeout(isUpload ? 30000 : 15000),
   };
   if (req.method !== "GET" && req.method !== "HEAD") {
     init.body = await req.text();
@@ -60,7 +65,13 @@ async function forward(
       response.cookies.set(SESSION_COOKIE_NAME, "", { path: "/", maxAge: 0 });
     }
     return response;
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.name === "TimeoutError") {
+      return NextResponse.json(
+        { message: "Koneksi ke Keyloka API timeout. Silakan coba lagi." },
+        { status: 504 },
+      );
+    }
     return NextResponse.json(
       { message: "Gagal terhubung ke Keyloka API." },
       { status: 502 },
