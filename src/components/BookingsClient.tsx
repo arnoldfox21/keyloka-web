@@ -132,18 +132,23 @@ export function BookingsClient({
 
   function handlePayNow(booking: Booking) {
     setMessage(null);
-    if (typeof window !== "undefined" && window.snap && booking.snapToken) {
-      window.snap.pay(booking.snapToken, {
-        onSuccess: () => {
+    if (
+      typeof window !== "undefined" &&
+      window.checkout &&
+      booking.paymentReference
+    ) {
+      window.checkout.process(booking.paymentReference, {
+        defaultLanguage: "id",
+        successEvent: () => {
           void handleSyncPayment(booking.id);
         },
-        onPending: () => {
+        pendingEvent: () => {
           void handleSyncPayment(booking.id);
         },
-        onClose: () => {
+        closeEvent: () => {
           void handleSyncPayment(booking.id);
         },
-        onError: () => {
+        errorEvent: () => {
           setMessage("Pembayaran gagal atau dibatalkan.");
         },
       });
@@ -668,7 +673,7 @@ export function BookingsClient({
                     <>
                       {isDirect && b.paymentStatus === "UNPAID" && (
                         <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
-                          {(b.snapToken || b.paymentUrl) && (
+                          {(b.paymentReference || b.paymentUrl) && (
                             <button
                               type="button"
                               disabled={isBusy}

@@ -939,7 +939,7 @@ export function DashboardClient({
         return;
       }
       const orderId = data.orderId || data.paymentOrderId;
-      const snapToken = data.snapToken;
+      const paymentReference = data.paymentReference;
       const syncTopup = async () => {
         if (!orderId) return;
         const sRes = await fetch(`/api/proxy/wallet/topup/${orderId}/sync`, {
@@ -948,15 +948,25 @@ export function DashboardClient({
         const sData = await sRes.json().catch(() => ({}));
         if (sRes.ok && typeof sData?.creditBalance === "number") {
           setCreditBalance(sData.creditBalance);
-          setNotice({ type: "ok", text: "Saldo kredit berhasil ditambahkan!" });
+          if (sData?.transaction?.status === "PAID") {
+            setNotice({ type: "ok", text: "Saldo kredit berhasil ditambahkan!" });
+          }
+          const wRes = await fetch("/api/proxy/wallet/me");
+          if (wRes.ok) {
+            const wData = await wRes.json().catch(() => ({}));
+            if (Array.isArray(wData?.transactions)) {
+              setWalletTransactions(wData.transactions);
+            }
+          }
         }
       };
 
-      if (snapToken && typeof window !== "undefined" && (window as unknown as { snap?: { pay: (t: string, cb: Record<string, () => void>) => void } }).snap) {
-        (window as unknown as { snap: { pay: (t: string, cb: Record<string, () => void>) => void } }).snap.pay(snapToken, {
-          onSuccess: syncTopup,
-          onPending: syncTopup,
-          onClose: syncTopup,
+      if (paymentReference && typeof window !== "undefined" && window.checkout) {
+        window.checkout.process(paymentReference, {
+          defaultLanguage: "id",
+          successEvent: syncTopup,
+          pendingEvent: syncTopup,
+          closeEvent: syncTopup,
         });
       } else if (data.paymentUrl) {
         window.open(data.paymentUrl, "_blank");

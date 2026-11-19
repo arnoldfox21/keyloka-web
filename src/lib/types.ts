@@ -125,7 +125,7 @@ export interface Booking {
   paidAmount?: number;
   remainingAmount?: number;
   paymentOrderId?: string | null;
-  snapToken?: string | null;
+  paymentReference?: string | null;
   paymentUrl?: string | null;
   paymentStatus: string;
   escrowStatus: string;

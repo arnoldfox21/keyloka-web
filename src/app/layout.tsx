@@ -84,11 +84,10 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const user = await getCurrentUser();
-  const isProd = process.env.NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION === "true";
-  const snapScriptUrl = isProd
-    ? "https://app.midtrans.com/snap/snap.js"
-    : "https://app.sandbox.midtrans.com/snap/snap.js";
-  const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || "";
+  const isDuitkuProd = process.env.NEXT_PUBLIC_DUITKU_IS_PRODUCTION === "true";
+  const duitkuScriptUrl = isDuitkuProd
+    ? "https://app-prod.duitku.com/lib/js/duitku.js"
+    : "https://app-sandbox.duitku.com/lib/js/duitku.js";
   const gaId = (process.env.NEXT_PUBLIC_GA_ID || "").trim();
 
   return (
@@ -105,13 +104,7 @@ export default async function RootLayout({
             </Script>
           </>
         ) : null}
-        {clientKey ? (
-          <Script
-            src={snapScriptUrl}
-            data-client-key={clientKey}
-            strategy="afterInteractive"
-          />
-        ) : null}
+        <Script src={duitkuScriptUrl} strategy="afterInteractive" />
         <Navbar user={user} />
         <main className="flex-1">{children}</main>
         <Footer user={user} />

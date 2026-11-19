@@ -12,7 +12,7 @@ Frontend web application untuk platform pencarian, survei, dan booking hunian **
 
 ## Fitur Utama
 - **Eksplorasi & Pencarian Properti:** Filter kategori (`Kost`, `Apartemen`, `Kontrakan`, `Hunian Harian`), harga, fasilitas, tampilan peta interaktif, perbandingan properti, dan halaman SEO `/sewa/[slug]`.
-- **Tanyakan Ketersediaan & Booking Escrow:** Pengajuan jadwal survei dan booking langsung dengan pembayaran Midtrans Escrow serta sistem poin loyalti (`/kost/[id]`, `/bookings`).
+- **Tanyakan Ketersediaan & Booking Escrow:** Pengajuan jadwal survei dan booking langsung dengan pembayaran Duitku Escrow serta sistem poin loyalti (`/kost/[id]`, `/bookings`).
 - **Chat Real-Time & Grup Penghuni Kost (`/chat`):**
   - Chat pribadi 1-on-1 dengan pemilik/penyewa.
   - Pemilik dapat **Setujui**, **Tolak**, atau **Batalkan** pengajuan langsung dari kartu pesan pengajuan di dalam chat.

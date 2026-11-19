@@ -8,14 +8,20 @@ export default async function PaymentFinishPage({
   searchParams,
 }: {
   searchParams: Promise<{
-    order_id?: string;
-    transaction_status?: string;
-    status_code?: string;
+    merchantOrderId?: string;
+    resultCode?: string;
+    reference?: string;
   }>;
 }) {
   const params = await searchParams;
-  const txStatus = (params.transaction_status || "").toLowerCase();
-  const orderId = params.order_id || "";
+  const resultCode = (params.resultCode || "").trim();
+  const txStatus =
+    resultCode === "00"
+      ? "paid"
+      : resultCode === "02"
+        ? "failed"
+        : "pending";
+  const orderId = params.merchantOrderId || "";
   const upperOrderId = orderId.toUpperCase();
 
   let userRole = "";

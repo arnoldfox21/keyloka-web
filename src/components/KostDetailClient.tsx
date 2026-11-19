@@ -45,14 +45,15 @@ import { KostCard } from "./KostCard";
 
 declare global {
   interface Window {
-    snap?: {
-      pay: (
-        snapToken: string,
+    checkout?: {
+      process: (
+        reference: string,
         callbacks?: {
-          onSuccess?: () => void;
-          onPending?: () => void;
-          onError?: () => void;
-          onClose?: () => void;
+          defaultLanguage?: string;
+          successEvent?: () => void;
+          pendingEvent?: () => void;
+          errorEvent?: () => void;
+          closeEvent?: () => void;
         },
       ) => void;
     };
@@ -400,13 +401,14 @@ export function KostDetailClient({
         throw new Error(booking?.message || "Gagal membuat booking langsung.");
       }
 
-      if (window.snap && booking.snapToken) {
+      if (window.checkout && booking.paymentReference) {
         setModalMode(null);
-        window.snap.pay(booking.snapToken, {
-          onSuccess: () => syncDirectPayment(booking.id, "success"),
-          onPending: () => syncDirectPayment(booking.id, "pending"),
-          onClose: () => syncDirectPayment(booking.id, "pending"),
-          onError: () => {
+        window.checkout.process(booking.paymentReference, {
+          defaultLanguage: "id",
+          successEvent: () => syncDirectPayment(booking.id, "success"),
+          pendingEvent: () => syncDirectPayment(booking.id, "pending"),
+          closeEvent: () => syncDirectPayment(booking.id, "pending"),
+          errorEvent: () => {
             setFeedback({
               type: "error",
               text: "Pembayaran gagal atau dibatalkan.",
