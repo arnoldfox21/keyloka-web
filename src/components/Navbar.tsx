@@ -180,7 +180,15 @@ export function Navbar({ user }: NavbarProps) {
       }
     }
 
+    function onVisibilityOrFocus() {
+      if (document.visibilityState === "visible") {
+        fetchNotifUnreadCount();
+      }
+    }
+
     window.addEventListener("keyloka:notifications-unread-update", onNotifUpdate);
+    window.addEventListener("focus", onVisibilityOrFocus);
+    document.addEventListener("visibilitychange", onVisibilityOrFocus);
     return () => {
       cancelled = true;
       clearInterval(interval);
@@ -188,8 +196,10 @@ export function Navbar({ user }: NavbarProps) {
         "keyloka:notifications-unread-update",
         onNotifUpdate,
       );
+      window.removeEventListener("focus", onVisibilityOrFocus);
+      document.removeEventListener("visibilitychange", onVisibilityOrFocus);
     };
-  }, [user?.id]);
+  }, [user?.id, pathname]);
 
   useEffect(() => {
     if (!notifOpen) return;

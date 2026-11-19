@@ -84,6 +84,9 @@ export function BookingsClient({
       const data = await res.json();
       setBookings(Array.isArray(data) ? data : []);
     }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("keyloka:notifications-unread-update"));
+    }
     router.refresh();
   }
 

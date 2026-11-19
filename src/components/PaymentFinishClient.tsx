@@ -56,6 +56,9 @@ export function PaymentFinishClient({
         await fetch(syncEndpoint, {
           method: "POST",
         });
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("keyloka:notifications-unread-update"));
+        }
       } catch {
         // Abaikan jika gagal sync manual; webhook tetap memproses di background
       } finally {

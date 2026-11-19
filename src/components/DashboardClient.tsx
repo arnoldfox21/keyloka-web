@@ -992,6 +992,9 @@ export function DashboardClient({
           prev ? nextList.find((item) => item.id === prev.id) ?? prev : null,
         );
       }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("keyloka:notifications-unread-update"));
+      }
     } catch {
       // Ignore background refresh failure
     }
