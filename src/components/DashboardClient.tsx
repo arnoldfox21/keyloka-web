@@ -938,7 +938,7 @@ export function DashboardClient({
       return false;
     }
     const url = (tx.paymentUrl || "").toLowerCase();
-    if (url.includes("midtrans.com")) return false;
+    if (url && !url.includes("midtrans.com")) return false;
     return Boolean(tx.snapToken || tx.paymentUrl);
   }
 

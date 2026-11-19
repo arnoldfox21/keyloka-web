@@ -30,7 +30,11 @@ export function PaymentFinishClient({
     normalizedStatus === "expire" ||
     normalizedStatus === "failure";
 
-  const [syncing, setSyncing] = useState(isTopupOrder && Boolean(orderId));
+  const isBookingOrder =
+    !isTopupOrder && orderId.toUpperCase().startsWith("HNV-BOOK-");
+  const shouldSync = Boolean(orderId) && (isTopupOrder || isBookingOrder);
+
+  const [syncing, setSyncing] = useState(shouldSync);
   const [countdown, setCountdown] = useState<number | null>(
     isSuccess ? 4 : null,
   );
@@ -42,11 +46,14 @@ export function PaymentFinishClient({
     : targetHref;
 
   useEffect(() => {
-    if (!isTopupOrder || !orderId) return;
+    if (!shouldSync || !orderId) return;
     let active = true;
     (async () => {
       try {
-        await fetch(`/api/proxy/wallet/topup/${encodeURIComponent(orderId)}/sync`, {
+        const syncEndpoint = isTopupOrder
+          ? `/api/proxy/wallet/topup/${encodeURIComponent(orderId)}/sync`
+          : `/api/proxy/bookings/sync-order/${encodeURIComponent(orderId)}`;
+        await fetch(syncEndpoint, {
           method: "POST",
         });
       } catch {
@@ -58,7 +65,7 @@ export function PaymentFinishClient({
     return () => {
       active = false;
     };
-  }, [isTopupOrder, orderId]);
+  }, [shouldSync, isTopupOrder, orderId]);
 
   useEffect(() => {
     if (!isSuccess || countdown === null) return;
