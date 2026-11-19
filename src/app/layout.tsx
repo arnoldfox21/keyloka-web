@@ -4,6 +4,7 @@ import Script from "next/script";
 import "./globals.css";
 import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/Navbar";
+import { AdSenseScript } from "@/components/AdSenseScript";
 import {
   DEFAULT_DESCRIPTION,
   DEFAULT_KEYWORDS,
@@ -114,6 +115,7 @@ export default async function RootLayout({
         <Navbar user={user} />
         <main className="flex-1">{children}</main>
         <Footer user={user} />
+        <AdSenseScript />
       </body>
     </html>
   );

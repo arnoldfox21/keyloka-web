@@ -6,6 +6,7 @@ const ALLOWED_PREFIXES = new Set([
   "bookings",
   "reviews",
   "posts",
+  "articles",
   "locations",
   "wallet",
   "chats",
@@ -41,6 +42,7 @@ async function forward(
 
   const isUpload =
     (path[0] === "kosts" && path[1] === "upload-image") ||
+    (path[0] === "articles" && path[1] === "upload-image") ||
     Boolean(contentType?.includes("multipart/form-data"));
 
   const init: RequestInit = {

@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { getKostHref, getSiteUrl } from "@/lib/seo";
 import { API_BASE_URL } from "@/lib/server-api";
-import type { Kost, OwnerPost } from "@/lib/types";
+import type { Article, Kost, OwnerPost } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +34,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: now,
       changeFrequency: "weekly",
       priority: 0.7,
+    },
+    {
+      url: `${siteUrl}/blog`,
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 0.9,
     },
     {
       url: `${siteUrl}/gabung-pemilik`,
@@ -83,9 +89,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     return entries;
   }
 
-  const [kostsRes, postsRes] = await Promise.all([
+  const [kostsRes, postsRes, articlesRes] = await Promise.all([
     fetchJsonSafe<Kost[] | { data?: Kost[] }>(`${API_BASE_URL}/kosts?page=1&limit=500`),
     fetchJsonSafe<OwnerPost[] | { data?: OwnerPost[] }>(`${API_BASE_URL}/posts`),
+    fetchJsonSafe<Article[] | { data?: Article[] }>(
+      `${API_BASE_URL}/articles?page=1&limit=500`,
+    ),
   ]);
 
   const kosts: Kost[] = Array.isArray(kostsRes)
@@ -145,6 +154,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: post.createdAt ? new Date(post.createdAt) : now,
       changeFrequency: "weekly",
       priority: 0.6,
+    });
+  }
+
+  const articles: Article[] = Array.isArray(articlesRes)
+    ? articlesRes
+    : articlesRes?.data || [];
+
+  for (const article of articles) {
+    if (!article?.slug) continue;
+    entries.push({
+      url: `${siteUrl}/blog/${article.slug}`,
+      lastModified: article.updatedAt
+        ? new Date(article.updatedAt)
+        : article.publishedAt
+          ? new Date(article.publishedAt)
+          : now,
+      changeFrequency: "weekly",
+      priority: 0.8,
     });
   }
 

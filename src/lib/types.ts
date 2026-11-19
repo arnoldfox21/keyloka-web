@@ -320,6 +320,7 @@ export function formatRupiah(value: number): string {
 const ROLE_LABELS: Record<string, string> = {
   PENYEWA: "Penyewa",
   PEMILIK_KOST: "Pemilik Kost",
+  PENULIS: "Penulis",
   STAFF: "Staff",
   ADMINISTRATOR: "Administrator",
 };
@@ -537,4 +538,61 @@ export interface NotificationPageResponse {
   total: number;
   unreadCount: number;
   hasMore: boolean;
+}
+
+export const ARTICLE_CATEGORY_LABELS: Record<string, string> = {
+  TIPS_KOST: "Tips Cari Kost",
+  PANDUAN_AREA: "Panduan Area & Kampus",
+  INFO_KONTRAKAN: "Info Kontrakan & Apartemen",
+  GAYA_HIDUP: "Gaya Hidup Anak Kost",
+  KEUANGAN: "Keuangan & Promo",
+};
+
+export function formatArticleCategoryLabel(category?: string | null): string {
+  return formatEnumLabel(category, ARTICLE_CATEGORY_LABELS, "Tips Cari Kost");
+}
+
+export interface ArticleAuthor {
+  id: number;
+  name: string;
+  avatarUrl?: string | null;
+  bio?: string;
+}
+
+export interface ArticleCategoryItem {
+  id: number;
+  slug: string;
+  name: string;
+  description?: string;
+}
+
+export interface Article {
+  id: number;
+  slug: string;
+  title: string;
+  excerpt: string;
+  contentHtml: string;
+  coverImageUrl?: string | null;
+  category: string;
+  tags: string[];
+  city?: string;
+  metaTitle?: string;
+  metaDescription?: string;
+  status: "DRAFT" | "PUBLISHED";
+  isFeatured: boolean;
+  viewCount: number;
+  readingTimeMinutes: number;
+  authorId: number;
+  author?: ArticleAuthor;
+  publishedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ArticleListResponse {
+  data: Article[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }

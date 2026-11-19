@@ -114,6 +114,14 @@ export function Footer({ user }: FooterProps) {
             <ul className="mt-4 space-y-2.5 text-xs text-slate-400">
               <li>
                 <Link
+                  href="/blog"
+                  className="hover:text-emerald-400 transition"
+                >
+                  Blog & Panduan Kost
+                </Link>
+              </li>
+              <li>
+                <Link
                   href={user ? "/favorites" : "/login"}
                   className="hover:text-emerald-400 transition"
                 >

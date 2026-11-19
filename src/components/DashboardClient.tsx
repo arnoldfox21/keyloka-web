@@ -86,6 +86,7 @@ const INDONESIAN_BANKS = [
 ];
 import {
   formatApprovalStatusLabel,
+  formatArticleCategoryLabel,
   formatBookingStatusLabel,
   formatBookingTypeLabel,
   formatCategoryLabel,
@@ -93,6 +94,7 @@ import {
   formatRoleLabel,
   formatRupiah,
   getDisplayPrice,
+  type Article,
   isKostProperty,
   type BoostPackageOption,
   type Booking,
@@ -191,7 +193,8 @@ type TabKey =
   | "WALLET"
   | "APPROVAL"
   | "WITHDRAWALS"
-  | "USERS";
+  | "USERS"
+  | "ARTICLES";
 
 export function DashboardClient({
   currentUser,
@@ -216,9 +219,11 @@ export function DashboardClient({
   const isStaffOrAdmin = role === "STAFF" || role === "ADMINISTRATOR";
   const isAdmin = role === "ADMINISTRATOR";
 
-  const validTabs: TabKey[] = isStaffOrAdmin
-    ? ["PROPERTIES", "DISPUTES", "APPROVAL", "WITHDRAWALS", "USERS"]
-    : ["PROPERTIES", "DISPUTES", "FINANCE", "WALLET"];
+  const validTabs: TabKey[] = isAdmin
+    ? ["PROPERTIES", "DISPUTES", "APPROVAL", "WITHDRAWALS", "USERS", "ARTICLES"]
+    : isStaffOrAdmin
+      ? ["PROPERTIES", "DISPUTES", "APPROVAL", "WITHDRAWALS", "USERS"]
+      : ["PROPERTIES", "DISPUTES", "FINANCE", "WALLET"];
   const normalizedInitialTab = initialTab === "BOOKINGS" ? "DISPUTES" : initialTab;
   const resolvedInitialTab: TabKey =
     normalizedInitialTab && validTabs.includes(normalizedInitialTab as TabKey)
@@ -261,6 +266,10 @@ export function DashboardClient({
     useState<ReviewReportItem[]>(initialReviewReports);
   const [kostReports, setKostReports] =
     useState<KostReportItem[]>(initialKostReports);
+  const [adminArticles, setAdminArticles] = useState<Article[]>([]);
+  const [adminArticlesLoaded, setAdminArticlesLoaded] = useState(false);
+  const [adminArticlesLoading, setAdminArticlesLoading] = useState(false);
+  const [adminArticleSearch, setAdminArticleSearch] = useState("");
 
   const [users, setUsers] = useState<DashboardUserItem[]>([]);
   const [usersLoaded, setUsersLoaded] = useState(false);
@@ -1160,6 +1169,7 @@ export function DashboardClient({
           badge: pendingWithdrawCount,
         },
         { key: "USERS", label: "Kelola Pengguna" },
+        ...(isAdmin ? [{ key: "ARTICLES" as TabKey, label: "Moderasi Artikel" }] : []),
       ]
     : [
         { key: "PROPERTIES", label: "Properti Saya", badge: kostsTotal },
@@ -1293,6 +1303,21 @@ export function DashboardClient({
               setTab(t.key);
               if (t.key === "USERS" && !usersLoaded) {
                 loadUsers(1, false);
+              }
+              if (t.key === "ARTICLES" && !adminArticlesLoaded) {
+                void (async () => {
+                  setAdminArticlesLoading(true);
+                  try {
+                    const res = await fetch("/api/proxy/articles/admin/all");
+                    if (res.ok) {
+                      const list: Article[] = await res.json();
+                      setAdminArticles(Array.isArray(list) ? list : []);
+                      setAdminArticlesLoaded(true);
+                    }
+                  } finally {
+                    setAdminArticlesLoading(false);
+                  }
+                })();
               }
             }}
             className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition ${
@@ -2863,6 +2888,7 @@ export function DashboardClient({
               <option value="SEMUA">Semua Role</option>
               <option value="PENYEWA">Penyewa</option>
               <option value="PEMILIK_KOST">Pemilik Kost</option>
+              <option value="PENULIS">Penulis</option>
               <option value="STAFF">Staff</option>
               <option value="ADMINISTRATOR">Administrator</option>
             </select>
@@ -2973,6 +2999,7 @@ export function DashboardClient({
                       >
                         <option value="PENYEWA">Penyewa</option>
                         <option value="PEMILIK_KOST">Pemilik Kost</option>
+                        <option value="PENULIS">Penulis</option>
                         <option value="STAFF">Staff</option>
                         <option value="ADMINISTRATOR">Administrator</option>
                       </select>
@@ -3171,6 +3198,161 @@ export function DashboardClient({
           </div>
         </div>
       )}
+
+      {/* Tab Content: ARTICLES (Admin Moderation) */}
+      {tab === "ARTICLES" && isAdmin && (() => {
+        const qArt = adminArticleSearch.trim().toLowerCase();
+        const filteredArts = qArt
+          ? adminArticles.filter((a) =>
+              [a.title, a.slug, a.author?.name, a.category]
+                .filter(Boolean)
+                .join(" ")
+                .toLowerCase()
+                .includes(qArt),
+            )
+          : adminArticles;
+
+        return (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 rounded-2xl border border-gray-200 bg-white p-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  value={adminArticleSearch}
+                  onChange={(e) => setAdminArticleSearch(e.target.value)}
+                  placeholder="Cari judul artikel atau nama penulis..."
+                  className="w-full rounded-xl border border-gray-200 pl-10 pr-3.5 py-2 text-sm"
+                />
+              </div>
+              <span className="text-xs font-bold text-gray-500">
+                Total: {filteredArts.length} artikel
+              </span>
+            </div>
+
+            {adminArticlesLoading ? (
+              <p className="py-10 text-center text-xs text-gray-400">
+                Memuat daftar artikel...
+              </p>
+            ) : filteredArts.length === 0 ? (
+              <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center text-xs text-gray-500">
+                Belum ada artikel blog.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredArts.map((art) => (
+                  <div
+                    key={art.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white p-4"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
+                            art.status === "PUBLISHED"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : "bg-amber-100 text-amber-800"
+                          }`}
+                        >
+                          {art.status === "PUBLISHED" ? "Published" : "Draft"}
+                        </span>
+                        <span className="text-[11px] font-bold text-emerald-700">
+                          {formatArticleCategoryLabel(art.category)}
+                        </span>
+                        <span className="text-[11px] text-gray-400">
+                          • Penulis: {art.author?.name || `#${art.authorId}`} •{" "}
+                          {art.viewCount} views
+                        </span>
+                      </div>
+                      <p className="mt-1 truncate text-sm font-extrabold text-gray-900">
+                        {art.title}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {art.status === "PUBLISHED" && (
+                        <Link
+                          href={`/blog/${art.slug}`}
+                          target="_blank"
+                          className="rounded-xl border border-gray-200 px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50"
+                        >
+                          Lihat
+                        </Link>
+                      )}
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={async () => {
+                          const nextStatus =
+                            art.status === "PUBLISHED" ? "DRAFT" : "PUBLISHED";
+                          setBusy(true);
+                          try {
+                            const res = await fetch(
+                              `/api/proxy/articles/${art.id}`,
+                              {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ status: nextStatus }),
+                              },
+                            );
+                            if (res.ok) {
+                              const updated: Article = await res.json();
+                              setAdminArticles((prev) =>
+                                prev.map((x) =>
+                                  x.id === updated.id ? updated : x,
+                                ),
+                              );
+                              setNotice({
+                                type: "ok",
+                                text:
+                                  nextStatus === "DRAFT"
+                                    ? `Artikel "${art.title}" di-unpublish.`
+                                    : `Artikel "${art.title}" dipublikasikan.`,
+                              });
+                            }
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                        className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                      >
+                        {art.status === "PUBLISHED" ? "Unpublish" : "Publish"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={async () => {
+                          if (!window.confirm(`Hapus artikel "${art.title}"?`))
+                            return;
+                          setBusy(true);
+                          try {
+                            const res = await fetch(
+                              `/api/proxy/articles/${art.id}`,
+                              { method: "DELETE" },
+                            );
+                            if (res.ok) {
+                              setAdminArticles((prev) =>
+                                prev.filter((x) => x.id !== art.id),
+                              );
+                              setNotice({
+                                type: "ok",
+                                text: `Artikel "${art.title}" dihapus.`,
+                              });
+                            }
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                        className="rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Modal Review & Revisi Withdraw (Staff/Admin) */}
       {reviewingPayout && (

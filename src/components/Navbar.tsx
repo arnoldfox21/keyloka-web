@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Award,
   Bell,
+  BookOpen,
   CalendarCheck,
   Compass,
   Heart,
@@ -15,6 +16,7 @@ import {
   LogOut,
   Menu,
   MessageCircle,
+  PenSquare,
   X,
 } from "lucide-react";
 import {
@@ -61,6 +63,7 @@ export function Navbar({ user }: NavbarProps) {
   const role = (user?.role || "").toUpperCase();
   const canAccessDashboard =
     role === "PEMILIK_KOST" || role === "STAFF" || role === "ADMINISTRATOR";
+  const isWriter = role === "PENULIS";
 
   useEffect(() => {
     if (!user?.id) {
@@ -272,6 +275,25 @@ export function Navbar({ user }: NavbarProps) {
       icon: Compass,
       isActive: (p) => p === "/",
     },
+    {
+      href: "/blog",
+      label: "Blog",
+      mobileLabel: "Blog & Panduan Kost",
+      icon: BookOpen,
+      isActive: (p) => p.startsWith("/blog"),
+    },
+    ...(isWriter
+      ? [
+          {
+            href: "/writer",
+            label: "Studio Penulis",
+            mobileLabel: "Studio Penulis Artikel",
+            icon: PenSquare,
+            isActive: (p: string) => p.startsWith("/writer"),
+            accent: true,
+          },
+        ]
+      : []),
     ...(user
       ? [
           {
