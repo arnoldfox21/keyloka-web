@@ -17,7 +17,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { compressImageFile } from "@/lib/image-compress";
+import { compressImageToDataUrl } from "@/lib/image-compress";
 import { sanitizeArticleHtml } from "@/lib/html-sanitize";
 import {
   ARTICLE_CATEGORY_LABELS,
@@ -136,7 +136,10 @@ export function WriterStudioClient({
     setUploadingCover(true);
     setFeedback(null);
     try {
-      const base64 = await compressImageFile(file, 1400, 0.82);
+      const { dataUrl: base64 } = await compressImageToDataUrl(file, {
+        maxDimension: 1400,
+        quality: 0.82,
+      });
       const res = await fetch("/api/proxy/articles/upload-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

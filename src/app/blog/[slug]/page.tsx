@@ -22,7 +22,8 @@ import { getKostHref, getSiteUrl, SITE_NAME } from "@/lib/seo";
 import { serverFetch } from "@/lib/server-api";
 import {
   formatArticleCategoryLabel,
-  formatPrice,
+  formatRupiah,
+  getDisplayPrice,
   resolveImageUrl,
   type Article,
   type Kost,
@@ -402,7 +403,9 @@ export default async function BlogDetailPage({
                 {article.city ? `di ${article.city}` : "Keyloka"}
               </h2>
               <div className="mt-3.5 space-y-3">
-                {relatedKosts.map((kost) => (
+                {relatedKosts.map((kost) => {
+                  const displayPrice = getDisplayPrice(kost);
+                  return (
                   <Link
                     key={kost.id}
                     href={getKostHref(kost)}
@@ -426,11 +429,13 @@ export default async function BlogDetailPage({
                         {kost.city}
                       </p>
                       <p className="mt-0.5 text-xs font-bold text-emerald-700">
-                        {formatPrice(kost.price)}/bln
+                        {formatRupiah(displayPrice.amount)}
+                        {displayPrice.unit}
                       </p>
                     </div>
                   </Link>
-                ))}
+                  );
+                })}
               </div>
               <Link
                 href="/"
