@@ -22,11 +22,13 @@ export function PaymentFinishClient({
 }: PaymentFinishClientProps) {
   const router = useRouter();
   const normalizedStatus = txStatus.toLowerCase();
-  const isSuccess = normalizedStatus === "paid" || normalizedStatus === "00";
+  const isSuccess =
+    normalizedStatus === "settlement" || normalizedStatus === "capture";
   const isFailed =
-    normalizedStatus === "failed" ||
-    normalizedStatus === "expired" ||
-    normalizedStatus === "02";
+    normalizedStatus === "cancel" ||
+    normalizedStatus === "deny" ||
+    normalizedStatus === "expire" ||
+    normalizedStatus === "failure";
 
   const [syncing, setSyncing] = useState(isTopupOrder && Boolean(orderId));
   const [countdown, setCountdown] = useState<number | null>(
@@ -48,7 +50,7 @@ export function PaymentFinishClient({
           method: "POST",
         });
       } catch {
-        // Abaikan jika gagal sync manual; callback Duitku tetap memproses di background
+        // Abaikan jika gagal sync manual; webhook tetap memproses di background
       } finally {
         if (active) setSyncing(false);
       }

@@ -125,7 +125,7 @@ export interface Booking {
   paidAmount?: number;
   remainingAmount?: number;
   paymentOrderId?: string | null;
-  paymentReference?: string | null;
+  snapToken?: string | null;
   paymentUrl?: string | null;
   paymentStatus: string;
   escrowStatus: string;
@@ -186,7 +186,7 @@ export interface WalletTransaction {
   type: string;
   description: string;
   status?: string;
-  paymentReference?: string | null;
+  snapToken?: string | null;
   paymentUrl?: string | null;
   paymentMethod?: string;
   paidAt?: string | null;

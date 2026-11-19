@@ -1246,7 +1246,7 @@ export function NewPropertyClient({
               </span>
               <span className="block text-[11px] text-gray-500">
                 {isAutoApproved
-                  ? "Penyewa dapat langsung membayar booking melalui Duitku dengan sistem Escrow."
+                  ? "Penyewa dapat langsung membayar booking melalui Midtrans dengan sistem Escrow."
                   : "Khusus pemilik terverifikasi. Lakukan verifikasi akun untuk mengaktifkan fitur booking."}
               </span>
             </span>

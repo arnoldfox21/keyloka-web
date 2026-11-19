@@ -289,7 +289,7 @@ export function DashboardClient({
   const [reviewAdminNote, setReviewAdminNote] = useState("");
 
   const [topupAmount, setTopupAmount] = useState("50000");
-  const [openingDuitkuOrder, setOpeningDuitkuOrder] = useState<{
+  const [openingPaymentOrder, setOpeningPaymentOrder] = useState<{
     orderId?: string;
     paymentUrl?: string | null;
   } | null>(null);
@@ -939,7 +939,7 @@ export function DashboardClient({
     }
     const url = (tx.paymentUrl || "").toLowerCase();
     if (url.includes("midtrans.com")) return false;
-    return Boolean(tx.paymentReference || tx.paymentUrl);
+    return Boolean(tx.snapToken || tx.paymentUrl);
   }
 
   function getWalletTxStatusBadge(status?: string) {
@@ -1031,7 +1031,7 @@ export function DashboardClient({
         } else if (!silent && newStatus === "PENDING") {
           setNotice({
             type: "ok",
-            text: `Transaksi ${orderId} masih menunggu pembayaran di Duitku.`,
+            text: `Transaksi ${orderId} masih menunggu pembayaran di Midtrans.`,
           });
         }
         await refreshWalletSummary();
@@ -1055,39 +1055,38 @@ export function DashboardClient({
 
   function openTopupCheckout(target: {
     orderId?: string;
-    paymentReference?: string | null;
+    snapToken?: string | null;
     paymentUrl?: string | null;
   }) {
-    const { orderId, paymentReference, paymentUrl } = target;
-    if (paymentReference && typeof window !== "undefined" && window.checkout) {
-      setOpeningDuitkuOrder({ orderId, paymentUrl });
+    const { orderId, snapToken, paymentUrl } = target;
+    if (snapToken && typeof window !== "undefined" && window.snap) {
+      setOpeningPaymentOrder({ orderId, paymentUrl });
 
       let cleared = false;
       const clearOpening = () => {
         if (cleared) return;
         cleared = true;
-        setOpeningDuitkuOrder(null);
+        setOpeningPaymentOrder(null);
       };
 
       const safetyTimer = window.setTimeout(clearOpening, 25000);
-      const checkoutOptions = {
-        defaultLanguage: "id",
-        successEvent: () => {
+      const snapCallbacks = {
+        onSuccess: () => {
           window.clearTimeout(safetyTimer);
           clearOpening();
           void syncTopupOrder(orderId, false);
         },
-        pendingEvent: () => {
+        onPending: () => {
           window.clearTimeout(safetyTimer);
           clearOpening();
           void syncTopupOrder(orderId, false);
         },
-        closeEvent: () => {
+        onClose: () => {
           window.clearTimeout(safetyTimer);
           clearOpening();
           void syncTopupOrder(orderId, true);
         },
-        errorEvent: () => {
+        onError: () => {
           window.clearTimeout(safetyTimer);
           clearOpening();
           void syncTopupOrder(orderId, true);
@@ -1100,27 +1099,13 @@ export function DashboardClient({
 
       try {
         try {
-          window.checkout.process(paymentReference, checkoutOptions);
+          window.snap.pay(snapToken, snapCallbacks);
         } catch {
-          (
-            window.checkout as typeof window.checkout & { hide?: () => void }
-          ).hide?.();
-          window.checkout.process(paymentReference, checkoutOptions);
+          window.snap.hide?.();
+          window.snap.pay(snapToken, snapCallbacks);
         }
-
-        const duitkuIframe = document.getElementById(
-          "duitku-payment",
-        ) as HTMLIFrameElement | null;
-        if (duitkuIframe) {
-          duitkuIframe.addEventListener(
-            "load",
-            () => {
-              window.clearTimeout(safetyTimer);
-              clearOpening();
-            },
-            { once: true },
-          );
-        }
+        window.clearTimeout(safetyTimer);
+        clearOpening();
       } catch {
         window.clearTimeout(safetyTimer);
         clearOpening();
@@ -1192,7 +1177,7 @@ export function DashboardClient({
       }
       const orderId: string | undefined =
         data.transaction?.orderId || data.orderId || data.paymentOrderId;
-      const paymentReference: string | undefined = data.paymentReference;
+      const snapToken: string | undefined = data.snapToken;
       const paymentUrl: string | undefined = data.paymentUrl;
 
       if (data.transaction && typeof data.transaction === "object") {
@@ -1206,7 +1191,7 @@ export function DashboardClient({
 
       openTopupCheckout({
         orderId,
-        paymentReference,
+        snapToken,
         paymentUrl,
       });
     } catch (err) {
@@ -2114,47 +2099,43 @@ export function DashboardClient({
               />
               <button
                 type="submit"
-                disabled={busy || Boolean(openingDuitkuOrder)}
+                disabled={busy || Boolean(openingPaymentOrder)}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
               >
-                {(busy || Boolean(openingDuitkuOrder)) && (
+                {(busy || Boolean(openingPaymentOrder)) && (
                   <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                 )}
                 {busy
                   ? "Membuat Invoice..."
-                  : openingDuitkuOrder
-                    ? "Membuka Popup Duitku..."
+                  : openingPaymentOrder
+                    ? "Membuka Popup Midtrans..."
                     : "Top-Up Saldo"}
               </button>
             </div>
-            {openingDuitkuOrder && (
+            {openingPaymentOrder && (
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-emerald-300 bg-white px-4 py-3 text-xs text-emerald-900 shadow-xs">
                 <div className="flex items-center gap-2.5">
                   <RefreshCw className="h-4 w-4 shrink-0 animate-spin text-emerald-600" />
                   <span>
-                    Menyiapkan & membuka popup pembayaran Duitku
-                    {openingDuitkuOrder.orderId
-                      ? ` (${openingDuitkuOrder.orderId})`
+                    Menyiapkan & membuka popup pembayaran Midtrans
+                    {openingPaymentOrder.orderId
+                      ? ` (${openingPaymentOrder.orderId})`
                       : ""}
                     , mohon tunggu beberapa detik...
                   </span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  {openingDuitkuOrder.paymentUrl && (
+                  {openingPaymentOrder.paymentUrl && (
                     <button
                       type="button"
                       onClick={() => {
-                        const url = openingDuitkuOrder.paymentUrl;
+                        const url = openingPaymentOrder.paymentUrl;
                         try {
-                          (
-                            window.checkout as typeof window.checkout & {
-                              hide?: () => void;
-                            }
-                          )?.hide?.();
+                          window.snap?.hide?.();
                         } catch {
                           // ignore
                         }
-                        setOpeningDuitkuOrder(null);
+                        setOpeningPaymentOrder(null);
                         if (url) {
                           window.open(url, "_blank", "noopener,noreferrer");
                         }
@@ -2166,7 +2147,7 @@ export function DashboardClient({
                   )}
                   <button
                     type="button"
-                    onClick={() => setOpeningDuitkuOrder(null)}
+                    onClick={() => setOpeningPaymentOrder(null)}
                     className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-[11px] font-bold text-gray-600 hover:bg-gray-100"
                   >
                     Tutup Info
@@ -2446,7 +2427,7 @@ export function DashboardClient({
                             <>
                               <button
                                 type="button"
-                                disabled={Boolean(openingDuitkuOrder)}
+                                disabled={Boolean(openingPaymentOrder)}
                                 onClick={() => openTopupCheckout(tx)}
                                 className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
                               >
@@ -3896,13 +3877,13 @@ export function DashboardClient({
                     {selectedWalletTx.orderId || "-"}
                   </span>
                 </div>
-                {selectedWalletTx.paymentReference && (
+                {selectedWalletTx.snapToken && (
                   <div className="flex items-start justify-between gap-3">
                     <span className="text-gray-500 shrink-0">
-                      Referensi Pembayaran
+                      Token Pembayaran
                     </span>
                     <span className="font-mono font-semibold text-gray-900 text-right break-all">
-                      {selectedWalletTx.paymentReference}
+                      {selectedWalletTx.snapToken}
                     </span>
                   </div>
                 )}
@@ -3952,7 +3933,7 @@ export function DashboardClient({
                     )}
                     <button
                       type="button"
-                      disabled={Boolean(openingDuitkuOrder)}
+                      disabled={Boolean(openingPaymentOrder)}
                       onClick={() => {
                         const tx = selectedWalletTx;
                         setSelectedWalletTx(null);
@@ -3977,7 +3958,7 @@ export function DashboardClient({
         );
       })()}
 
-      {openingDuitkuOrder && (
+      {openingPaymentOrder && (
         <div
           style={{ zIndex: 1000000 }}
           className="fixed inset-0 flex items-center justify-center bg-black/40 p-4"
@@ -3988,32 +3969,28 @@ export function DashboardClient({
             </div>
             <div className="space-y-1">
               <h3 className="text-sm font-black text-gray-900">
-                Memuat Halaman Pembayaran Duitku...
+                Memuat Halaman Pembayaran Midtrans...
               </h3>
               <p className="text-xs text-gray-500">
                 Mohon tunggu beberapa detik hingga popup pembayaran muncul
-                {openingDuitkuOrder.orderId
-                  ? ` (${openingDuitkuOrder.orderId})`
+                {openingPaymentOrder.orderId
+                  ? ` (${openingPaymentOrder.orderId})`
                   : ""}
                 .
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-              {openingDuitkuOrder.paymentUrl && (
+              {openingPaymentOrder.paymentUrl && (
                 <button
                   type="button"
                   onClick={() => {
-                    const url = openingDuitkuOrder.paymentUrl;
+                    const url = openingPaymentOrder.paymentUrl;
                     try {
-                      (
-                        window.checkout as typeof window.checkout & {
-                          hide?: () => void;
-                        }
-                      )?.hide?.();
+                      window.snap?.hide?.();
                     } catch {
                       // ignore
                     }
-                    setOpeningDuitkuOrder(null);
+                    setOpeningPaymentOrder(null);
                     if (url) {
                       window.open(url, "_blank", "noopener,noreferrer");
                     }
@@ -4027,15 +4004,11 @@ export function DashboardClient({
                 type="button"
                 onClick={() => {
                   try {
-                    (
-                      window.checkout as typeof window.checkout & {
-                        hide?: () => void;
-                      }
-                    )?.hide?.();
+                    window.snap?.hide?.();
                   } catch {
                     // ignore
                   }
-                  setOpeningDuitkuOrder(null);
+                  setOpeningPaymentOrder(null);
                 }}
                 className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50"
               >
