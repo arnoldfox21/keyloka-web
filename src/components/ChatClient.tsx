@@ -6,10 +6,13 @@ import {
   ArrowLeft,
   CalendarCheck,
   Check,
+  CheckCheck,
   Lock,
   MessageCircle,
+  Search,
   Send,
   ShieldAlert,
+  Smile,
   UserPlus,
   Users,
   UserX,
@@ -38,11 +41,46 @@ interface ChatClientProps {
   initialGroupKostId?: number;
 }
 
-const QUICK_REPLIES = [
+const TENANT_QUICK_REPLIES = [
   "Halo, apakah kamar masih tersedia?",
   "Boleh jadwalkan survei besok?",
   "Apakah harga sudah termasuk listrik?",
 ];
+
+const OWNER_QUICK_REPLIES = [
+  "Halo, kamar masih tersedia. Kapan rencana survei atau masuk?",
+  "Silakan datang untuk survei sesuai jadwal yang disepakati.",
+  "Untuk info harga dan fasilitas sudah sesuai di halaman properti.",
+];
+
+const CHAT_EMOJIS = [
+  "😊", "😂", "🙏", "👍", "👌", "❤️", "🏠", "📍",
+  "📅", "⏰", "💰", "✅", "❓", "🤝", "👋", "🎉",
+];
+
+function getDateKey(dateStr?: string | null): string {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function formatChatDateLabel(dateStr?: string | null): string {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return "";
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diffDays = Math.round((today.getTime() - target.getTime()) / 86400000);
+  if (diffDays === 0) return "Hari ini";
+  if (diffDays === 1) return "Kemarin";
+  return d.toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 export function ChatClient({
   currentUser,
@@ -98,6 +136,8 @@ export function ChatClient({
   );
   const [groupDetail, setGroupDetail] = useState<KostGroupDetail | null>(null);
   const [input, setInput] = useState("");
+  const [inboxSearch, setInboxSearch] = useState("");
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [loadingRoom, setLoadingRoom] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
@@ -113,6 +153,7 @@ export function ChatClient({
   const activeDirectRef = useRef(activeDirect);
   const activeGroupRef = useRef(activeGroupKostId);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     activeDirectRef.current = activeDirect;
@@ -121,6 +162,15 @@ export function ChatClient({
   useEffect(() => {
     activeGroupRef.current = activeGroupKostId;
   }, [activeGroupKostId]);
+
+  useEffect(() => {
+    const total =
+      conversations.reduce((sum, c) => sum + (Number(c.unreadCount) || 0), 0) +
+      groups.reduce((sum, g) => sum + (Number(g.unreadCount) || 0), 0);
+    window.dispatchEvent(
+      new CustomEvent<number>("keyloka:chat-unread-update", { detail: total }),
+    );
+  }, [conversations, groups]);
 
   // Connect Socket.IO with JWT token
   useEffect(() => {
@@ -153,16 +203,23 @@ export function ChatClient({
 
     socket.on("newMessage", (msg: ChatMessage) => {
       const currentRoom = activeDirectRef.current;
-      if (
-        currentRoom &&
-        msg.kostId === currentRoom.kostId &&
-        (msg.senderId === currentRoom.peerId ||
-          msg.receiverId === currentRoom.peerId)
-      ) {
+      const isCurrentRoom =
+        Boolean(currentRoom) &&
+        msg.kostId === currentRoom!.kostId &&
+        (msg.senderId === currentRoom!.peerId ||
+          msg.receiverId === currentRoom!.peerId);
+
+      if (isCurrentRoom) {
         setDirectMessages((prev) => {
           if (prev.some((m) => m.id === msg.id)) return prev;
           return [...prev, msg];
         });
+        if (msg.senderId !== currentUser.id) {
+          socket.emit("markAsRead", {
+            kostId: msg.kostId,
+            readerId: currentUser.id,
+          });
+        }
       }
       setConversations((prev) =>
         prev.map((c) => {
@@ -175,10 +232,36 @@ export function ChatClient({
             ...c,
             message: msg.message,
             createdAt: msg.createdAt,
+            unreadCount:
+              isCurrentRoom || msg.senderId === currentUser.id
+                ? 0
+                : (c.unreadCount ?? 0) + 1,
           };
         }),
       );
     });
+
+    socket.on(
+      "messageStatusUpdated",
+      (payload: {
+        kostId: number;
+        status: string;
+        messageIds?: number[];
+      }) => {
+        if (!payload?.status) return;
+        const ids = Array.isArray(payload.messageIds)
+          ? new Set(payload.messageIds)
+          : null;
+        setDirectMessages((prev) =>
+          prev.map((m) => {
+            if (m.kostId !== payload.kostId) return m;
+            if (ids && !ids.has(m.id)) return m;
+            if (m.senderId !== currentUser.id) return m;
+            return { ...m, status: payload.status };
+          }),
+        );
+      },
+    );
 
     socket.on("newGroupMessage", (msg: KostGroupDetail["messages"][number]) => {
       setGroupDetail((prev) => {
@@ -497,7 +580,7 @@ export function ChatClient({
 
   async function handleBookingAction(
     bookingId: number,
-    action: "APPROVE" | "REJECT" | "CANCEL",
+    action: "APPROVE" | "REJECT" | "CANCEL" | "COMPLETE",
   ) {
     if (
       action === "CANCEL" &&
@@ -514,7 +597,9 @@ export function ChatClient({
           ? "DISETUJUI"
           : action === "REJECT"
             ? "DITOLAK"
-            : "DIBATALKAN";
+            : action === "COMPLETE"
+              ? "SELESAI"
+              : "DIBATALKAN";
       const res = await fetch(
         isCancel
           ? `/api/proxy/bookings/${bookingId}/cancel`
@@ -697,18 +782,68 @@ export function ChatClient({
           </div>
 
           <div className="p-3 space-y-4">
-            {/* Group Rooms */}
-            <div>
-              <p className="px-2 text-[11px] font-extrabold uppercase tracking-wider text-gray-400">
-                Grup Penghuni Kost ({groups.length})
-              </p>
-              <div className="mt-1.5 space-y-1">
-                {groups.length === 0 ? (
-                  <p className="px-2 py-2 text-xs text-gray-400">
-                    Belum tergabung di grup kost.
-                  </p>
-                ) : (
-                  groups.map((g) => (
+            {/* Search Inbox */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+              <input
+                type="text"
+                value={inboxSearch}
+                onChange={(e) => setInboxSearch(e.target.value)}
+                placeholder="Cari percakapan atau properti..."
+                className="w-full rounded-xl border border-gray-200 bg-white pl-8 pr-7 py-2 text-xs outline-none focus:border-emerald-500"
+              />
+              {inboxSearch && (
+                <button
+                  type="button"
+                  onClick={() => setInboxSearch("")}
+                  aria-label="Hapus pencarian"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            {(() => {
+              const q = inboxSearch.trim().toLowerCase();
+              const filteredGroups = q
+                ? groups.filter((g) =>
+                    [g.kostName, g.lastMessage]
+                      .filter(Boolean)
+                      .join(" ")
+                      .toLowerCase()
+                      .includes(q),
+                  )
+                : groups;
+              const filteredConversations = q
+                ? conversations.filter((c) => {
+                    const pName =
+                      c.peerUser?.name ||
+                      (c.senderId === currentUser.id
+                        ? `Pengguna #${c.receiverId}`
+                        : c.senderName);
+                    return [pName, c.kost?.name, c.message]
+                      .filter(Boolean)
+                      .join(" ")
+                      .toLowerCase()
+                      .includes(q);
+                  })
+                : conversations;
+
+              return (
+                <>
+                  {/* Group Rooms */}
+                  <div>
+                    <p className="px-2 text-[11px] font-extrabold uppercase tracking-wider text-gray-400">
+                      Grup Penghuni Kost ({filteredGroups.length})
+                    </p>
+                    <div className="mt-1.5 space-y-1">
+                      {filteredGroups.length === 0 ? (
+                        <p className="px-2 py-2 text-xs text-gray-400">
+                          {q ? "Tidak ada grup yang cocok." : "Belum tergabung di grup kost."}
+                        </p>
+                      ) : (
+                        filteredGroups.map((g) => (
                     <button
                       key={`grp-${g.kostId}`}
                       type="button"
@@ -746,23 +881,23 @@ export function ChatClient({
                         </span>
                       )}
                     </button>
-                  ))
-                )}
-              </div>
-            </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
 
-            {/* 1-on-1 Conversations */}
-            <div>
-              <p className="px-2 text-[11px] font-extrabold uppercase tracking-wider text-gray-400">
-                Chat Pribadi ({conversations.length})
-              </p>
-              <div className="mt-1.5 space-y-1">
-                {conversations.length === 0 ? (
-                  <p className="px-2 py-2 text-xs text-gray-400">
-                    Belum ada percakapan pribadi.
-                  </p>
-                ) : (
-                  conversations.map((c) => {
+                  {/* 1-on-1 Conversations */}
+                  <div>
+                    <p className="px-2 text-[11px] font-extrabold uppercase tracking-wider text-gray-400">
+                      Chat Pribadi ({filteredConversations.length})
+                    </p>
+                    <div className="mt-1.5 space-y-1">
+                      {filteredConversations.length === 0 ? (
+                        <p className="px-2 py-2 text-xs text-gray-400">
+                          {q ? "Tidak ada percakapan yang cocok." : "Belum ada percakapan pribadi."}
+                        </p>
+                      ) : (
+                        filteredConversations.map((c) => {
                     const peerId =
                       c.senderId === currentUser.id ? c.receiverId : c.senderId;
                     const peerName =
@@ -834,8 +969,11 @@ export function ChatClient({
                     );
                   })
                 )}
-              </div>
-            </div>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </aside>
 
@@ -1083,20 +1221,40 @@ export function ChatClient({
                                   </>
                                 )}
                                 {isApproved && (
-                                  <button
-                                    type="button"
-                                    disabled={isBusy}
-                                    onClick={() =>
-                                      handleBookingAction(
-                                        activeDirectBooking.id,
-                                        "CANCEL",
-                                      )
-                                    }
-                                    className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100 disabled:opacity-50"
-                                  >
-                                    <X className="h-3.5 w-3.5" />
-                                    Batalkan
-                                  </button>
+                                  <>
+                                    {(activeDirectBooking.bookingType || "SURVEI").toUpperCase() === "SURVEI" && (
+                                      <button
+                                        type="button"
+                                        disabled={isBusy}
+                                        onClick={() =>
+                                          handleBookingAction(
+                                            activeDirectBooking.id,
+                                            "COMPLETE",
+                                          )
+                                        }
+                                        className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                                      >
+                                        <Check className="h-3.5 w-3.5" />
+                                        Selesaikan Survei
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      disabled={isBusy}
+                                      onClick={() =>
+                                        handleBookingAction(
+                                          activeDirectBooking.id,
+                                          "CANCEL",
+                                        )
+                                      }
+                                      className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                      {(activeDirectBooking.bookingType || "SURVEI").toUpperCase() === "SEWA"
+                                        ? "Batalkan Booking"
+                                        : "Batalkan Survei"}
+                                    </button>
+                                  </>
                                 )}
                               </div>
                             )}
@@ -1108,8 +1266,14 @@ export function ChatClient({
                         Belum ada pesan. Mulai obrolan sekarang!
                       </p>
                     ) : (
-                      directMessages.map((m) => {
+                      directMessages.map((m, idx) => {
+                        const prevMsg = idx > 0 ? directMessages[idx - 1] : null;
+                        const currDateKey = getDateKey(m.createdAt);
+                        const prevDateKey = getDateKey(prevMsg?.createdAt);
+                        const showDateDivider =
+                          Boolean(currDateKey) && currDateKey !== prevDateKey;
                         const isMe = m.senderId === currentUser.id;
+                        const msgStatus = (m.status || "SENT").toUpperCase();
                         const booking = m.booking;
                         const bStatus = (booking?.status || "").toUpperCase();
                         const canManageBooking =
@@ -1125,17 +1289,24 @@ export function ChatClient({
                           booking && bookingActionBusyId === booking.id;
 
                         return (
-                          <div
-                            key={m.id}
-                            className={`flex ${isMe ? "justify-end" : "justify-start"}`}
-                          >
+                          <div key={m.id} className="space-y-2">
+                            {showDateDivider && (
+                              <div className="flex justify-center py-1">
+                                <span className="rounded-full bg-gray-200/80 px-3 py-0.5 text-[10px] font-bold text-gray-600">
+                                  {formatChatDateLabel(m.createdAt)}
+                                </span>
+                              </div>
+                            )}
                             <div
-                              className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm shadow-2xs ${
-                                isMe
-                                  ? "bg-emerald-600 text-white"
-                                  : "bg-white border border-gray-200 text-gray-800"
-                              }`}
+                              className={`flex ${isMe ? "justify-end" : "justify-start"}`}
                             >
+                              <div
+                                className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm shadow-2xs ${
+                                  isMe
+                                    ? "bg-emerald-600 text-white"
+                                    : "bg-white border border-gray-200 text-gray-800"
+                                }`}
+                              >
                               <p className="whitespace-pre-line">{m.message}</p>
                               {booking && (
                                 <div
@@ -1209,77 +1380,130 @@ export function ChatClient({
                                           </>
                                         )}
                                         {isApproved && (
-                                          <button
-                                            type="button"
-                                            disabled={Boolean(isBusy)}
-                                            onClick={() =>
-                                              handleBookingAction(
-                                                booking.id,
-                                                "CANCEL",
-                                              )
-                                            }
-                                            className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700 hover:bg-red-100 disabled:opacity-50"
-                                          >
-                                            <X className="h-3 w-3" />
-                                            Batalkan
-                                          </button>
+                                          <>
+                                            {(booking.bookingType || "SURVEI").toUpperCase() === "SURVEI" && (
+                                              <button
+                                                type="button"
+                                                disabled={Boolean(isBusy)}
+                                                onClick={() =>
+                                                  handleBookingAction(
+                                                    booking.id,
+                                                    "COMPLETE",
+                                                  )
+                                                }
+                                                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                                              >
+                                                <Check className="h-3 w-3" />
+                                                Selesaikan Survei
+                                              </button>
+                                            )}
+                                            <button
+                                              type="button"
+                                              disabled={Boolean(isBusy)}
+                                              onClick={() =>
+                                                handleBookingAction(
+                                                  booking.id,
+                                                  "CANCEL",
+                                                )
+                                              }
+                                              className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                                            >
+                                              <X className="h-3 w-3" />
+                                              {(booking.bookingType || "SURVEI").toUpperCase() === "SEWA"
+                                                ? "Batalkan Booking"
+                                                : "Batalkan Survei"}
+                                            </button>
+                                          </>
                                         )}
                                       </div>
                                     )}
                                 </div>
                               )}
                               <p
-                                className={`mt-1 text-[10px] ${
+                                className={`mt-1 flex items-center justify-end gap-1 text-[10px] ${
                                   isMe ? "text-emerald-100" : "text-gray-400"
                                 }`}
                               >
-                                {new Date(m.createdAt).toLocaleTimeString(
-                                  "id-ID",
-                                  {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  },
-                                )}
+                                <span>
+                                  {new Date(m.createdAt).toLocaleTimeString(
+                                    "id-ID",
+                                    {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    },
+                                  )}
+                                </span>
+                                {isMe &&
+                                  (msgStatus === "READ" ? (
+                                    <CheckCheck
+                                      aria-label="Dibaca"
+                                      className="h-3.5 w-3.5 text-sky-200"
+                                    />
+                                  ) : msgStatus === "DELIVERED" ? (
+                                    <CheckCheck
+                                      aria-label="Terkirim"
+                                      className="h-3.5 w-3.5 text-emerald-100/80"
+                                    />
+                                  ) : (
+                                    <Check
+                                      aria-label="Terkirim"
+                                      className="h-3.5 w-3.5 text-emerald-100/80"
+                                    />
+                                  ))}
                               </p>
                             </div>
+                          </div>
                           </div>
                         );
                       })
                     )}
                   </>
                 ) : (
-                  (groupDetail?.messages || []).map((m) => {
+                  (groupDetail?.messages || []).map((m, idx, arr) => {
+                    const prevMsg = idx > 0 ? arr[idx - 1] : null;
+                    const currDateKey = getDateKey(m.createdAt);
+                    const prevDateKey = getDateKey(prevMsg?.createdAt);
+                    const showDateDivider =
+                      Boolean(currDateKey) && currDateKey !== prevDateKey;
                     const isMe = m.senderId === currentUser.id;
                     return (
-                      <div
-                        key={m.id}
-                        className={`flex ${isMe ? "justify-end" : "justify-start"}`}
-                      >
+                      <div key={m.id} className="space-y-2">
+                        {showDateDivider && (
+                          <div className="flex justify-center py-1">
+                            <span className="rounded-full bg-gray-200/80 px-3 py-0.5 text-[10px] font-bold text-gray-600">
+                              {formatChatDateLabel(m.createdAt)}
+                            </span>
+                          </div>
+                        )}
                         <div
-                          className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm shadow-2xs ${
-                            isMe
-                              ? "bg-emerald-600 text-white"
-                              : "bg-white border border-gray-200 text-gray-800"
-                          }`}
+                          className={`flex ${isMe ? "justify-end" : "justify-start"}`}
                         >
-                          {!isMe && (
-                            <p className="text-[11px] font-bold text-emerald-700 mb-0.5">
-                              {m.senderName}
-                            </p>
-                          )}
-                          <p className="whitespace-pre-line">{m.message}</p>
-                          {m.createdAt && (
-                            <p
-                              className={`mt-1 text-[10px] ${
-                                isMe ? "text-emerald-100" : "text-gray-400"
-                              }`}
-                            >
-                              {new Date(m.createdAt).toLocaleTimeString("id-ID", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                            </p>
-                          )}
+                          <div
+                            className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm shadow-2xs ${
+                              isMe
+                                ? "bg-emerald-600 text-white"
+                                : "bg-white border border-gray-200 text-gray-800"
+                            }`}
+                          >
+                            {!isMe && (
+                              <p className="text-[11px] font-bold text-emerald-700 mb-0.5">
+                                {m.senderName}
+                              </p>
+                            )}
+                            <p className="whitespace-pre-line">{m.message}</p>
+                            {m.createdAt && (
+                              <p
+                                className={`mt-1 text-[10px] ${
+                                  isMe ? "text-emerald-100" : "text-gray-400"
+                                }`}
+                              >
+                                {new Date(m.createdAt).toLocaleTimeString("id-ID", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -1291,7 +1515,11 @@ export function ChatClient({
               {/* Quick Replies (for 1-on-1) */}
               {activeDirect && (
                 <div className="flex gap-1.5 overflow-x-auto border-t border-gray-100 px-3 py-2 sm:px-4 bg-white">
-                  {QUICK_REPLIES.map((qr) => (
+                  {((currentUser.role || "").toUpperCase() === "PEMILIK_KOST" ||
+                  activeDirectBooking?.kost?.ownerId === currentUser.id
+                    ? OWNER_QUICK_REPLIES
+                    : TENANT_QUICK_REPLIES
+                  ).map((qr) => (
                     <button
                       key={qr}
                       type="button"
@@ -1316,22 +1544,93 @@ export function ChatClient({
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
+                    setEmojiOpen(false);
                     handleSend();
                   }}
-                  className="flex gap-2 border-t border-gray-200 bg-white p-2.5 sm:p-3.5"
+                  className="relative flex items-end gap-2 border-t border-gray-200 bg-white p-2.5 sm:p-3.5"
                 >
-                  <input
-                    type="text"
+                  {emojiOpen && (
+                    <div className="absolute bottom-full left-2.5 sm:left-3.5 mb-2 w-64 rounded-2xl border border-gray-200 bg-white p-2.5 shadow-lg z-20">
+                      <div className="mb-1.5 flex items-center justify-between px-1">
+                        <span className="text-[11px] font-bold text-gray-500">
+                          Pilih Emoji
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setEmojiOpen(false)}
+                          aria-label="Tutup pemilih emoji"
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-8 gap-1">
+                        {CHAT_EMOJIS.map((emoji) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => {
+                              const el = inputRef.current;
+                              if (el) {
+                                const start = el.selectionStart ?? input.length;
+                                const end = el.selectionEnd ?? input.length;
+                                const next =
+                                  input.slice(0, start) + emoji + input.slice(end);
+                                setInput(next);
+                                requestAnimationFrame(() => {
+                                  el.focus();
+                                  const pos = start + emoji.length;
+                                  el.setSelectionRange(pos, pos);
+                                });
+                              } else {
+                                setInput((prev) => prev + emoji);
+                              }
+                            }}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-base hover:bg-emerald-50 transition"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setEmojiOpen((v) => !v)}
+                    aria-label="Tambah emoji"
+                    aria-expanded={emojiOpen}
+                    className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition ${
+                      emojiOpen
+                        ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                        : "border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    <Smile className="h-4 w-4" />
+                  </button>
+
+                  <textarea
+                    ref={inputRef}
+                    rows={1}
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Tulis pesan..."
-                    className="min-w-0 flex-1 rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm outline-none focus:border-emerald-500"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        if (input.trim() && !sending) {
+                          setEmojiOpen(false);
+                          handleSend();
+                        }
+                      }
+                    }}
+                    placeholder="Tulis pesan... (Shift+Enter untuk baris baru)"
+                    className="min-w-0 max-h-28 flex-1 resize-none rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm leading-snug outline-none focus:border-emerald-500"
                   />
                   <button
                     type="submit"
                     disabled={sending || !input.trim()}
                     aria-label="Kirim pesan"
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 sm:px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                    className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 sm:px-4 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
                   >
                     <Send className="h-4 w-4" />
                     <span className="hidden sm:inline">Kirim</span>

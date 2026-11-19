@@ -186,7 +186,7 @@ interface DashboardClientProps {
 
 type TabKey =
   | "PROPERTIES"
-  | "BOOKINGS"
+  | "DISPUTES"
   | "FINANCE"
   | "WALLET"
   | "APPROVAL"
@@ -217,11 +217,12 @@ export function DashboardClient({
   const isAdmin = role === "ADMINISTRATOR";
 
   const validTabs: TabKey[] = isStaffOrAdmin
-    ? ["PROPERTIES", "BOOKINGS", "APPROVAL", "WITHDRAWALS", "USERS"]
-    : ["PROPERTIES", "BOOKINGS", "FINANCE", "WALLET"];
+    ? ["PROPERTIES", "DISPUTES", "APPROVAL", "WITHDRAWALS", "USERS"]
+    : ["PROPERTIES", "DISPUTES", "FINANCE", "WALLET"];
+  const normalizedInitialTab = initialTab === "BOOKINGS" ? "DISPUTES" : initialTab;
   const resolvedInitialTab: TabKey =
-    initialTab && validTabs.includes(initialTab as TabKey)
-      ? (initialTab as TabKey)
+    normalizedInitialTab && validTabs.includes(normalizedInitialTab as TabKey)
+      ? (normalizedInitialTab as TabKey)
       : "PROPERTIES";
 
   const [tab, setTab] = useState<TabKey>(resolvedInitialTab);
@@ -239,10 +240,7 @@ export function DashboardClient({
   const [bookingsPage, setBookingsPage] = useState(1);
   const [bookingsHasMore, setBookingsHasMore] = useState(initialBookingsHasMore);
   const [bookingsLoadingMore, setBookingsLoadingMore] = useState(false);
-  const [onlyDisputedBookings, setOnlyDisputedBookings] = useState(false);
   const [bookingSearch, setBookingSearch] = useState("");
-  const [bookingStatusFilter, setBookingStatusFilter] = useState("SEMUA");
-  const [bookingTypeFilter, setBookingTypeFilter] = useState("SEMUA");
 
   const [withdrawSearch, setWithdrawSearch] = useState("");
   const [withdrawStatusFilter, setWithdrawStatusFilter] = useState("SEMUA");
@@ -572,49 +570,6 @@ export function DashboardClient({
         text: e instanceof Error ? e.message : "Gagal memperbarui kamar.",
       });
     } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleBookingStatus(bookingId: number, status: string) {
-    setBusy(true);
-    setNotice(null);
-    try {
-      const res = await fetch(`/api/proxy/bookings/${bookingId}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(d?.message || "Gagal memperbarui status.");
-      setNotice({ type: "ok", text: `Status booking diubah ke ${status}.` });
-      await refreshDashboardData();
-    } catch (e) {
-      setNotice({
-        type: "err",
-        text: e instanceof Error ? e.message : "Terjadi kesalahan.",
-      });
-      setBusy(false);
-    }
-  }
-
-  async function handleCancelBooking(bookingId: number) {
-    if (!window.confirm("Batalkan booking yang sudah disetujui ini?")) return;
-    setBusy(true);
-    setNotice(null);
-    try {
-      const res = await fetch(`/api/proxy/bookings/${bookingId}/cancel`, {
-        method: "PATCH",
-      });
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(d?.message || "Gagal membatalkan booking.");
-      setNotice({ type: "ok", text: "Booking berhasil dibatalkan." });
-      await refreshDashboardData();
-    } catch (e) {
-      setNotice({
-        type: "err",
-        text: e instanceof Error ? e.message : "Terjadi kesalahan.",
-      });
       setBusy(false);
     }
   }
@@ -1184,9 +1139,9 @@ export function DashboardClient({
           badge: moderationCount,
         },
         {
-          key: "BOOKINGS",
-          label: "Booking & Sengketa",
-          badge: disputedCount > 0 ? disputedCount : bookings.length,
+          key: "DISPUTES",
+          label: "Sengketa",
+          badge: disputedCount,
         },
         {
           key: "WITHDRAWALS",
@@ -1198,9 +1153,9 @@ export function DashboardClient({
     : [
         { key: "PROPERTIES", label: "Properti Saya", badge: kostsTotal },
         {
-          key: "BOOKINGS",
-          label: "Booking Masuk",
-          badge: bookings.length,
+          key: "DISPUTES",
+          label: "Sengketa",
+          badge: disputedCount,
         },
         { key: "FINANCE", label: "Keuangan" },
         { key: "WALLET", label: "Dompet & Tarik Dana" },
@@ -1300,7 +1255,10 @@ export function DashboardClient({
               {formatRupiah(creditBalance)}
             </p>
           </div>
-          <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          <Link
+            href="/bookings"
+            className="rounded-2xl border border-gray-200 bg-white p-4 hover:border-emerald-300 transition block"
+          >
             <div className="flex items-center justify-between text-xs font-semibold text-gray-500">
               <span>Booking / Survei</span>
               <CalendarClock className="h-4 w-4 text-amber-600" />
@@ -1308,7 +1266,10 @@ export function DashboardClient({
             <p className="mt-2 text-2xl font-black text-gray-900">
               {bookings.length}
             </p>
-          </div>
+            <p className="mt-0.5 text-[11px] font-semibold text-emerald-700">
+              Kelola di menu Booking →
+            </p>
+          </Link>
         </div>
       )}
 
@@ -1648,28 +1609,17 @@ export function DashboardClient({
         );
       })()}
 
-      {/* Tab Content: BOOKINGS & DISPUTES */}
-      {tab === "BOOKINGS" && (() => {
+      {/* Tab Content: DISPUTES */}
+      {tab === "DISPUTES" && (() => {
         const q = bookingSearch.trim().toLowerCase();
-        const visibleBookings = bookings.filter((b) => {
-          if (onlyDisputedBookings && b.escrowStatus !== "DISPUTED") return false;
-          if (
-            bookingStatusFilter !== "SEMUA" &&
-            (b.status || "").toUpperCase() !== bookingStatusFilter
-          ) {
-            return false;
-          }
-          if (
-            bookingTypeFilter !== "SEMUA" &&
-            (b.bookingType || "SURVEI").toUpperCase() !== bookingTypeFilter
-          ) {
-            return false;
-          }
+        const disputedBookings = bookings.filter((b) => b.escrowStatus === "DISPUTED");
+        const visibleDisputes = disputedBookings.filter((b) => {
           if (q) {
             const hay = [
               b.tenantName,
               b.tenantPhone,
               b.kost?.name,
+              b.disputeReason,
               String(b.id),
             ]
               .filter(Boolean)
@@ -1679,271 +1629,140 @@ export function DashboardClient({
           }
           return true;
         });
-        const hasBookingFilter =
-          q.length > 0 ||
-          bookingStatusFilter !== "SEMUA" ||
-          bookingTypeFilter !== "SEMUA" ||
-          onlyDisputedBookings;
 
         return (
           <div className="space-y-4">
-            <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
-              <div className="flex flex-col sm:flex-row gap-2.5">
-                <div className="relative flex-1">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-emerald-950">
+              <div>
+                <p className="font-bold">Daftar Sengketa Escrow</p>
+                <p className="mt-0.5 text-[11px] text-emerald-900">
+                  Pengelolaan pengajuan survei dan booking masuk kini tersedia terpusat di menu Booking &amp; Survei.
+                </p>
+              </div>
+              <Link
+                href="/bookings"
+                className="shrink-0 inline-flex items-center justify-center rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+              >
+                Buka Booking &amp; Survei →
+              </Link>
+            </div>
+
+            {disputedBookings.length > 0 && (
+              <div className="rounded-2xl border border-gray-200 bg-white p-4 flex flex-col sm:flex-row items-center gap-2.5">
+                <div className="relative flex-1 w-full">
                   <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
                     value={bookingSearch}
                     onChange={(e) => setBookingSearch(e.target.value)}
-                    placeholder="Cari nama penyewa, no. HP, atau nama properti..."
+                    placeholder="Cari nama penyewa, no. HP, properti, atau alasan sengketa..."
                     className="w-full rounded-xl border border-gray-200 pl-10 pr-3.5 py-2 text-sm"
                   />
                 </div>
-                <select
-                  value={bookingStatusFilter}
-                  onChange={(e) => setBookingStatusFilter(e.target.value)}
-                  className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-bold text-gray-700"
-                >
-                  <option value="SEMUA">Semua Status</option>
-                  <option value="TERKIRIM">Terkirim</option>
-                  <option value="MENUNGGU KONFIRMASI">Menunggu Konfirmasi</option>
-                  <option value="DISETUJUI">Disetujui</option>
-                  <option value="DITOLAK">Ditolak</option>
-                  <option value="DIBATALKAN">Dibatalkan</option>
-                  <option value="SELESAI">Selesai</option>
-                </select>
-                <select
-                  value={bookingTypeFilter}
-                  onChange={(e) => setBookingTypeFilter(e.target.value)}
-                  className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-bold text-gray-700"
-                >
-                  <option value="SEMUA">Semua Tipe</option>
-                  <option value="SURVEI">Survei</option>
-                  <option value="SEWA">Booking Langsung</option>
-                </select>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                {isStaffOrAdmin && (
-                  <>
-                    <button
-                      onClick={() => setOnlyDisputedBookings(false)}
-                      className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition ${
-                        !onlyDisputedBookings
-                          ? "bg-emerald-600 text-white"
-                          : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                      }`}
-                    >
-                      Semua ({bookings.length})
-                    </button>
-                    <button
-                      onClick={() => setOnlyDisputedBookings(true)}
-                      className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition ${
-                        onlyDisputedBookings
-                          ? "bg-amber-600 text-white"
-                          : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                      }`}
-                    >
-                      Sengketa Escrow ({disputedCount})
-                    </button>
-                  </>
-                )}
-
-                {hasBookingFilter && (
+                {q.length > 0 && (
                   <button
-                    onClick={() => {
-                      setBookingSearch("");
-                      setBookingStatusFilter("SEMUA");
-                      setBookingTypeFilter("SEMUA");
-                      setOnlyDisputedBookings(false);
-                    }}
-                    className="inline-flex items-center gap-1 rounded-xl border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-100"
+                    onClick={() => setBookingSearch("")}
+                    className="inline-flex items-center gap-1 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-100"
                   >
                     <RotateCcw className="h-3.5 w-3.5" />
                     Reset
                   </button>
                 )}
-
-                <span className="ml-auto text-xs font-semibold text-gray-500">
-                  Menampilkan {visibleBookings.length} dari {bookings.length} booking dimuat
+                <span className="text-xs font-semibold text-gray-500">
+                  Menampilkan {visibleDisputes.length} dari {disputedBookings.length} sengketa
                 </span>
               </div>
-            </div>
+            )}
 
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-xs text-emerald-950">
-              <p className="font-bold">Info Biaya Layanan Booking Langsung (Escrow)</p>
-              <p className="mt-0.5 text-[11px] text-emerald-900">
-                Penyewa bebas biaya tambahan. Setiap transaksi Booking Langsung dikenakan potongan{" "}
-                <strong>Biaya Platform 1%</strong> dan{" "}
-                <strong>Biaya Layanan & Payment Gateway 2,5% (min. Rp5.000)</strong> yang otomatis dipotong dari dana bersih pemilik.
-              </p>
-            </div>
-
-            {visibleBookings.length === 0 ? (
+            {visibleDisputes.length === 0 ? (
               <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-500">
-                {onlyDisputedBookings
-                  ? "Tidak ada sengketa escrow saat ini."
-                  : hasBookingFilter
-                    ? "Tidak ada booking yang cocok dengan filter Anda."
-                    : "Belum ada pengajuan masuk."}
+                {q.length > 0
+                  ? "Tidak ada sengketa yang cocok dengan pencarian Anda."
+                  : "Tidak ada sengketa escrow saat ini."}
               </div>
             ) : (
-              visibleBookings.map((b) => (
-              <div
-                key={b.id}
-                className="rounded-2xl border border-gray-200 bg-white p-5 space-y-3"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <div className="flex flex-wrap gap-2">
-                      <span className="rounded-lg bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700">
-                        {formatBookingTypeLabel(b.bookingType)}
-                      </span>
-                      <span className="rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-800">
-                        {formatBookingStatusLabel(b.status)}
-                      </span>
-                      {b.escrowStatus && b.escrowStatus !== "NONE" && (
-                        <span className="rounded-lg bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-800">
+              visibleDisputes.map((b) => (
+                <div
+                  key={b.id}
+                  className="rounded-2xl border border-amber-200 bg-white p-5 space-y-3"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="rounded-lg bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700">
+                          {formatBookingTypeLabel(b.bookingType)}
+                        </span>
+                        <span className="rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-800">
+                          {formatBookingStatusLabel(b.status)}
+                        </span>
+                        <span className="rounded-lg bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700">
                           Escrow: {formatEscrowStatusLabel(b.escrowStatus)}
                         </span>
-                      )}
-                    </div>
-                    <h3 className="mt-1.5 text-base font-extrabold text-gray-900">
-                      {b.kost?.name || `Properti #${b.kostId}`}
-                    </h3>
-                    <p className="text-xs text-gray-600">
-                      Penyewa: <span className="font-bold">{b.tenantName}</span> ({b.tenantPhone}) • Mulai {b.startDate}
-                    </p>
-                  </div>
-                  {b.totalAmount > 0 && (
-                    <div className="sm:text-right space-y-0.5">
-                      <p className="text-base font-black text-emerald-700">
-                        {formatRupiah(b.totalAmount)}
+                      </div>
+                      <h3 className="mt-1.5 text-base font-extrabold text-gray-900">
+                        {b.kost?.name || `Properti #${b.kostId}`}
+                      </h3>
+                      <p className="text-xs text-gray-600">
+                        Penyewa: <span className="font-bold">{b.tenantName}</span> ({b.tenantPhone}) • Mulai {b.startDate}
                       </p>
-                      {b.platformFee > 0 && (
-                        <p className="text-[11px] text-gray-500">
-                          Potongan Platform: -{formatRupiah(b.platformFee)}
-                        </p>
-                      )}
-                      {(b.serviceFee ?? 0) > 0 && (
-                        <p className="text-[11px] text-gray-500">
-                          Biaya Layanan & Escrow: -{formatRupiah(b.serviceFee!)}
-                        </p>
-                      )}
-                      {b.ownerNetAmount > 0 && (
-                        <p className="text-[11px] font-bold text-gray-800">
-                          Bersih ke Saldo: {formatRupiah(b.ownerNetAmount)}
-                        </p>
-                      )}
-                      {b.paymentScheme === "DP" && (b.remainingAmount ?? 0) > 0 && (
-                        <p className="text-[11px] font-semibold text-amber-700">
-                          Skema DP • Sisa saat Check-In: {formatRupiah(b.remainingAmount!)}
-                        </p>
-                      )}
                     </div>
-                  )}
-                </div>
-
-                {(b.status === "TERKIRIM" || b.status === "MENUNGGU KONFIRMASI") && (
-                  <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
-                    <button
-                      disabled={busy}
-                      onClick={() => handleBookingStatus(b.id, "DISETUJUI")}
-                      className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700"
-                    >
-                      Setujui
-                    </button>
-                    <button
-                      disabled={busy}
-                      onClick={() => handleBookingStatus(b.id, "DITOLAK")}
-                      className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-100"
-                    >
-                      Tolak
-                    </button>
-                  </div>
-                )}
-
-                {b.status === "DISETUJUI" && (
-                  <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
-                    <button
-                      disabled={busy}
-                      onClick={() => handleCancelBooking(b.id)}
-                      className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-100"
-                    >
-                      Batalkan Booking
-                    </button>
-                  </div>
-                )}
-
-                {b.userId && (
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    <Link
-                      href={`/chat?kostId=${b.kostId}&peerId=${b.userId}`}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-100"
-                    >
-                      <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
-                      Chat Penyewa
-                    </Link>
-                    {isKostProperty(b.kost?.propertyCategory) && (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={async () => {
-                          const res = await fetch(
-                            `/api/proxy/chats/groups/${b.kostId}/members`,
-                            {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ userId: b.userId }),
-                            },
-                          );
-                          if (res.ok) {
-                            setNotice({
-                              type: "ok",
-                              text: `${b.tenantName} ditambahkan ke Grup Penghuni.`,
-                            });
-                          }
-                        }}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
-                      >
-                        <UserPlus className="h-3.5 w-3.5" />
-                        Masukkan ke Grup
-                      </button>
+                    {b.totalAmount > 0 && (
+                      <div className="sm:text-right space-y-0.5">
+                        <p className="text-base font-black text-emerald-700">
+                          {formatRupiah(b.totalAmount)}
+                        </p>
+                        {b.ownerNetAmount > 0 && (
+                          <p className="text-[11px] font-bold text-gray-800">
+                            Bersih ke Saldo: {formatRupiah(b.ownerNetAmount)}
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
 
-                {isStaffOrAdmin && b.escrowStatus === "DISPUTED" && (
+                  {b.userId && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <Link
+                        href={`/chat?kostId=${b.kostId}&peerId=${b.userId}`}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-100"
+                      >
+                        <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
+                        Chat Penyewa
+                      </Link>
+                    </div>
+                  )}
+
                   <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 space-y-2.5">
                     <p className="flex items-center gap-1.5 text-xs font-extrabold text-amber-900">
                       <Gavel className="h-4 w-4" />
-                      Sengketa Escrow (Admin/Staff)
+                      {isStaffOrAdmin ? "Sengketa Escrow (Admin/Staff)" : "Sengketa Escrow (Sedang Ditinjau Admin/Staff)"}
                     </p>
                     {b.disputeReason && (
                       <p className="text-xs text-amber-900">
                         Alasan: {b.disputeReason}
                       </p>
                     )}
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        disabled={busy}
-                        onClick={() => handleResolveDispute(b.id, "REFUND")}
-                        className="rounded-xl border border-red-300 bg-white px-3.5 py-2 text-xs font-bold text-red-700 hover:bg-red-50"
-                      >
-                        Refund Penyewa
-                      </button>
-                      <button
-                        disabled={busy}
-                        onClick={() => handleResolveDispute(b.id, "RELEASE")}
-                        className="rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-emerald-700"
-                      >
-                        Cairkan ke Pemilik
-                      </button>
-                    </div>
+                    {isStaffOrAdmin && (
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          disabled={busy}
+                          onClick={() => handleResolveDispute(b.id, "REFUND")}
+                          className="rounded-xl border border-red-300 bg-white px-3.5 py-2 text-xs font-bold text-red-700 hover:bg-red-50"
+                        >
+                          Refund Penyewa
+                        </button>
+                        <button
+                          disabled={busy}
+                          onClick={() => handleResolveDispute(b.id, "RELEASE")}
+                          className="rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+                        >
+                          Cairkan ke Pemilik
+                        </button>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ))
-          )}
+                </div>
+              ))
+            )}
 
             {bookingsHasMore && (
               <div className="flex justify-center pt-2">
@@ -1952,7 +1771,7 @@ export function DashboardClient({
                   onClick={loadMoreBookings}
                   className="rounded-xl border border-emerald-600 bg-white px-6 py-2.5 text-xs font-bold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
                 >
-                  {bookingsLoadingMore ? "Memuat..." : "Muat Booking Lainnya"}
+                  {bookingsLoadingMore ? "Memuat..." : "Muat Data Lainnya"}
                 </button>
               </div>
             )}

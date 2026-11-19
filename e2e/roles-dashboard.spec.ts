@@ -29,7 +29,7 @@ test.describe("Role-based Dashboard Flows (Owner, Staff, Administrator)", () => 
     await expect(
       page.getByRole("button", { name: /Properti Saya/i }),
     ).toBeVisible();
-    await page.getByRole("button", { name: /Booking Masuk/i }).click();
+    await page.getByRole("button", { name: /^Sengketa/i }).click();
     await page.getByRole("button", { name: /Dompet & Tarik Dana/i }).click();
 
     await page.goto("/dashboard/new-property");
@@ -84,7 +84,7 @@ test.describe("Role-based Dashboard Flows (Owner, Staff, Administrator)", () => 
 
     for (const tabLabel of [
       /Approval & Moderasi/i,
-      /Booking & Sengketa/i,
+      /^Sengketa/i,
       /Ajuan Withdraw/i,
       /Kelola Pengguna/i,
       /Semua Properti/i,
@@ -109,7 +109,7 @@ test.describe("Role-based Dashboard Flows (Owner, Staff, Administrator)", () => 
 
     for (const tabLabel of [
       /Approval & Moderasi/i,
-      /Booking & Sengketa/i,
+      /^Sengketa/i,
       /Ajuan Withdraw/i,
       /Semua Properti/i,
     ]) {

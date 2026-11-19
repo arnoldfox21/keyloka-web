@@ -520,3 +520,21 @@ export function calculateBookingBreakdown(params: {
     finalPayNow,
   };
 }
+
+export interface NotificationItem {
+  id: number;
+  userId: number;
+  type: string;
+  title: string;
+  body: string;
+  targetUrl?: string | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface NotificationPageResponse {
+  data: NotificationItem[];
+  total: number;
+  unreadCount: number;
+  hasMore: boolean;
+}

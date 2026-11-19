@@ -10,6 +10,7 @@ const ALLOWED_PREFIXES = new Set([
   "wallet",
   "chats",
   "auth",
+  "notifications",
 ]);
 
 async function forward(
