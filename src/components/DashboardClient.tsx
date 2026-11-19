@@ -93,6 +93,7 @@ import {
   formatRoleLabel,
   formatRupiah,
   getDisplayPrice,
+  isKostProperty,
   type BoostPackageOption,
   type Booking,
   type Kost,
@@ -1882,30 +1883,32 @@ export function DashboardClient({
                       <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
                       Chat Penyewa
                     </Link>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={async () => {
-                        const res = await fetch(
-                          `/api/proxy/chats/groups/${b.kostId}/members`,
-                          {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ userId: b.userId }),
-                          },
-                        );
-                        if (res.ok) {
-                          setNotice({
-                            type: "ok",
-                            text: `${b.tenantName} ditambahkan ke Grup Penghuni.`,
-                          });
-                        }
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
-                    >
-                      <UserPlus className="h-3.5 w-3.5" />
-                      Masukkan ke Grup
-                    </button>
+                    {isKostProperty(b.kost?.propertyCategory) && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={async () => {
+                          const res = await fetch(
+                            `/api/proxy/chats/groups/${b.kostId}/members`,
+                            {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ userId: b.userId }),
+                            },
+                          );
+                          if (res.ok) {
+                            setNotice({
+                              type: "ok",
+                              text: `${b.tenantName} ditambahkan ke Grup Penghuni.`,
+                            });
+                          }
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
+                      >
+                        <UserPlus className="h-3.5 w-3.5" />
+                        Masukkan ke Grup
+                      </button>
+                    )}
                   </div>
                 )}
 

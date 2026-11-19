@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import {
   ArrowLeft,
+  CalendarCheck,
+  Check,
   Lock,
   MessageCircle,
   Send,
@@ -11,10 +13,15 @@ import {
   UserPlus,
   Users,
   UserX,
+  X,
 } from "lucide-react";
 import {
+  formatBookingStatusLabel,
+  formatBookingTypeLabel,
   getSocketBaseUrl,
+  isKostProperty,
   resolveImageUrl,
+  type Booking,
   type ChatMessage,
   type KostGroupDetail,
   type KostGroupRoom,
@@ -53,6 +60,7 @@ export function ChatClient({
     kostId: number;
     peerId: number;
     title: string;
+    propertyCategory?: string | null;
   } | null>(() => {
     if (initialKostId && initialPeerId) {
       const existing = initialConversations.find((c) => {
@@ -71,6 +79,7 @@ export function ChatClient({
         kostId: initialKostId,
         peerId: initialPeerId,
         title: peerName ? `${peerName} • ${kostTitle}` : kostTitle,
+        propertyCategory: existing?.kost?.propertyCategory ?? null,
       };
     }
     return null;
@@ -81,6 +90,12 @@ export function ChatClient({
   );
 
   const [directMessages, setDirectMessages] = useState<ChatMessage[]>([]);
+  const [activeDirectBooking, setActiveDirectBooking] = useState<Booking | null>(
+    null,
+  );
+  const [bookingActionBusyId, setBookingActionBusyId] = useState<number | null>(
+    null,
+  );
   const [groupDetail, setGroupDetail] = useState<KostGroupDetail | null>(null);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -234,7 +249,74 @@ export function ChatClient({
     return () => {
       active = false;
     };
-  }, [activeDirect, currentUser.id]);
+  }, [activeDirect?.kostId, activeDirect?.peerId, currentUser.id]);
+
+  // Resolve propertyCategory (if missing) & active booking fallback for owner/staff
+  useEffect(() => {
+    if (!activeDirect) {
+      setActiveDirectBooking(null);
+      return;
+    }
+    let active = true;
+    const { kostId, peerId, propertyCategory } = activeDirect;
+
+    async function loadMeta() {
+      if (propertyCategory == null) {
+        try {
+          const kRes = await fetch(`/api/proxy/kosts/${kostId}`);
+          if (kRes.ok && active) {
+            const kostData = await kRes.json();
+            setActiveDirect((prev) =>
+              prev && prev.kostId === kostId
+                ? {
+                    ...prev,
+                    propertyCategory: kostData?.propertyCategory ?? "KOST",
+                  }
+                : prev,
+            );
+          }
+        } catch {
+          // Abaikan jika gagal memuat metadata properti
+        }
+      }
+
+      const role = (currentUser.role || "").toUpperCase();
+      if (
+        role === "PEMILIK_KOST" ||
+        role === "STAFF" ||
+        role === "ADMINISTRATOR"
+      ) {
+        try {
+          const endpoint =
+            role === "STAFF" || role === "ADMINISTRATOR"
+              ? "/api/proxy/bookings?all=true&page=1&limit=30"
+              : `/api/proxy/bookings?ownerId=${currentUser.id}&page=1&limit=30`;
+          const bRes = await fetch(endpoint);
+          if (bRes.ok && active) {
+            const list: Booking[] = await bRes.json();
+            const match = (Array.isArray(list) ? list : []).find(
+              (b) =>
+                b.kostId === kostId &&
+                b.userId === peerId &&
+                ["TERKIRIM", "MENUNGGU KONFIRMASI", "DISETUJUI"].includes(
+                  (b.status || "").toUpperCase(),
+                ),
+            );
+            setActiveDirectBooking(match ?? null);
+          }
+        } catch {
+          if (active) setActiveDirectBooking(null);
+        }
+      } else {
+        setActiveDirectBooking(null);
+      }
+    }
+
+    loadMeta();
+    return () => {
+      active = false;
+    };
+  }, [activeDirect?.kostId, activeDirect?.peerId, currentUser.id, currentUser.role]);
 
   // Load Group chat detail
   useEffect(() => {
@@ -242,16 +324,24 @@ export function ChatClient({
     let active = true;
     async function loadGroup() {
       setLoadingRoom(true);
+      setChatError(null);
       try {
         const res = await fetch(`/api/proxy/chats/groups/${activeGroupKostId}`);
         if (res.ok && active) {
           const data: KostGroupDetail = await res.json();
           setGroupDetail(data);
+          socketRef.current?.emit("joinGroupChat", {
+            kostId: activeGroupKostId,
+            userId: currentUser.id,
+          });
+        } else if (active) {
+          const errData = await res.json().catch(() => ({}));
+          setGroupDetail(null);
+          setChatError(
+            errData?.message ||
+              "Grup penghuni hanya tersedia untuk properti Kost atau Anda belum memiliki akses.",
+          );
         }
-        socketRef.current?.emit("joinGroupChat", {
-          kostId: activeGroupKostId,
-          userId: currentUser.id,
-        });
       } finally {
         if (active) setLoadingRoom(false);
       }
@@ -401,6 +491,62 @@ export function ChatClient({
     } else {
       const data = await res.json().catch(() => ({}));
       setChatError(data?.message || "Gagal menambahkan ke grup.");
+    }
+  }
+
+  async function handleBookingAction(
+    bookingId: number,
+    action: "APPROVE" | "REJECT" | "CANCEL",
+  ) {
+    if (
+      action === "CANCEL" &&
+      !window.confirm("Batalkan pengajuan yang sudah disetujui ini?")
+    ) {
+      return;
+    }
+    setBookingActionBusyId(bookingId);
+    setChatError(null);
+    try {
+      const isCancel = action === "CANCEL";
+      const nextStatus =
+        action === "APPROVE"
+          ? "DISETUJUI"
+          : action === "REJECT"
+            ? "DITOLAK"
+            : "DIBATALKAN";
+      const res = await fetch(
+        isCancel
+          ? `/api/proxy/bookings/${bookingId}/cancel`
+          : `/api/proxy/bookings/${bookingId}/status`,
+        {
+          method: "PATCH",
+          headers: isCancel ? undefined : { "Content-Type": "application/json" },
+          body: isCancel ? undefined : JSON.stringify({ status: nextStatus }),
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.message || "Gagal memperbarui status pengajuan.");
+      }
+
+      setDirectMessages((prev) =>
+        prev.map((m) =>
+          m.booking?.id === bookingId
+            ? { ...m, booking: { ...m.booking, status: nextStatus } }
+            : m,
+        ),
+      );
+      setActiveDirectBooking((prev) =>
+        prev && prev.id === bookingId ? { ...prev, status: nextStatus } : prev,
+      );
+    } catch (err) {
+      setChatError(
+        err instanceof Error
+          ? err.message
+          : "Gagal memperbarui status pengajuan.",
+      );
+    } finally {
+      setBookingActionBusyId(null);
     }
   }
 
@@ -637,6 +783,7 @@ export function ChatClient({
                             kostId: c.kostId,
                             peerId,
                             title: `${peerName} • ${c.kost?.name || `Properti #${c.kostId}`}`,
+                            propertyCategory: c.kost?.propertyCategory ?? null,
                           });
                           setConversations((prev) =>
                             prev.map((item) => {
@@ -740,6 +887,8 @@ export function ChatClient({
                 </div>
 
                 {activeDirect &&
+                  activeDirect.propertyCategory != null &&
+                  isKostProperty(activeDirect.propertyCategory) &&
                   (currentUser.role === "PEMILIK_KOST" ||
                     currentUser.role === "ADMINISTRATOR") && (
                     <button
@@ -865,41 +1014,238 @@ export function ChatClient({
                     Memuat pesan...
                   </p>
                 ) : activeDirect ? (
-                  directMessages.length === 0 ? (
-                    <p className="text-center text-xs text-gray-400 py-8">
-                      Belum ada pesan. Mulai obrolan sekarang!
-                    </p>
-                  ) : (
-                    directMessages.map((m) => {
-                      const isMe = m.senderId === currentUser.id;
-                      return (
-                        <div
-                          key={m.id}
-                          className={`flex ${isMe ? "justify-end" : "justify-start"}`}
-                        >
+                  <>
+                    {activeDirectBooking &&
+                      !directMessages.some(
+                        (m) => m.booking?.id === activeDirectBooking.id,
+                      ) && (() => {
+                        const bStatus = (
+                          activeDirectBooking.status || ""
+                        ).toUpperCase();
+                        const isPending =
+                          bStatus === "TERKIRIM" ||
+                          bStatus === "MENUNGGU KONFIRMASI";
+                        const isApproved = bStatus === "DISETUJUI";
+                        const isBusy =
+                          bookingActionBusyId === activeDirectBooking.id;
+                        return (
+                          <div className="rounded-2xl border border-emerald-200 bg-white p-3 shadow-2xs flex flex-wrap items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="flex items-center gap-1.5 text-xs font-extrabold text-gray-900">
+                                <CalendarCheck className="h-3.5 w-3.5 text-emerald-600" />
+                                {formatBookingTypeLabel(
+                                  activeDirectBooking.bookingType,
+                                )}{" "}
+                                •{" "}
+                                {activeDirectBooking.surveyDateTime ||
+                                  activeDirectBooking.startDate}
+                              </p>
+                              <p className="text-[11px] font-semibold text-gray-500 mt-0.5">
+                                Status:{" "}
+                                <span className="text-emerald-700 font-bold">
+                                  {formatBookingStatusLabel(bStatus)}
+                                </span>
+                              </p>
+                            </div>
+                            {(isPending || isApproved) && (
+                              <div className="flex items-center gap-1.5">
+                                {isPending && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      disabled={isBusy}
+                                      onClick={() =>
+                                        handleBookingAction(
+                                          activeDirectBooking.id,
+                                          "APPROVE",
+                                        )
+                                      }
+                                      className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                                    >
+                                      <Check className="h-3.5 w-3.5" />
+                                      Setujui
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={isBusy}
+                                      onClick={() =>
+                                        handleBookingAction(
+                                          activeDirectBooking.id,
+                                          "REJECT",
+                                        )
+                                      }
+                                      className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                      Tolak
+                                    </button>
+                                  </>
+                                )}
+                                {isApproved && (
+                                  <button
+                                    type="button"
+                                    disabled={isBusy}
+                                    onClick={() =>
+                                      handleBookingAction(
+                                        activeDirectBooking.id,
+                                        "CANCEL",
+                                      )
+                                    }
+                                    className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                    Batalkan
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    {directMessages.length === 0 ? (
+                      <p className="text-center text-xs text-gray-400 py-8">
+                        Belum ada pesan. Mulai obrolan sekarang!
+                      </p>
+                    ) : (
+                      directMessages.map((m) => {
+                        const isMe = m.senderId === currentUser.id;
+                        const booking = m.booking;
+                        const bStatus = (booking?.status || "").toUpperCase();
+                        const canManageBooking =
+                          Boolean(booking) &&
+                          (currentUser.id === booking?.ownerId ||
+                            currentUser.role === "STAFF" ||
+                            currentUser.role === "ADMINISTRATOR");
+                        const isPending =
+                          bStatus === "TERKIRIM" ||
+                          bStatus === "MENUNGGU KONFIRMASI";
+                        const isApproved = bStatus === "DISETUJUI";
+                        const isBusy =
+                          booking && bookingActionBusyId === booking.id;
+
+                        return (
                           <div
-                            className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm shadow-2xs ${
-                              isMe
-                                ? "bg-emerald-600 text-white"
-                                : "bg-white border border-gray-200 text-gray-800"
-                            }`}
+                            key={m.id}
+                            className={`flex ${isMe ? "justify-end" : "justify-start"}`}
                           >
-                            <p className="whitespace-pre-line">{m.message}</p>
-                            <p
-                              className={`mt-1 text-[10px] ${
-                                isMe ? "text-emerald-100" : "text-gray-400"
+                            <div
+                              className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm shadow-2xs ${
+                                isMe
+                                  ? "bg-emerald-600 text-white"
+                                  : "bg-white border border-gray-200 text-gray-800"
                               }`}
                             >
-                              {new Date(m.createdAt).toLocaleTimeString("id-ID", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                            </p>
+                              <p className="whitespace-pre-line">{m.message}</p>
+                              {booking && (
+                                <div
+                                  className={`mt-2.5 rounded-xl border p-2.5 text-xs ${
+                                    isMe
+                                      ? "border-emerald-400/40 bg-emerald-700/40 text-white"
+                                      : "border-gray-200 bg-gray-50 text-gray-800"
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="inline-flex items-center gap-1 font-bold">
+                                      <CalendarCheck className="h-3.5 w-3.5" />
+                                      {formatBookingTypeLabel(
+                                        booking.bookingType,
+                                      )}
+                                    </span>
+                                    <span
+                                      className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
+                                        bStatus === "DISETUJUI"
+                                          ? "bg-emerald-100 text-emerald-800"
+                                          : bStatus === "DITOLAK" ||
+                                              bStatus === "DIBATALKAN"
+                                            ? "bg-red-100 text-red-700"
+                                            : "bg-amber-100 text-amber-800"
+                                      }`}
+                                    >
+                                      {formatBookingStatusLabel(bStatus)}
+                                    </span>
+                                  </div>
+                                  <p
+                                    className={`mt-1 text-[11px] ${
+                                      isMe ? "text-emerald-100" : "text-gray-500"
+                                    }`}
+                                  >
+                                    Jadwal:{" "}
+                                    {booking.surveyDateTime || booking.startDate}
+                                  </p>
+                                  {canManageBooking &&
+                                    (isPending || isApproved) && (
+                                      <div className="mt-2 flex flex-wrap gap-1.5">
+                                        {isPending && (
+                                          <>
+                                            <button
+                                              type="button"
+                                              disabled={Boolean(isBusy)}
+                                              onClick={() =>
+                                                handleBookingAction(
+                                                  booking.id,
+                                                  "APPROVE",
+                                                )
+                                              }
+                                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                                            >
+                                              <Check className="h-3 w-3" />
+                                              Setujui
+                                            </button>
+                                            <button
+                                              type="button"
+                                              disabled={Boolean(isBusy)}
+                                              onClick={() =>
+                                                handleBookingAction(
+                                                  booking.id,
+                                                  "REJECT",
+                                                )
+                                              }
+                                              className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                                            >
+                                              <X className="h-3 w-3" />
+                                              Tolak
+                                            </button>
+                                          </>
+                                        )}
+                                        {isApproved && (
+                                          <button
+                                            type="button"
+                                            disabled={Boolean(isBusy)}
+                                            onClick={() =>
+                                              handleBookingAction(
+                                                booking.id,
+                                                "CANCEL",
+                                              )
+                                            }
+                                            className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                                          >
+                                            <X className="h-3 w-3" />
+                                            Batalkan
+                                          </button>
+                                        )}
+                                      </div>
+                                    )}
+                                </div>
+                              )}
+                              <p
+                                className={`mt-1 text-[10px] ${
+                                  isMe ? "text-emerald-100" : "text-gray-400"
+                                }`}
+                              >
+                                {new Date(m.createdAt).toLocaleTimeString(
+                                  "id-ID",
+                                  {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  },
+                                )}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })
-                  )
+                        );
+                      })
+                    )}
+                  </>
                 ) : (
                   (groupDetail?.messages || []).map((m) => {
                     const isMe = m.senderId === currentUser.id;

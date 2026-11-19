@@ -34,6 +34,7 @@ import {
   formatCategoryLabel,
   formatRupiah,
   getDisplayPrice,
+  isKostProperty,
   resolveImageUrl,
   type Kost,
   type ReviewItem,
@@ -1043,7 +1044,7 @@ export function KostDetailClient({
                   </a>
                 ) : null;
               })()}
-              {currentUser && (
+              {currentUser && isKostProperty(kost.propertyCategory) && (
                 <Link
                   href={`/chat?groupKostId=${kost.id}`}
                   className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 py-2.5 text-xs font-bold text-gray-700 hover:bg-gray-100 transition"

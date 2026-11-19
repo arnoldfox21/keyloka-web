@@ -20,6 +20,7 @@ import {
   formatEscrowStatusLabel,
   formatPaymentStatusLabel,
   formatRupiah,
+  isKostProperty,
   type Booking,
   type LoyaltySummary,
 } from "@/lib/types";
@@ -461,17 +462,18 @@ export function BookingsClient({
                         Chat Pemilik
                       </Link>
                     )}
-                    {["DISETUJUI", "APPROVED", "AKTIF", "SELESAI"].includes(
-                      (b.status || "").toUpperCase(),
-                    ) && (
-                      <Link
-                        href={`/chat?groupKostId=${b.kostId}`}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
-                      >
-                        <Users className="h-3.5 w-3.5" />
-                        Grup {b.kost?.name || "Penghuni"}
-                      </Link>
-                    )}
+                    {isKostProperty(b.kost?.propertyCategory) &&
+                      ["DISETUJUI", "APPROVED", "AKTIF", "SELESAI"].includes(
+                        (b.status || "").toUpperCase(),
+                      ) && (
+                        <Link
+                          href={`/chat?groupKostId=${b.kostId}`}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
+                        >
+                          <Users className="h-3.5 w-3.5" />
+                          Grup {b.kost?.name || "Penghuni"}
+                        </Link>
+                      )}
                   </div>
 
                   {/* Actions */}

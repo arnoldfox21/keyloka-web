@@ -209,6 +209,16 @@ export interface WalletPricing {
   boostPackages: BoostPackageOption[];
 }
 
+export interface ChatBookingSummary {
+  id: number;
+  status: string;
+  bookingType: string;
+  startDate: string;
+  surveyDateTime?: string | null;
+  tenantName: string;
+  ownerId: number;
+}
+
 export interface ChatMessage {
   id: number;
   kostId: number;
@@ -217,6 +227,8 @@ export interface ChatMessage {
   senderAvatar?: string;
   receiverId: number;
   message: string;
+  bookingId?: number | null;
+  booking?: ChatBookingSummary | null;
   status: string;
   createdAt: string;
   unreadCount?: number;
@@ -370,6 +382,10 @@ export function formatRoleLabel(role?: string | null): string {
 
 export function formatCategoryLabel(category?: string | null): string {
   return formatEnumLabel(category, CATEGORY_LABELS, "Kost");
+}
+
+export function isKostProperty(category?: string | null): boolean {
+  return (category || "KOST").trim().toUpperCase() === "KOST";
 }
 
 export function formatApprovalStatusLabel(status?: string | null): string {
