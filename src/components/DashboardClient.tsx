@@ -985,6 +985,17 @@ export function DashboardClient({
 
   async function submitTransferOwner(targetOwnerId: number) {
     if (!transferTargetKost) return;
+    const candidate = transferCandidates.find((u) => u.id === targetOwnerId);
+    const targetLabel = candidate
+      ? `${candidate.name} (${candidate.email})`
+      : `pengguna #${targetOwnerId}`;
+    if (
+      !window.confirm(
+        `Pindahkan kepemilikan "${transferTargetKost.name}" ke ${targetLabel}?`,
+      )
+    ) {
+      return;
+    }
     setBusy(true);
     try {
       const res = await fetch(
