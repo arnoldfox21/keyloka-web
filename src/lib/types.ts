@@ -181,12 +181,18 @@ export interface KostFilters {
 
 export interface WalletTransaction {
   id: number;
+  orderId?: string;
   amount: number;
   type: string;
   description: string;
   status?: string;
+  paymentReference?: string | null;
+  paymentUrl?: string | null;
+  paymentMethod?: string;
+  paidAt?: string | null;
   referenceId?: string | null;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface WalletSummary {

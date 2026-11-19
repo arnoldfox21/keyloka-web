@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Banknote,
   BarChart3,
@@ -289,6 +289,15 @@ export function DashboardClient({
   const [reviewAdminNote, setReviewAdminNote] = useState("");
 
   const [topupAmount, setTopupAmount] = useState("50000");
+  const [openingDuitkuOrder, setOpeningDuitkuOrder] = useState<{
+    orderId?: string;
+    paymentUrl?: string | null;
+  } | null>(null);
+  const [syncingTopupOrderId, setSyncingTopupOrderId] = useState<string | null>(
+    null,
+  );
+  const [selectedWalletTx, setSelectedWalletTx] =
+    useState<WalletTransaction | null>(null);
   const [boostTargetKost, setBoostTargetKost] = useState<DashboardKostItem | null>(
     null,
   );
@@ -921,6 +930,245 @@ export function DashboardClient({
     }
   }
 
+  function isPayablePendingTopup(tx: WalletTransaction): boolean {
+    if (
+      (tx.type || "").toUpperCase() !== "TOPUP" ||
+      (tx.status || "").toUpperCase() !== "PENDING"
+    ) {
+      return false;
+    }
+    const url = (tx.paymentUrl || "").toLowerCase();
+    if (url.includes("midtrans.com")) return false;
+    return Boolean(tx.paymentReference || tx.paymentUrl);
+  }
+
+  function getWalletTxStatusBadge(status?: string) {
+    const s = (status || "").toUpperCase();
+    if (s === "PAID") {
+      return {
+        label: "Lunas",
+        className: "bg-emerald-100 text-emerald-800 border-emerald-200",
+      };
+    }
+    if (s === "PENDING") {
+      return {
+        label: "Menunggu Pembayaran",
+        className: "bg-amber-100 text-amber-800 border-amber-200",
+      };
+    }
+    if (s === "FAILED") {
+      return {
+        label: "Gagal",
+        className: "bg-red-100 text-red-700 border-red-200",
+      };
+    }
+    if (s === "EXPIRED") {
+      return {
+        label: "Kedaluwarsa",
+        className: "bg-gray-200 text-gray-700 border-gray-300",
+      };
+    }
+    return {
+      label: s || "Selesai",
+      className: "bg-gray-100 text-gray-700 border-gray-200",
+    };
+  }
+
+  async function refreshWalletSummary() {
+    try {
+      const wRes = await fetch("/api/proxy/wallet/me");
+      if (!wRes.ok) return;
+      const wData = await wRes.json().catch(() => ({}));
+      if (typeof wData?.creditBalance === "number") {
+        setCreditBalance(wData.creditBalance);
+      }
+      if (typeof wData?.payoutBalance === "number") {
+        setPayoutBalance(wData.payoutBalance);
+      }
+      if (Array.isArray(wData?.transactions)) {
+        const nextList: WalletTransaction[] = wData.transactions;
+        setWalletTransactions(nextList);
+        setSelectedWalletTx((prev) =>
+          prev ? nextList.find((item) => item.id === prev.id) ?? prev : null,
+        );
+      }
+    } catch {
+      // Ignore background refresh failure
+    }
+  }
+
+  async function syncTopupOrder(orderId?: string, silent = false) {
+    if (!orderId) return;
+    if (!silent) setSyncingTopupOrderId(orderId);
+    try {
+      const prevTx = walletTransactions.find((item) => item.orderId === orderId);
+      const wasPaid = (prevTx?.status || "").toUpperCase() === "PAID";
+
+      const sRes = await fetch(
+        `/api/proxy/wallet/topup/${encodeURIComponent(orderId)}/sync`,
+        {
+          method: "POST",
+        },
+      );
+      const sData = await sRes.json().catch(() => ({}));
+      if (sRes.ok && typeof sData?.creditBalance === "number") {
+        setCreditBalance(sData.creditBalance);
+        const newStatus = (sData?.transaction?.status || "").toUpperCase();
+        const txAmount = Number(sData?.transaction?.amount ?? prevTx?.amount ?? 0);
+        if (newStatus === "PAID" && (!wasPaid || !silent)) {
+          setNotice({
+            type: "ok",
+            text: `Pembayaran top-up ${formatRupiah(txAmount)} berhasil! Saldo kredit Anda telah ditambahkan.`,
+          });
+        } else if (!silent && (newStatus === "FAILED" || newStatus === "EXPIRED")) {
+          setNotice({
+            type: "err",
+            text:
+              newStatus === "FAILED"
+                ? "Pembayaran top-up gagal diproses."
+                : "Invoice top-up telah kedaluwarsa.",
+          });
+        } else if (!silent && newStatus === "PENDING") {
+          setNotice({
+            type: "ok",
+            text: `Transaksi ${orderId} masih menunggu pembayaran di Duitku.`,
+          });
+        }
+        await refreshWalletSummary();
+      } else if (!silent && !sRes.ok) {
+        setNotice({
+          type: "err",
+          text: sData?.message || "Gagal menyinkronkan status top-up.",
+        });
+      }
+    } catch {
+      if (!silent) {
+        setNotice({
+          type: "err",
+          text: "Gagal memeriksa status pembayaran top-up.",
+        });
+      }
+    } finally {
+      if (!silent) setSyncingTopupOrderId(null);
+    }
+  }
+
+  function openTopupCheckout(target: {
+    orderId?: string;
+    paymentReference?: string | null;
+    paymentUrl?: string | null;
+  }) {
+    const { orderId, paymentReference, paymentUrl } = target;
+    if (paymentReference && typeof window !== "undefined" && window.checkout) {
+      setOpeningDuitkuOrder({ orderId, paymentUrl });
+
+      let cleared = false;
+      const clearOpening = () => {
+        if (cleared) return;
+        cleared = true;
+        setOpeningDuitkuOrder(null);
+      };
+
+      const safetyTimer = window.setTimeout(clearOpening, 25000);
+      const checkoutOptions = {
+        defaultLanguage: "id",
+        successEvent: () => {
+          window.clearTimeout(safetyTimer);
+          clearOpening();
+          void syncTopupOrder(orderId, false);
+        },
+        pendingEvent: () => {
+          window.clearTimeout(safetyTimer);
+          clearOpening();
+          void syncTopupOrder(orderId, false);
+        },
+        closeEvent: () => {
+          window.clearTimeout(safetyTimer);
+          clearOpening();
+          void syncTopupOrder(orderId, true);
+        },
+        errorEvent: () => {
+          window.clearTimeout(safetyTimer);
+          clearOpening();
+          void syncTopupOrder(orderId, true);
+          setNotice({
+            type: "err",
+            text: "Pembayaran top-up gagal atau dibatalkan.",
+          });
+        },
+      };
+
+      try {
+        try {
+          window.checkout.process(paymentReference, checkoutOptions);
+        } catch {
+          (
+            window.checkout as typeof window.checkout & { hide?: () => void }
+          ).hide?.();
+          window.checkout.process(paymentReference, checkoutOptions);
+        }
+
+        const duitkuIframe = document.getElementById(
+          "duitku-payment",
+        ) as HTMLIFrameElement | null;
+        if (duitkuIframe) {
+          duitkuIframe.addEventListener(
+            "load",
+            () => {
+              window.clearTimeout(safetyTimer);
+              clearOpening();
+            },
+            { once: true },
+          );
+        }
+      } catch {
+        window.clearTimeout(safetyTimer);
+        clearOpening();
+        if (paymentUrl) {
+          window.open(paymentUrl, "_blank", "noopener,noreferrer");
+        }
+      }
+    } else if (paymentUrl) {
+      window.open(paymentUrl, "_blank", "noopener,noreferrer");
+      setNotice({
+        type: "ok",
+        text: `Halaman pembayaran top-up (${orderId || "-"}) dibuka di tab baru. Selesaikan pembayaran lalu klik Cek Status.`,
+      });
+    } else {
+      setNotice({
+        type: "err",
+        text: "Tautan pembayaran tidak tersedia untuk transaksi ini.",
+      });
+    }
+  }
+
+  useEffect(() => {
+    if (tab !== "WALLET") return;
+    const pendingTopups = walletTransactions
+      .filter(
+        (tx) =>
+          (tx.type || "").toUpperCase() === "TOPUP" &&
+          (tx.status || "").toUpperCase() === "PENDING" &&
+          Boolean(tx.orderId) &&
+          Date.now() - new Date(tx.createdAt).getTime() <= 24 * 60 * 60 * 1000 &&
+          !(tx.paymentUrl || "").toLowerCase().includes("midtrans.com"),
+      )
+      .slice(0, 2);
+
+    if (pendingTopups.length === 0) return;
+
+    const timer = window.setInterval(() => {
+      for (const tx of pendingTopups) {
+        if (tx.orderId) {
+          void syncTopupOrder(tx.orderId, true);
+        }
+      }
+    }, 10000);
+
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, walletTransactions]);
+
   async function handleTopupCredit(e: React.FormEvent) {
     e.preventDefault();
     const amt = Number(topupAmount);
@@ -942,67 +1190,25 @@ export function DashboardClient({
         setNotice({ type: "err", text: msg || "Gagal membuat transaksi top-up." });
         return;
       }
-      const orderId = data.transaction?.orderId || data.orderId || data.paymentOrderId;
-      const paymentReference = data.paymentReference;
-      const syncTopup = async () => {
-        if (!orderId) return;
-        try {
-          const sRes = await fetch(`/api/proxy/wallet/topup/${encodeURIComponent(orderId)}/sync`, {
-            method: "POST",
-          });
-          const sData = await sRes.json().catch(() => ({}));
-          if (sRes.ok && typeof sData?.creditBalance === "number") {
-            setCreditBalance(sData.creditBalance);
-            if (sData?.transaction?.status === "PAID") {
-              setNotice({ type: "ok", text: "Saldo kredit berhasil ditambahkan!" });
-            } else if (sData?.transaction?.status === "FAILED" || sData?.transaction?.status === "EXPIRED") {
-              setNotice({ type: "err", text: `Pembayaran top-up ${sData.transaction.status.toLowerCase()}.` });
-            }
-            const wRes = await fetch("/api/proxy/wallet/me");
-            if (wRes.ok) {
-              const wData = await wRes.json().catch(() => ({}));
-              if (Array.isArray(wData?.transactions)) {
-                setWalletTransactions(wData.transactions);
-              }
-            }
-          } else if (!sRes.ok) {
-            setNotice({
-              type: "err",
-              text: sData?.message || "Gagal menyinkronkan status top-up.",
-            });
-          }
-        } catch {
-          setNotice({ type: "err", text: "Gagal memeriksa status pembayaran top-up." });
-        }
-      };
+      const orderId: string | undefined =
+        data.transaction?.orderId || data.orderId || data.paymentOrderId;
+      const paymentReference: string | undefined = data.paymentReference;
+      const paymentUrl: string | undefined = data.paymentUrl;
 
-      if (paymentReference && typeof window !== "undefined" && window.checkout) {
-        window.checkout.process(paymentReference, {
-          defaultLanguage: "id",
-          successEvent: () => {
-            void syncTopup();
-          },
-          pendingEvent: () => {
-            void syncTopup();
-          },
-          closeEvent: () => {
-            void syncTopup();
-          },
-          errorEvent: () => {
-            void syncTopup();
-            setNotice({
-              type: "err",
-              text: "Pembayaran top-up gagal atau dibatalkan.",
-            });
-          },
-        });
-      } else if (data.paymentUrl) {
-        window.open(data.paymentUrl, "_blank", "noopener,noreferrer");
-        setNotice({
-          type: "ok",
-          text: `Invoice top-up dibuat (${orderId || "-"}). Selesaikan pembayaran lalu muat ulang.`,
-        });
+      if (data.transaction && typeof data.transaction === "object") {
+        const createdTx = data.transaction as WalletTransaction;
+        setWalletTransactions((prev) =>
+          prev.some((item) => item.id === createdTx.id)
+            ? prev
+            : [createdTx, ...prev],
+        );
       }
+
+      openTopupCheckout({
+        orderId,
+        paymentReference,
+        paymentUrl,
+      });
     } catch (err) {
       setNotice({
         type: "err",
@@ -1908,12 +2114,66 @@ export function DashboardClient({
               />
               <button
                 type="submit"
-                disabled={busy}
-                className="rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                disabled={busy || Boolean(openingDuitkuOrder)}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
               >
-                {busy ? "Memproses..." : "Top-Up Saldo"}
+                {(busy || Boolean(openingDuitkuOrder)) && (
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                )}
+                {busy
+                  ? "Membuat Invoice..."
+                  : openingDuitkuOrder
+                    ? "Membuka Popup Duitku..."
+                    : "Top-Up Saldo"}
               </button>
             </div>
+            {openingDuitkuOrder && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-emerald-300 bg-white px-4 py-3 text-xs text-emerald-900 shadow-xs">
+                <div className="flex items-center gap-2.5">
+                  <RefreshCw className="h-4 w-4 shrink-0 animate-spin text-emerald-600" />
+                  <span>
+                    Menyiapkan & membuka popup pembayaran Duitku
+                    {openingDuitkuOrder.orderId
+                      ? ` (${openingDuitkuOrder.orderId})`
+                      : ""}
+                    , mohon tunggu beberapa detik...
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {openingDuitkuOrder.paymentUrl && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const url = openingDuitkuOrder.paymentUrl;
+                        try {
+                          (
+                            window.checkout as typeof window.checkout & {
+                              hide?: () => void;
+                            }
+                          )?.hide?.();
+                        } catch {
+                          // ignore
+                        }
+                        setOpeningDuitkuOrder(null);
+                        if (url) {
+                          window.open(url, "_blank", "noopener,noreferrer");
+                        }
+                      }}
+                      className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-emerald-700"
+                    >
+                      Buka di Tab Baru
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setOpeningDuitkuOrder(null)}
+                    className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-[11px] font-bold text-gray-600 hover:bg-gray-100"
+                  >
+                    Tutup Info
+                  </button>
+                </div>
+              </div>
+            )}
           </form>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -2122,9 +2382,19 @@ export function DashboardClient({
           </div>
 
           <div className="rounded-2xl border border-gray-200 bg-white p-6 space-y-3">
-            <h2 className="text-lg font-black text-gray-900">
-              Riwayat Transaksi Kredit ({walletTransactions.length})
-            </h2>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-lg font-black text-gray-900">
+                Riwayat Transaksi Kredit ({walletTransactions.length})
+              </h2>
+              <button
+                type="button"
+                onClick={() => void refreshWalletSummary()}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Segarkan
+              </button>
+            </div>
             {walletTransactions.length === 0 ? (
               <p className="text-sm text-gray-500">
                 Belum ada riwayat transaksi kredit atau boost iklan.
@@ -2133,28 +2403,83 @@ export function DashboardClient({
               <div className="space-y-2.5">
                 {walletTransactions.map((tx) => {
                   const isPositive = tx.amount > 0;
+                  const badge = getWalletTxStatusBadge(tx.status);
+                  const canPay = isPayablePendingTopup(tx);
+                  const isSyncingThis =
+                    Boolean(tx.orderId) && syncingTopupOrderId === tx.orderId;
+
                   return (
                     <div
                       key={tx.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50 p-3.5"
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50 p-3.5"
                     >
-                      <div className="min-w-0">
-                        <p className="text-xs font-extrabold text-gray-900">
-                          {tx.description || tx.type}
-                        </p>
-                        <p className="mt-0.5 text-[11px] text-gray-500">
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-xs font-extrabold text-gray-900">
+                            {tx.description || tx.type}
+                          </p>
+                          <span
+                            className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-bold ${badge.className}`}
+                          >
+                            {badge.label}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-500 break-all">
                           {new Date(tx.createdAt).toLocaleString("id-ID")}
-                          {tx.status ? ` • ${tx.status}` : ""}
+                          {tx.orderId ? ` • ${tx.orderId}` : ""}
+                          {tx.paymentMethod
+                            ? ` • ${tx.paymentMethod.toUpperCase()}`
+                            : ""}
                         </p>
                       </div>
-                      <span
-                        className={`shrink-0 text-sm font-black ${
-                          isPositive ? "text-emerald-700" : "text-red-600"
-                        }`}
-                      >
-                        {isPositive ? "+" : ""}
-                        {formatRupiah(tx.amount)}
-                      </span>
+                      <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 shrink-0">
+                        <span
+                          className={`text-sm font-black ${
+                            isPositive ? "text-emerald-700" : "text-red-600"
+                          }`}
+                        >
+                          {isPositive ? "+" : ""}
+                          {formatRupiah(tx.amount)}
+                        </span>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {canPay && (
+                            <>
+                              <button
+                                type="button"
+                                disabled={Boolean(openingDuitkuOrder)}
+                                onClick={() => openTopupCheckout(tx)}
+                                className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                              >
+                                Bayar Sekarang
+                              </button>
+                              {tx.orderId && (
+                                <button
+                                  type="button"
+                                  disabled={isSyncingThis}
+                                  onClick={() =>
+                                    void syncTopupOrder(tx.orderId, false)
+                                  }
+                                  className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-[11px] font-bold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+                                >
+                                  <RefreshCw
+                                    className={`h-3 w-3 ${
+                                      isSyncingThis ? "animate-spin" : ""
+                                    }`}
+                                  />
+                                  {isSyncingThis ? "Mengecek..." : "Cek Status"}
+                                </button>
+                              )}
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedWalletTx(tx)}
+                            className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-gray-700 hover:bg-gray-100"
+                          >
+                            Detail
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
@@ -3504,6 +3829,217 @@ export function DashboardClient({
                 className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-xs font-extrabold text-white hover:bg-emerald-700 disabled:opacity-50"
               >
                 {busy ? "Memproses..." : "Setujui Penarikan"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedWalletTx && (() => {
+        const badge = getWalletTxStatusBadge(selectedWalletTx.status);
+        const isPositive = selectedWalletTx.amount > 0;
+        const canPay = isPayablePendingTopup(selectedWalletTx);
+        const isSyncingThis =
+          Boolean(selectedWalletTx.orderId) &&
+          syncingTopupOrderId === selectedWalletTx.orderId;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-4">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h3 className="text-base font-black text-gray-900">
+                    Detail Transaksi Kredit
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    {selectedWalletTx.description || selectedWalletTx.type}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedWalletTx(null)}
+                  className="text-xs font-bold text-gray-400 hover:text-gray-600"
+                >
+                  Tutup
+                </button>
+              </div>
+
+              <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 space-y-2.5 text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-gray-500">Status</span>
+                  <span
+                    className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-bold ${badge.className}`}
+                  >
+                    {badge.label}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-gray-500">Nominal</span>
+                  <span
+                    className={`text-sm font-black ${
+                      isPositive ? "text-emerald-700" : "text-red-600"
+                    }`}
+                  >
+                    {isPositive ? "+" : ""}
+                    {formatRupiah(selectedWalletTx.amount)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-gray-500">Tipe Transaksi</span>
+                  <span className="font-bold text-gray-900">
+                    {selectedWalletTx.type}
+                  </span>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-gray-500 shrink-0">Order ID</span>
+                  <span className="font-mono font-semibold text-gray-900 text-right break-all">
+                    {selectedWalletTx.orderId || "-"}
+                  </span>
+                </div>
+                {selectedWalletTx.paymentReference && (
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-gray-500 shrink-0">
+                      Referensi Pembayaran
+                    </span>
+                    <span className="font-mono font-semibold text-gray-900 text-right break-all">
+                      {selectedWalletTx.paymentReference}
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-gray-500">Metode Pembayaran</span>
+                  <span className="font-semibold text-gray-900">
+                    {selectedWalletTx.paymentMethod
+                      ? selectedWalletTx.paymentMethod.toUpperCase()
+                      : "-"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-gray-500">Waktu Dibuat</span>
+                  <span className="font-semibold text-gray-900">
+                    {new Date(selectedWalletTx.createdAt).toLocaleString("id-ID")}
+                  </span>
+                </div>
+                {selectedWalletTx.paidAt && (
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-gray-500">Waktu Lunas</span>
+                    <span className="font-semibold text-emerald-700">
+                      {new Date(selectedWalletTx.paidAt).toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                {canPay && (
+                  <>
+                    {selectedWalletTx.orderId && (
+                      <button
+                        type="button"
+                        disabled={isSyncingThis}
+                        onClick={() =>
+                          void syncTopupOrder(selectedWalletTx.orderId, false)
+                        }
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2 text-xs font-bold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+                      >
+                        <RefreshCw
+                          className={`h-3.5 w-3.5 ${
+                            isSyncingThis ? "animate-spin" : ""
+                          }`}
+                        />
+                        {isSyncingThis ? "Mengecek..." : "Cek Status"}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      disabled={Boolean(openingDuitkuOrder)}
+                      onClick={() => {
+                        const tx = selectedWalletTx;
+                        setSelectedWalletTx(null);
+                        openTopupCheckout(tx);
+                      }}
+                      className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-extrabold text-white hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      Bayar Sekarang
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSelectedWalletTx(null)}
+                  className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50"
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {openingDuitkuOrder && (
+        <div
+          style={{ zIndex: 1000000 }}
+          className="fixed inset-0 flex items-center justify-center bg-black/40 p-4"
+        >
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl space-y-4 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+              <RefreshCw className="h-6 w-6 animate-spin" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-sm font-black text-gray-900">
+                Memuat Halaman Pembayaran Duitku...
+              </h3>
+              <p className="text-xs text-gray-500">
+                Mohon tunggu beberapa detik hingga popup pembayaran muncul
+                {openingDuitkuOrder.orderId
+                  ? ` (${openingDuitkuOrder.orderId})`
+                  : ""}
+                .
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+              {openingDuitkuOrder.paymentUrl && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = openingDuitkuOrder.paymentUrl;
+                    try {
+                      (
+                        window.checkout as typeof window.checkout & {
+                          hide?: () => void;
+                        }
+                      )?.hide?.();
+                    } catch {
+                      // ignore
+                    }
+                    setOpeningDuitkuOrder(null);
+                    if (url) {
+                      window.open(url, "_blank", "noopener,noreferrer");
+                    }
+                  }}
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-extrabold text-white hover:bg-emerald-700"
+                >
+                  Buka di Tab Baru
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    (
+                      window.checkout as typeof window.checkout & {
+                        hide?: () => void;
+                      }
+                    )?.hide?.();
+                  } catch {
+                    // ignore
+                  }
+                  setOpeningDuitkuOrder(null);
+                }}
+                className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50"
+              >
+                Tutup
               </button>
             </div>
           </div>
