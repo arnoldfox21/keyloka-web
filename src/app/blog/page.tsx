@@ -5,7 +5,6 @@ import {
   Clock,
   Eye,
   Flame,
-  Rss,
   Search,
   Tag,
 } from "lucide-react";
@@ -151,13 +150,6 @@ export default async function BlogPage({
               Temukan panduan memilih kost aman, estimasi biaya hidup sekitar kampus, dan tips sewa hunian terpercaya.
             </p>
           </div>
-          <Link
-            href="/blog/rss.xml"
-            className="inline-flex items-center gap-1.5 rounded-xl bg-white/15 px-3.5 py-2 text-xs font-bold text-white hover:bg-white/25 transition"
-          >
-            <Rss className="h-3.5 w-3.5" />
-            RSS Feed
-          </Link>
         </div>
 
         {/* Search & Category Filter */}
