@@ -686,7 +686,7 @@ export function KostDetailClient({
                     Terverifikasi
                   </span>
                 )}
-                {kost.allowDirectBooking && (
+                {kost.allowDirectBooking && !kost.isStaffPosted && (
                   <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white">
                     <ShieldCheck className="h-3.5 w-3.5" />
                     Direct Booking + Escrow
@@ -1129,7 +1129,7 @@ export function KostDetailClient({
               </p>
             </div>
 
-            {kost.allowDirectBooking && (
+            {kost.allowDirectBooking && !kost.isStaffPosted && (
               <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-3.5 text-xs text-emerald-900">
                 <p className="font-bold flex items-center gap-1.5">
                   <ShieldCheck className="h-4 w-4 text-emerald-600" />
@@ -1142,7 +1142,7 @@ export function KostDetailClient({
             )}
 
             <div className="space-y-2.5">
-              {currentUser?.id !== kost.ownerId && (
+              {!kost.isStaffPosted && currentUser?.id !== kost.ownerId && (
                 <Link
                   href={
                     currentUser
@@ -1155,7 +1155,7 @@ export function KostDetailClient({
                   Tanya Pemilik (Chat)
                 </Link>
               )}
-              {kost.showOwnerWhatsapp && kost.ownerPhone && (() => {
+              {(kost.isStaffPosted || kost.showOwnerWhatsapp) && kost.ownerPhone && (() => {
                 const waNumber = toWhatsappDigits(kost.ownerPhone);
                 if (!waNumber) return null;
                 const kostUrl = `${getSiteUrl()}/kost/${kost.id}`;
@@ -1167,14 +1167,18 @@ export function KostDetailClient({
                     href={`https://wa.me/${waNumber}?text=${waText}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 py-2.5 text-sm font-bold text-emerald-800 hover:bg-emerald-100 transition"
+                    className={
+                      kost.isStaffPosted
+                        ? "flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-sm font-extrabold text-white shadow-sm hover:bg-emerald-700 transition"
+                        : "flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 py-2.5 text-sm font-bold text-emerald-800 hover:bg-emerald-100 transition"
+                    }
                   >
-                    <Phone className="h-4 w-4 text-emerald-600" />
-                    Chat Pemilik via WhatsApp
+                    <Phone className={kost.isStaffPosted ? "h-4 w-4 text-white" : "h-4 w-4 text-emerald-600"} />
+                    {kost.isStaffPosted ? "Hubungi Pemilik via WhatsApp" : "Chat Pemilik via WhatsApp"}
                   </a>
                 );
               })()}
-              {currentUser && isKostProperty(kost.propertyCategory) && (
+              {!kost.isStaffPosted && currentUser && isKostProperty(kost.propertyCategory) && (
                 <Link
                   href={`/chat?groupKostId=${kost.id}`}
                   className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 py-2.5 text-xs font-bold text-gray-700 hover:bg-gray-100 transition"
@@ -1198,6 +1202,10 @@ export function KostDetailClient({
               {currentUser?.id === kost.ownerId ? (
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-3.5 text-center text-xs font-bold text-gray-600">
                   Ini adalah properti milik Anda.
+                </div>
+              ) : kost.isStaffPosted ? (
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-[11px] leading-relaxed text-gray-600">
+                  Listing dikurasi tim Keyloka — hubungi pengelola langsung via WhatsApp. Pemilik properti dapat mengklaim listing ini melalui menu opsi (<span className="font-bold text-gray-800">...</span>) untuk mengaktifkan chat &amp; booking online.
                 </div>
               ) : currentUserRole === "PEMILIK_KOST" ? (
                 <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 text-center space-y-2.5">
@@ -1277,7 +1285,7 @@ export function KostDetailClient({
                     <ShieldAlert className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
                     <span>
                       <strong>Peringatan Keamanan:</strong>{" "}
-                      {kost.allowDirectBooking
+                      {kost.allowDirectBooking && !kost.isStaffPosted
                         ? "Dilarang melakukan transfer langsung ke rekening pemilik di luar platform Keyloka. Gunakan pembayaran Escrow resmi agar dana Anda terlindungi."
                         : "Properti ini belum mengaktifkan pembayaran Escrow. Jangan melakukan transfer DP atau sewa langsung ke pemilik di luar platform sebelum survei di lokasi."}
                     </span>
