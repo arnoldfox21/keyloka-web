@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import {
+  formatNotificationTimestamp,
   formatRoleLabel,
   hasDualRoles,
   type NotificationItem,
@@ -487,32 +488,43 @@ function NavbarInner({ user }: NavbarProps) {
                           Belum ada notifikasi.
                         </p>
                       ) : (
-                        notifItems.map((n) => (
-                          <button
-                            key={n.id}
-                            type="button"
-                            onClick={() => handleClickNotifItem(n)}
-                            className={`flex w-full items-start gap-2.5 px-4 py-3 text-left transition ${
-                              n.isRead
-                                ? "bg-white hover:bg-gray-50"
-                                : "bg-emerald-50/40 hover:bg-emerald-50/70"
-                            }`}
-                          >
-                            <span
-                              className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
-                                n.isRead ? "bg-transparent" : "bg-emerald-600"
+                        notifItems.map((n) => {
+                          const ts = formatNotificationTimestamp(n.createdAt);
+                          return (
+                            <button
+                              key={n.id}
+                              type="button"
+                              onClick={() => handleClickNotifItem(n)}
+                              className={`flex w-full items-start gap-2.5 px-4 py-3 text-left transition ${
+                                n.isRead
+                                  ? "bg-white hover:bg-gray-50"
+                                  : "bg-emerald-50/40 hover:bg-emerald-50/70"
                               }`}
-                            />
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-xs font-bold text-gray-900">
-                                {n.title}
-                              </p>
-                              <p className="mt-0.5 line-clamp-2 text-[11px] text-gray-600">
-                                {n.body}
-                              </p>
-                            </div>
-                          </button>
-                        ))
+                            >
+                              <span
+                                className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
+                                  n.isRead ? "bg-transparent" : "bg-emerald-600"
+                                }`}
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-xs font-bold text-gray-900">
+                                  {n.title}
+                                </p>
+                                <p className="mt-0.5 line-clamp-2 text-[11px] text-gray-600">
+                                  {n.body}
+                                </p>
+                                {ts.relative && (
+                                  <p
+                                    suppressHydrationWarning
+                                    className="mt-1 text-[10px] font-medium text-gray-400"
+                                  >
+                                    {ts.relative} • {ts.exact}
+                                  </p>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })
                       )}
                     </div>
                     <Link
