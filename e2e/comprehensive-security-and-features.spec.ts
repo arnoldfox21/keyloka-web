@@ -208,7 +208,9 @@ test.describe("Comprehensive Security, Validation, Chat Spam & Feature Tests", (
 
     await firstCard.click();
     await page
-      .getByRole("button", { name: "Tanyakan Ketersediaan" })
+      .getByRole("button", {
+        name: /Jadwalkan Survei Dulu|Survei & Cek Ketersediaan/,
+      })
       .first()
       .click();
 

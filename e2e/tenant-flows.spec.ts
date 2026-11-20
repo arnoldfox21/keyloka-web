@@ -121,14 +121,14 @@ test.describe("Tenant & Interactive Public Flows", () => {
     await firstCard.click();
 
     const surveyBtn = page
-      .getByRole("button", { name: "Tanyakan Ketersediaan" })
+      .getByRole("button", {
+        name: /Jadwalkan Survei Dulu|Survei & Cek Ketersediaan/,
+      })
       .first();
     await expect(surveyBtn).toBeVisible();
     await surveyBtn.click();
 
-    await expect(
-      page.getByText("Tanya Ketersediaan & Survei"),
-    ).toBeVisible();
+    await expect(page.getByText("Jadwalkan Survei")).toBeVisible();
     const phoneInput = page
       .locator("form")
       .filter({ hasText: "Nomor HP / WhatsApp" })

@@ -1252,7 +1252,7 @@ export function KostDetailClient({
                       onClick={() => openModal("SURVEI")}
                       className="w-full rounded-xl border border-emerald-600 py-3 text-sm font-bold text-emerald-700 hover:bg-emerald-50 transition"
                     >
-                      Tanyakan Ketersediaan
+                      Jadwalkan Survei Dulu
                     </button>
                   </>
                 ) : (
@@ -1268,7 +1268,7 @@ export function KostDetailClient({
                   onClick={() => openModal("SURVEI")}
                   className="w-full rounded-xl bg-emerald-600 py-3.5 text-sm font-extrabold text-white shadow-sm hover:bg-emerald-700 transition"
                 >
-                  Tanyakan Ketersediaan
+                  Survei &amp; Cek Ketersediaan
                 </button>
               )}
               {currentUser?.id !== kost.ownerId && currentUserRole !== "PEMILIK_KOST" && (
@@ -1336,7 +1336,7 @@ export function KostDetailClient({
             <div className="shrink-0 flex items-start justify-between gap-3 border-b border-gray-100 px-4 py-3 sm:px-6 sm:py-4 bg-gray-50/70">
               <div className="min-w-0">
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
-                  {modalMode === "DIRECT" ? "Booking Langsung" : "Tanya Ketersediaan & Survei"}
+                  {modalMode === "DIRECT" ? "Booking Langsung" : "Jadwalkan Survei"}
                 </span>
                 <h3 className="mt-1 truncate text-base font-black text-gray-900">
                   {kost.name}
