@@ -230,10 +230,13 @@ export function OnboardingClient({ user }: OnboardingClientProps) {
                     type="text"
                     value={city}
                     onChange={(e) => handleCitySearch(e.target.value)}
-                    placeholder="Contoh: Malang, Surabaya, Yogyakarta"
+                    placeholder="Contoh: Malang"
                     className="w-full rounded-xl border border-gray-300 py-2.5 pl-10 pr-3 text-sm text-gray-900 outline-none focus:border-emerald-500"
                   />
                 </div>
+                <p className="mt-1 text-[11px] text-gray-500">
+                  Saat ini Keyloka berfokus di area Malang dan sekitarnya (kota lain Coming Soon).
+                </p>
                 {citySuggestions.length > 0 && (
                   <div className="mt-1 rounded-xl border border-gray-200 bg-white shadow-md overflow-hidden">
                     {citySuggestions.map((s) => (

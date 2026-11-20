@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowRight, MapPin, Sparkles } from "lucide-react";
 import { HomeExplorer } from "@/components/HomeExplorer";
 import { JsonLd } from "@/components/JsonLd";
 import { SITE_NAME, getSiteUrl } from "@/lib/seo";
@@ -26,9 +28,12 @@ function parseSewaSlug(rawSlug: string, availableCities: string[]) {
   let categoryLabel = "Hunian";
   let cityParts = parts;
 
+  let dailySub = "ALL_DAILY";
   if (catEntry) {
     propertyCategory = catEntry.apiValue;
     categoryLabel = catEntry.label;
+    if (parts[0] === "villa") dailySub = "VILLA";
+    else if (parts[0] === "homestay") dailySub = "HOMESTAY";
     cityParts = parts.slice(1);
   } else {
     categoryLabel = "Kost & Hunian";
@@ -52,9 +57,15 @@ function parseSewaSlug(rawSlug: string, availableCities: string[]) {
   return {
     slug,
     propertyCategory,
+    dailySub,
     categoryLabel,
     city: matchedCity,
   };
+}
+
+function isSupportedActiveCity(city: string): boolean {
+  if (!city) return true;
+  return city.toLowerCase().includes("malang");
 }
 
 async function fetchFilters(): Promise<KostFilters> {
@@ -79,7 +90,17 @@ export async function generateMetadata({
     return { title: "Hunian Tidak Ditemukan", robots: { index: false, follow: false } };
   }
 
-  const locationText = parsed.city ? ` di ${parsed.city}` : " di Indonesia";
+  if (parsed.city && !isSupportedActiveCity(parsed.city)) {
+    const title = `Sewa ${parsed.categoryLabel} di ${parsed.city} — Coming Soon`;
+    const description = `Layanan pencarian ${parsed.categoryLabel.toLowerCase()} di ${parsed.city} akan segera hadir di ${SITE_NAME}. Saat ini ${SITE_NAME} berfokus melayani area Malang dan sekitarnya.`;
+    return {
+      title,
+      description,
+      robots: { index: false, follow: false },
+    };
+  }
+
+  const locationText = parsed.city ? ` di ${parsed.city}` : " di Malang";
   const title = `Sewa ${parsed.categoryLabel}${locationText} Aman & Terverifikasi`;
   const description = `Temukan pilihan ${parsed.categoryLabel.toLowerCase()}${locationText}. Tanya ketersediaan gratis, survei mudah, dan booking aman dengan sistem Escrow di ${SITE_NAME}.`;
   const canonical = `/sewa/${parsed.slug}`;
@@ -107,6 +128,42 @@ export default async function SewaLandingPage({
   const filters = await fetchFilters();
   const parsed = parseSewaSlug(slug, filters.cities || []);
   if (!parsed) notFound();
+
+  if (parsed.city && !isSupportedActiveCity(parsed.city)) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8">
+        <div className="rounded-3xl border border-emerald-200/80 bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-700 p-8 sm:p-10 text-center text-white shadow-xl">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-extrabold uppercase tracking-wider text-amber-200">
+            <Sparkles className="h-3.5 w-3.5" />
+            Coming Soon
+          </span>
+          <h1 className="mt-4 text-2xl sm:text-3xl font-black tracking-tight">
+            Sewa {parsed.categoryLabel} di {parsed.city} Segera Hadir
+          </h1>
+          <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-emerald-50/90">
+            Saat ini {SITE_NAME} sedang berfokus menghadirkan hunian terverifikasi di area Malang
+            dan sekitarnya. Area {parsed.city} akan segera menyusul dalam ekspansi berikutnya.
+          </p>
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+            <Link
+              href="/sewa/kost-malang"
+              className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-extrabold text-emerald-800 shadow-sm hover:bg-emerald-50 transition"
+            >
+              <MapPin className="h-4 w-4" />
+              Jelajahi Hunian di Malang
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center rounded-2xl border border-white/30 bg-white/10 px-5 py-3 text-sm font-bold text-white hover:bg-white/20 transition"
+            >
+              Kembali ke Beranda
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const qs = new URLSearchParams({
     page: "1",
@@ -150,6 +207,8 @@ export default async function SewaLandingPage({
     ],
   };
 
+  const isDailyStay = parsed.propertyCategory === "HUNIAN_HARIAN";
+
   return (
     <>
       <JsonLd data={breadcrumbJsonLd} />
@@ -157,6 +216,10 @@ export default async function SewaLandingPage({
         initialKosts={kosts}
         initialHasMore={hasMore}
         filters={filters}
+        initialStayMode={isDailyStay ? "HUNIAN_HARIAN" : "LONG_TERM"}
+        initialDailySub={isDailyStay ? parsed.dailySub : "ALL_DAILY"}
+        initialCategory={isDailyStay ? "SEMUA" : parsed.propertyCategory}
+        initialCity={parsed.city || "Semua Kota"}
       />
     </>
   );

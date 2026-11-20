@@ -130,7 +130,7 @@ export default async function BlogPage({
           "@type": "Blog",
           name: `${SITE_NAME} Blog`,
           description:
-            "Tips mencari kost, panduan area kampus, dan informasi hunian sewa di Indonesia.",
+            "Tips mencari kost, panduan area kampus, dan informasi hunian sewa di Malang dan sekitarnya.",
           url: `${siteUrl}/blog`,
         }}
       />
@@ -164,7 +164,7 @@ export default async function BlogPage({
               type="text"
               name="q"
               defaultValue={q}
-              placeholder="Cari artikel (misal: tips kost, UGM, kontrak rumah)..."
+              placeholder="Cari artikel (misal: tips kost, UB Malang, kontrak rumah)..."
               className="w-full rounded-xl bg-white pl-10 pr-4 py-2.5 text-sm text-gray-900 outline-none placeholder:text-gray-400"
             />
           </div>

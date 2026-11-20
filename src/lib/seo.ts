@@ -5,9 +5,16 @@ export const SITE_NAME = "Keyloka";
 export const DEFAULT_SITE_URL = "https://keyloka.com";
 
 export const DEFAULT_DESCRIPTION =
-  "Platform pencarian & booking hunian kost, apartemen, kontrakan, villa, dan homestay dengan transaksi aman, survei terverifikasi, dan poin loyalti.";
+  "Platform pencarian & booking hunian kost, apartemen, kontrakan, villa, dan homestay di Malang dengan transaksi aman, survei terverifikasi, dan poin loyalti.";
 
 export const DEFAULT_KEYWORDS = [
+  "cari kost malang",
+  "sewa kost malang",
+  "kost dekat ub",
+  "kost dekat um",
+  "kontrakan malang",
+  "apartemen malang",
+  "villa malang",
   "cari kost",
   "sewa kost",
   "kost harian",

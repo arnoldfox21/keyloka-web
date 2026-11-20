@@ -31,6 +31,10 @@ interface HomeExplorerProps {
   initialKosts: Kost[];
   initialHasMore: boolean;
   filters: KostFilters;
+  initialStayMode?: "LONG_TERM" | "HUNIAN_HARIAN";
+  initialDailySub?: string;
+  initialCategory?: string;
+  initialCity?: string;
 }
 
 const LONG_TERM_CATEGORIES = [
@@ -47,22 +51,23 @@ const DAILY_SUBCATEGORIES = [
 ];
 
 const TYPES = ["Semua", "Putra", "Putri", "Campur"];
-const DEFAULT_POPULAR_AREAS = [
-  "Jakarta",
-  "Bandung",
-  "Yogyakarta",
-  "Malang",
-  "Surabaya",
-  "Bali",
+const MALANG_POPULAR_AREAS = [
+  "UB",
+  "UM",
+  "UIN",
+  "Polinema",
+  "UMM",
+  "Ijen",
+  "Sawojajar",
 ];
-const POPULAR_AREA_BY_CITY: Record<string, string[]> = {
-  Malang: ["UB", "UM", "UIN", "Polinema", "UMM", "Ijen", "Sawojajar"],
-  Jakarta: ["Kemang", "Kuningan", "Setiabudi", "Menteng", "Tebet", "Senopati"],
-  Bandung: ["Dago", "Setiabudi", "Dipatiukur", "Cihampelas", "Lembang"],
-  Yogyakarta: ["Sleman", "UGM", "Seturan", "Malioboro", "Gejayan"],
-  Surabaya: ["ITS", "Unair", "Gubeng", "Citraland", "Darmo"],
-  Bali: ["Canggu", "Seminyak", "Ubud", "Kuta", "Uluwatu"],
-};
+const DEFAULT_POPULAR_AREAS: Array<{ label: string; comingSoon?: boolean }> = [
+  { label: "Malang" },
+  { label: "Jakarta", comingSoon: true },
+  { label: "Bandung", comingSoon: true },
+  { label: "Yogyakarta", comingSoon: true },
+  { label: "Surabaya", comingSoon: true },
+  { label: "Bali", comingSoon: true },
+];
 
 const HISTORY_KEY = "keyloka_search_history";
 const RECENT_KEY = "keyloka_recently_viewed";
@@ -71,18 +76,22 @@ export function HomeExplorer({
   initialKosts,
   initialHasMore,
   filters,
+  initialStayMode = "LONG_TERM",
+  initialDailySub = "ALL_DAILY",
+  initialCategory = "SEMUA",
+  initialCity = "Semua Kota",
 }: HomeExplorerProps) {
   const router = useRouter();
   const [kosts, setKosts] = useState<Kost[]>(initialKosts);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [page, setPage] = useState(1);
 
-  const [stayMode, setStayMode] = useState<"LONG_TERM" | "HUNIAN_HARIAN">("LONG_TERM");
-  const [dailySub, setDailySub] = useState("ALL_DAILY");
+  const [stayMode, setStayMode] = useState<"LONG_TERM" | "HUNIAN_HARIAN">(initialStayMode);
+  const [dailySub, setDailySub] = useState(initialDailySub);
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("SEMUA");
+  const [category, setCategory] = useState(initialCategory);
   const [type, setType] = useState("Semua");
-  const [city, setCity] = useState("Semua Kota");
+  const [city, setCity] = useState(initialCity);
   const [district, setDistrict] = useState("Semua Area");
   const [sortBy, setSortBy] = useState("recommended");
   const [onlyAvailable, setOnlyAvailable] = useState(false);
@@ -117,6 +126,20 @@ export function HomeExplorer({
     );
     return stat?.districts || [];
   }, [city, filters.cityStats]);
+
+  const cityOptions = useMemo(() => {
+    if (city === "Semua Kota" || filters.cities.includes(city)) {
+      return filters.cities;
+    }
+    return [city, ...filters.cities];
+  }, [city, filters.cities]);
+
+  const popularAreaChips = useMemo(() => {
+    if (city.toLowerCase().includes("malang")) {
+      return MALANG_POPULAR_AREAS.map((label) => ({ label, comingSoon: false }));
+    }
+    return DEFAULT_POPULAR_AREAS;
+  }, [city]);
 
   const compareList = useMemo(
     () => kosts.filter((k) => compareIds.includes(k.id)),
@@ -404,20 +427,35 @@ export function HomeExplorer({
             <Sparkles className="h-3 w-3" />
             Area Populer:
           </span>
-          {(POPULAR_AREA_BY_CITY[city] || DEFAULT_POPULAR_AREAS).map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => {
-                setSearch(tag);
-                saveSearchTerm(tag);
-                fetchList(1, false, { search: tag });
-              }}
-              className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white hover:bg-white/25 transition"
-            >
-              {tag}
-            </button>
-          ))}
+          {popularAreaChips.map((chip) =>
+            chip.comingSoon ? (
+              <button
+                key={chip.label}
+                type="button"
+                disabled
+                title={`${chip.label} — Coming Soon`}
+                className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/60"
+              >
+                <span>{chip.label}</span>
+                <span className="rounded-full bg-amber-400/20 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-amber-200">
+                  Coming Soon
+                </span>
+              </button>
+            ) : (
+              <button
+                key={chip.label}
+                type="button"
+                onClick={() => {
+                  setSearch(chip.label);
+                  saveSearchTerm(chip.label);
+                  fetchList(1, false, { search: chip.label });
+                }}
+                className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white hover:bg-white/25 transition"
+              >
+                {chip.label}
+              </button>
+            ),
+          )}
           {searchHistory.length > 0 && (
             <>
               <span className="ml-2 inline-flex items-center gap-1 text-[11px] font-bold text-emerald-100">
@@ -603,7 +641,7 @@ export function HomeExplorer({
               className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 py-2 pl-3 pr-9 text-xs font-semibold text-gray-800 outline-none focus:border-emerald-500"
             >
               <option value="Semua Kota">Semua Kota</option>
-              {filters.cities.map((c) => (
+              {cityOptions.map((c) => (
                 <option key={c} value={c}>
                   {c}
                 </option>

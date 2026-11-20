@@ -631,7 +631,7 @@ export function WriterStudioClient({
                       onChange={(e) =>
                         setForm((p) => ({ ...p, title: e.target.value }))
                       }
-                      placeholder="Contoh: 7 Tips Memilih Kost Dekat Kampus UGM yang Aman"
+                      placeholder="Contoh: 7 Tips Memilih Kost Dekat Kampus UB Malang yang Aman"
                       className="w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-sm outline-none focus:border-emerald-500"
                     />
                   </div>
@@ -646,7 +646,7 @@ export function WriterStudioClient({
                       onChange={(e) =>
                         setForm((p) => ({ ...p, slug: e.target.value }))
                       }
-                      placeholder="tips-memilih-kost-dekat-ugm"
+                      placeholder="tips-memilih-kost-dekat-ub-malang"
                       className="w-full rounded-xl border border-gray-300 px-3.5 py-2 text-xs outline-none focus:border-emerald-500"
                     />
                   </div>
@@ -680,7 +680,7 @@ export function WriterStudioClient({
                       onChange={(e) =>
                         setForm((p) => ({ ...p, tagsText: e.target.value }))
                       }
-                      placeholder="kost jogja, mahasiswa, tips hemat"
+                      placeholder="kost malang, mahasiswa, tips hemat"
                       className="w-full rounded-xl border border-gray-300 px-3.5 py-2 text-xs outline-none focus:border-emerald-500"
                     />
                   </div>
@@ -695,7 +695,7 @@ export function WriterStudioClient({
                       onChange={(e) =>
                         setForm((p) => ({ ...p, city: e.target.value }))
                       }
-                      placeholder="Contoh: Yogyakarta"
+                      placeholder="Contoh: Malang"
                       className="w-full rounded-xl border border-gray-300 px-3.5 py-2 text-xs outline-none focus:border-emerald-500"
                     />
                   </div>

@@ -46,8 +46,8 @@ export function Footer({ user }: FooterProps) {
             </Link>
             <p className="text-xs leading-relaxed text-slate-400">
               Platform pencarian dan booking kost, apartemen, kontrakan, serta
-              hunian harian yang praktis, transparan, dan terpercaya di
-              Indonesia.
+              hunian harian yang praktis, transparan, dan terpercaya — fokus
+              layanan saat ini di area Malang dan sekitarnya.
             </p>
             <div className="flex flex-wrap gap-2 pt-1">
               <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-300">
