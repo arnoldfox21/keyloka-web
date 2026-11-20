@@ -28,6 +28,7 @@ import {
   Zap,
 } from "lucide-react";
 import { validateWithdrawAccount } from "@/lib/validation";
+import { AdminPlatformPanel } from "./AdminPlatformPanel";
 
 const INDONESIAN_BANKS = [
   "BCA",
@@ -194,7 +195,8 @@ type TabKey =
   | "APPROVAL"
   | "WITHDRAWALS"
   | "USERS"
-  | "ARTICLES";
+  | "ARTICLES"
+  | "PLATFORM";
 
 export function DashboardClient({
   currentUser,
@@ -220,7 +222,7 @@ export function DashboardClient({
   const isAdmin = role === "ADMINISTRATOR";
 
   const validTabs: TabKey[] = isAdmin
-    ? ["PROPERTIES", "DISPUTES", "APPROVAL", "WITHDRAWALS", "USERS", "ARTICLES"]
+    ? ["PROPERTIES", "DISPUTES", "APPROVAL", "WITHDRAWALS", "USERS", "ARTICLES", "PLATFORM"]
     : isStaffOrAdmin
       ? ["PROPERTIES", "DISPUTES", "APPROVAL", "WITHDRAWALS", "USERS"]
       : ["PROPERTIES", "DISPUTES", "FINANCE", "WALLET"];
@@ -1434,7 +1436,12 @@ export function DashboardClient({
           badge: pendingWithdrawCount,
         },
         { key: "USERS", label: "Kelola Pengguna" },
-        ...(isAdmin ? [{ key: "ARTICLES" as TabKey, label: "Moderasi Artikel" }] : []),
+        ...(isAdmin
+          ? [
+              { key: "ARTICLES" as TabKey, label: "Moderasi Artikel" },
+              { key: "PLATFORM" as TabKey, label: "Konfigurasi & Monitor" },
+            ]
+          : []),
       ]
     : [
         { key: "PROPERTIES", label: "Properti Saya", badge: kostsTotal },
@@ -3578,6 +3585,9 @@ export function DashboardClient({
           </div>
         </div>
       )}
+
+      {/* Tab Content: PLATFORM (Admin Config & Monitor) */}
+      {tab === "PLATFORM" && isAdmin && <AdminPlatformPanel />}
 
       {/* Tab Content: ARTICLES (Admin Moderation) */}
       {tab === "ARTICLES" && isAdmin && (() => {

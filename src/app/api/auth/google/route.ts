@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
 import { verifySameOrigin } from "@/lib/request-security";
 import { API_BASE_URL, SESSION_COOKIE_NAME } from "@/lib/server-api";
 
@@ -60,7 +61,10 @@ export async function POST(req: NextRequest) {
       maxAge: 60 * 60 * 24 * 30,
     });
     return response;
-  } catch {
+  } catch (err) {
+    logger.error("AuthGoogle", "Failed to reach auth backend", {
+      error: err instanceof Error ? err.message : String(err),
+    });
     return NextResponse.json(
       { message: "Gagal menghubungi server autentikasi." },
       { status: 500 },

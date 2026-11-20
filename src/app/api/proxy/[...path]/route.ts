@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
 import { checkRateLimit, getClientIp, verifySameOrigin } from "@/lib/request-security";
 import { API_BASE_URL, getServerToken, SESSION_COOKIE_NAME } from "@/lib/server-api";
 
@@ -13,6 +14,7 @@ const ALLOWED_PREFIXES = new Set([
   "chats",
   "auth",
   "notifications",
+  "admin",
 ]);
 
 // Auth mutations that issue/rotate session cookies must go through /api/auth/*
@@ -113,8 +115,25 @@ async function forward(
     init.body = isMultipart ? await req.arrayBuffer() : await req.text();
   }
 
+  const startedAt = Date.now();
   try {
     const res = await fetch(targetUrl, init);
+    const durationMs = Date.now() - startedAt;
+    if (res.status >= 500) {
+      logger.error("ApiProxy", "Upstream API 5xx response", {
+        method: req.method,
+        path: targetPath,
+        status: res.status,
+        durationMs,
+      });
+    } else if (res.status >= 400 && res.status !== 401 && res.status !== 404) {
+      logger.warn("ApiProxy", "Upstream API 4xx response", {
+        method: req.method,
+        path: targetPath,
+        status: res.status,
+        durationMs,
+      });
+    }
     const bodyText = await res.text();
     const response = new NextResponse(bodyText, {
       status: res.status,
@@ -127,12 +146,24 @@ async function forward(
     }
     return response;
   } catch (err) {
+    const durationMs = Date.now() - startedAt;
     if (err instanceof Error && err.name === "TimeoutError") {
+      logger.error("ApiProxy", "Upstream API timeout", {
+        method: req.method,
+        path: targetPath,
+        durationMs,
+      });
       return NextResponse.json(
         { message: "Koneksi ke Keyloka API timeout. Silakan coba lagi." },
         { status: 504 },
       );
     }
+    logger.error("ApiProxy", "Upstream API connection failed", {
+      method: req.method,
+      path: targetPath,
+      durationMs,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return NextResponse.json(
       { message: "Gagal terhubung ke Keyloka API." },
       { status: 502 },
