@@ -1,7 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifySameOrigin } from "@/lib/request-security";
 import { API_BASE_URL, SESSION_COOKIE_NAME } from "@/lib/server-api";
 
 export async function POST(req: NextRequest) {
+  if (!API_BASE_URL) {
+    return NextResponse.json(
+      { message: "Konfigurasi API server belum tersedia." },
+      { status: 500 },
+    );
+  }
+  if (!verifySameOrigin(req)) {
+    return NextResponse.json(
+      { message: "Permintaan lintas situs tidak diizinkan." },
+      { status: 403 },
+    );
+  }
+
   try {
     const body = await req.json();
     const idToken = String(body?.idToken || "").trim();

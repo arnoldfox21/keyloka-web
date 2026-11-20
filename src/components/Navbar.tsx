@@ -72,7 +72,6 @@ export function Navbar({ user }: NavbarProps) {
 
   useEffect(() => {
     if (!user?.id) {
-      setUnreadChatCount(0);
       return;
     }
 
@@ -148,8 +147,6 @@ export function Navbar({ user }: NavbarProps) {
 
   useEffect(() => {
     if (!user?.id) {
-      setUnreadNotifCount(0);
-      setNotifItems([]);
       return;
     }
 

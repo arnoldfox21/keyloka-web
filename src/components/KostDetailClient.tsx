@@ -42,6 +42,10 @@ import {
   type UserProfile,
 } from "@/lib/types";
 import { getSiteUrl } from "@/lib/seo";
+import {
+  normalizeAndValidateIndonesianPhone,
+  toWhatsappDigits,
+} from "@/lib/validation";
 import { KostCard } from "./KostCard";
 
 declare global {
@@ -332,6 +336,16 @@ export function KostDetailClient({
 
   async function handleSubmitClaim(e: React.FormEvent) {
     e.preventDefault();
+    const phoneCheck = normalizeAndValidateIndonesianPhone(claimPhone, {
+      required: true,
+    });
+    if (!phoneCheck.valid) {
+      setClaimFeedback({
+        type: "error",
+        text: phoneCheck.error || "Nomor WhatsApp tidak valid.",
+      });
+      return;
+    }
     setClaiming(true);
     setClaimFeedback(null);
     try {
@@ -340,8 +354,8 @@ export function KostDetailClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           kostId: kost.id,
-          phone: claimPhone,
-          notes: claimNotes,
+          phone: phoneCheck.normalized,
+          notes: claimNotes.trim(),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -366,6 +380,24 @@ export function KostDetailClient({
 
   async function handleSubmitSurvey(e: React.FormEvent) {
     e.preventDefault();
+    if (!tenantName.trim() || tenantName.trim().length < 2) {
+      setFeedback({
+        type: "error",
+        text: "Nama lengkap minimal 2 karakter.",
+      });
+      return;
+    }
+    const phoneCheck = normalizeAndValidateIndonesianPhone(tenantPhone, {
+      required: true,
+      label: "Nomor HP / WhatsApp",
+    });
+    if (!phoneCheck.valid) {
+      setFeedback({
+        type: "error",
+        text: phoneCheck.error || "Nomor HP / WhatsApp tidak valid.",
+      });
+      return;
+    }
     if (!startDate || startDate < minSurveyDate) {
       setFeedback({
         type: "error",
@@ -381,12 +413,12 @@ export function KostDetailClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           kostId: kost.id,
-          tenantName,
-          tenantPhone,
+          tenantName: tenantName.trim(),
+          tenantPhone: phoneCheck.normalized,
           startDate,
           bookingType: "SURVEI",
           surveyDateTime: startDate,
-          notes,
+          notes: notes.trim(),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -428,6 +460,24 @@ export function KostDetailClient({
 
   async function handleSubmitDirect(e: React.FormEvent) {
     e.preventDefault();
+    if (!tenantName.trim() || tenantName.trim().length < 2) {
+      setFeedback({
+        type: "error",
+        text: "Nama lengkap minimal 2 karakter.",
+      });
+      return;
+    }
+    const phoneCheck = normalizeAndValidateIndonesianPhone(tenantPhone, {
+      required: true,
+      label: "Nomor HP / WhatsApp",
+    });
+    if (!phoneCheck.valid) {
+      setFeedback({
+        type: "error",
+        text: phoneCheck.error || "Nomor HP / WhatsApp tidak valid.",
+      });
+      return;
+    }
     if (!startDate || startDate < minSurveyDate) {
       setFeedback({
         type: "error",
@@ -443,12 +493,12 @@ export function KostDetailClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           kostId: kost.id,
-          tenantName,
-          tenantPhone,
+          tenantName: tenantName.trim(),
+          tenantPhone: phoneCheck.normalized,
           startDate,
           durationCount,
           paymentScheme: breakdown.effectiveScheme,
-          notes,
+          notes: notes.trim(),
           usePoints,
         }),
       });
@@ -1084,15 +1134,13 @@ export function KostDetailClient({
                 </Link>
               )}
               {kost.showOwnerWhatsapp && kost.ownerPhone && (() => {
-                const digits = kost.ownerPhone.replace(/\D/g, "");
-                const waNumber = digits.startsWith("0")
-                  ? `62${digits.slice(1)}`
-                  : digits;
+                const waNumber = toWhatsappDigits(kost.ownerPhone);
+                if (!waNumber) return null;
                 const kostUrl = `${getSiteUrl()}/kost/${kost.id}`;
                 const waText = encodeURIComponent(
                   `Halo, saya melihat ${kost.name} (${kost.city}) di platform Keyloka.\nBoleh info ketersediaan dan detail lengkapnya?\n\n${kostUrl}`,
                 );
-                return waNumber ? (
+                return (
                   <a
                     href={`https://wa.me/${waNumber}?text=${waText}`}
                     target="_blank"
@@ -1102,7 +1150,7 @@ export function KostDetailClient({
                     <Phone className="h-4 w-4 text-emerald-600" />
                     Chat Pemilik via WhatsApp
                   </a>
-                ) : null;
+                );
               })()}
               {currentUser && isKostProperty(kost.propertyCategory) && (
                 <Link
@@ -1311,6 +1359,7 @@ export function KostDetailClient({
                       Nomor HP / WhatsApp
                     </label>
                     <input
+                      type="tel"
                       required
                       value={tenantPhone}
                       onChange={(e) => setTenantPhone(e.target.value)}
@@ -1700,6 +1749,7 @@ export function KostDetailClient({
                               Nomor WhatsApp Aktif
                             </label>
                             <input
+                              type="tel"
                               required
                               value={claimPhone}
                               onChange={(e) => setClaimPhone(e.target.value)}

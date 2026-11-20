@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifySameOrigin } from "@/lib/request-security";
 import {
   API_BASE_URL,
   getServerToken,
@@ -10,6 +11,19 @@ export async function forwardAuthRoleMutation(
   backendPath: string,
   fallbackError: string,
 ): Promise<NextResponse> {
+  if (!API_BASE_URL) {
+    return NextResponse.json(
+      { message: "Konfigurasi API server belum tersedia." },
+      { status: 500 },
+    );
+  }
+  if (!verifySameOrigin(req)) {
+    return NextResponse.json(
+      { message: "Permintaan lintas situs tidak diizinkan." },
+      { status: 403 },
+    );
+  }
+
   const token = await getServerToken();
   if (!token) {
     return NextResponse.json(

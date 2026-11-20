@@ -56,7 +56,10 @@ test.describe("Auth & Protected Routes", () => {
     }
 
     await page.goto("/dashboard");
-    await expect(page).toHaveURL(/\/bookings/);
+    await expect(page).toHaveURL(/\/dashboard/);
+    await expect(
+      page.getByText(/Aktifkan Akun Pemilik|Beralih ke Mode Pemilik|Masuk ke Mode Pemilik/i).first(),
+    ).toBeVisible();
 
     expect(pageErrors).toEqual([]);
   });

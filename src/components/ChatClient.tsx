@@ -345,7 +345,6 @@ export function ChatClient({
   // Resolve propertyCategory (if missing) & active booking fallback for owner/staff
   useEffect(() => {
     if (!activeDirect) {
-      setActiveDirectBooking(null);
       return;
     }
     let active = true;

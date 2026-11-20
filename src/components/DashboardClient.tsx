@@ -22,12 +22,12 @@ import {
   Trash2,
   TrendingUp,
   UserCheck,
-  UserPlus,
   Users,
   Wallet,
   XCircle,
   Zap,
 } from "lucide-react";
+import { validateWithdrawAccount } from "@/lib/validation";
 
 const INDONESIAN_BANKS = [
   "BCA",
@@ -95,7 +95,6 @@ import {
   formatRupiah,
   getDisplayPrice,
   type Article,
-  isKostProperty,
   type BoostPackageOption,
   type Booking,
   type Kost,
@@ -642,6 +641,21 @@ export function DashboardClient({
       setNotice({ type: "err", text: "Nama bank wajib diisi." });
       return;
     }
+    const accountCheck = validateWithdrawAccount(accountNumber, withdrawMethod);
+    if (!accountCheck.valid) {
+      setNotice({
+        type: "err",
+        text: accountCheck.error || "Nomor rekening / E-Wallet tidak valid.",
+      });
+      return;
+    }
+    if (!accountHolder.trim() || accountHolder.trim().length < 2) {
+      setNotice({
+        type: "err",
+        text: "Nama pemilik rekening wajib diisi (minimal 2 karakter).",
+      });
+      return;
+    }
     setBusy(true);
     setNotice(null);
     try {
@@ -651,7 +665,7 @@ export function DashboardClient({
         body: JSON.stringify({
           amount,
           bankName: resolvedBankName,
-          accountNumber: accountNumber.trim(),
+          accountNumber: accountCheck.normalized,
           accountHolder: accountHolder.trim(),
         }),
       });

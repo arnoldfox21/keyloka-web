@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import { createElement } from "react";
 import {
   Armchair,
   Bath,
@@ -170,6 +171,8 @@ export function FacilityIcon({
   name: string;
   className?: string;
 }) {
-  const Icon = getFacilityIcon(name);
-  return <Icon className={className} aria-hidden="true" />;
+  return createElement(getFacilityIcon(name), {
+    className,
+    "aria-hidden": true,
+  });
 }

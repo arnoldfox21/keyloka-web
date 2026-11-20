@@ -8,12 +8,16 @@ import {
   ChevronLeft,
   ChevronRight,
   Home,
-  MapPin,
   Phone,
   Sparkles,
   UserCheck,
   Users,
 } from "lucide-react";
+import { CityAutocompleteInput } from "@/components/CityAutocompleteInput";
+import {
+  normalizeAndValidateIndonesianPhone,
+  validateCityName,
+} from "@/lib/validation";
 import type { UserProfile } from "@/lib/types";
 
 interface OnboardingClientProps {
@@ -39,35 +43,23 @@ export function OnboardingClient({ user }: OnboardingClientProps) {
   );
   const [city, setCity] = useState(user.city || "");
   const [phone, setPhone] = useState(user.phone || "");
-  const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleCitySearch(q: string) {
-    setCity(q);
-    if (q.trim().length < 2) {
-      setCitySuggestions([]);
+  async function handleSubmit() {
+    const cityCheck = validateCityName(city, { required: false });
+    if (!cityCheck.valid) {
+      setError(cityCheck.error || "Nama kota tidak valid.");
       return;
     }
-    try {
-      const res = await fetch(
-        `/api/proxy/locations/cities?q=${encodeURIComponent(q.trim())}`,
-      );
-      if (res.ok) {
-        const data = await res.json();
-        const list = Array.isArray(data)
-          ? data.map((item: string | { name?: string }) =>
-              typeof item === "string" ? item : item.name || "",
-            )
-          : [];
-        setCitySuggestions(list.filter(Boolean).slice(0, 6));
-      }
-    } catch {
-      // ignore autocomplete error
+    const phoneCheck = normalizeAndValidateIndonesianPhone(phone, {
+      required: false,
+    });
+    if (!phoneCheck.valid) {
+      setError(phoneCheck.error || "Nomor WhatsApp tidak valid.");
+      return;
     }
-  }
 
-  async function handleSubmit() {
     setSaving(true);
     setError(null);
     try {
@@ -78,8 +70,8 @@ export function OnboardingClient({ user }: OnboardingClientProps) {
           role,
           roles: role === "BOTH" ? ["PENYEWA", "PEMILIK_KOST"] : [role],
           preferredCategory,
-          city: city.trim() || undefined,
-          phone: phone.trim() || undefined,
+          city: cityCheck.normalized || undefined,
+          phone: phoneCheck.normalized || undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -255,36 +247,14 @@ export function OnboardingClient({ user }: OnboardingClientProps) {
                 <label className="block text-xs font-bold text-gray-700 mb-1">
                   Kota Domisili / Pencarian
                 </label>
-                <div className="relative">
-                  <MapPin className="absolute left-3.5 top-3 h-4 w-4 text-gray-400" />
-                  <input
-                    type="text"
-                    value={city}
-                    onChange={(e) => handleCitySearch(e.target.value)}
-                    placeholder="Contoh: Malang"
-                    className="w-full rounded-xl border border-gray-300 py-2.5 pl-10 pr-3 text-sm text-gray-900 outline-none focus:border-emerald-500"
-                  />
-                </div>
+                <CityAutocompleteInput
+                  value={city}
+                  onChange={setCity}
+                  placeholder="Contoh: Kota Malang"
+                />
                 <p className="mt-1 text-[11px] text-gray-500">
                   Saat ini Keyloka berfokus di area Malang dan sekitarnya (kota lain Coming Soon).
                 </p>
-                {citySuggestions.length > 0 && (
-                  <div className="mt-1 rounded-xl border border-gray-200 bg-white shadow-md overflow-hidden">
-                    {citySuggestions.map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => {
-                          setCity(s);
-                          setCitySuggestions([]);
-                        }}
-                        className="block w-full px-3.5 py-2 text-left text-xs font-medium text-gray-700 hover:bg-emerald-50"
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
 
               <div>

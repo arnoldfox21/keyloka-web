@@ -1,15 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifySameOrigin } from "@/lib/request-security";
 import { API_BASE_URL, SESSION_COOKIE_NAME } from "@/lib/server-api";
 
 export async function POST(req: NextRequest) {
+  if (!API_BASE_URL) {
+    return NextResponse.json(
+      { message: "Konfigurasi API server belum tersedia." },
+      { status: 500 },
+    );
+  }
+  if (!verifySameOrigin(req)) {
+    return NextResponse.json(
+      { message: "Permintaan lintas situs tidak diizinkan." },
+      { status: 403 },
+    );
+  }
+
   try {
     const body = await req.json();
-    const email = String(body?.email || "").trim();
+    const email = String(body?.email || "").trim().toLowerCase();
     const password = String(body?.password || "");
 
     if (!email || !password) {
       return NextResponse.json(
         { message: "Email dan password wajib diisi." },
+        { status: 400 },
+      );
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json(
+        { message: "Format email tidak valid." },
         { status: 400 },
       );
     }

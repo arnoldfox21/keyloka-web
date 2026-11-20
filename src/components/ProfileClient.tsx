@@ -14,7 +14,6 @@ import {
   EyeOff,
   KeyRound,
   LayoutDashboard,
-  MapPin,
   Phone,
   Save,
   ShieldAlert,
@@ -23,7 +22,13 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
+import { CityAutocompleteInput } from "./CityAutocompleteInput";
 import { compressImageToDataUrl } from "@/lib/image-compress";
+import {
+  normalizeAndValidateIndonesianPhone,
+  validateCityName,
+  validateUsername,
+} from "@/lib/validation";
 import { formatRoleLabel, formatRupiah, resolveImageUrl, type UserProfile } from "@/lib/types";
 import { RoleActivationPanel } from "./RoleActivationPanel";
 
@@ -146,6 +151,28 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
 
   async function handleSaveProfile(e: React.FormEvent) {
     e.preventDefault();
+    if (!name.trim() || name.trim().length < 2) {
+      setMsg({ type: "err", text: "Nama lengkap minimal 2 karakter." });
+      return;
+    }
+    const usernameCheck = validateUsername(username);
+    if (!usernameCheck.valid) {
+      setMsg({ type: "err", text: usernameCheck.error || "Username tidak valid." });
+      return;
+    }
+    const cityCheck = validateCityName(city, { required: false });
+    if (!cityCheck.valid) {
+      setMsg({ type: "err", text: cityCheck.error || "Nama kota tidak valid." });
+      return;
+    }
+    const phoneCheck = normalizeAndValidateIndonesianPhone(phone, {
+      required: false,
+    });
+    if (!phoneCheck.valid) {
+      setMsg({ type: "err", text: phoneCheck.error || "Nomor WhatsApp tidak valid." });
+      return;
+    }
+
     setSaving(true);
     setMsg(null);
     try {
@@ -154,10 +181,10 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
-          username: username.trim() || undefined,
+          username: usernameCheck.normalized || undefined,
           bio: bio.trim(),
-          city: city.trim(),
-          phone: phone.trim(),
+          city: cityCheck.normalized,
+          phone: phoneCheck.normalized,
           avatarUrl: avatarUrl || undefined,
           coverUrl: coverUrl || undefined,
           showWhatsapp,
@@ -241,6 +268,16 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
 
   async function handleRequestVerification(e: React.FormEvent) {
     e.preventDefault();
+    const phoneCheck = normalizeAndValidateIndonesianPhone(verifyPhone, {
+      required: true,
+    });
+    if (!phoneCheck.valid) {
+      setMsg({
+        type: "err",
+        text: phoneCheck.error || "Nomor WhatsApp verifikasi tidak valid.",
+      });
+      return;
+    }
     setSubmittingVerify(true);
     setMsg(null);
     try {
@@ -248,8 +285,8 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          phone: verifyPhone,
-          notes: verifyNotes,
+          phone: phoneCheck.normalized,
+          notes: verifyNotes.trim(),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -645,16 +682,12 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
               <label className="block text-xs font-bold text-gray-700 mb-1">
                 Kota
               </label>
-              <div className="relative">
-                <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="Malang"
-                  className="w-full rounded-xl border border-gray-300 py-2.5 pl-9 pr-3 text-sm text-gray-900 outline-none focus:border-emerald-500"
-                />
-              </div>
+              <CityAutocompleteInput
+                value={city}
+                onChange={setCity}
+                placeholder="Contoh: Kota Malang"
+                inputClassName="w-full rounded-xl border border-gray-300 py-2.5 pl-9 pr-3 text-sm text-gray-900 outline-none focus:border-emerald-500"
+              />
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1">

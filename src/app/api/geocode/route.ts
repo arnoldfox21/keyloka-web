@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkRateLimit, getClientIp } from "@/lib/request-security";
 
 const NOMINATIM_HEADERS = {
   "User-Agent": "KeylokaWeb/1.0 (https://keyloka.id)",
@@ -548,6 +549,15 @@ async function buildAutoSelectResponse(
 }
 
 export async function GET(request: NextRequest) {
+  const ip = getClientIp(request);
+  const rl = checkRateLimit(`geocode:${ip}`, 30, 60_000);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { message: "Terlalu banyak permintaan pencarian lokasi. Coba lagi sebentar." },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const mode = searchParams.get("mode") || "reverse";
 
@@ -555,6 +565,12 @@ export async function GET(request: NextRequest) {
     const rawQ = (searchParams.get("q") || "").trim();
     if (rawQ.length < 2) {
       return NextResponse.json({ results: [] });
+    }
+    if (rawQ.length > 300) {
+      return NextResponse.json(
+        { message: "Query lokasi terlalu panjang.", results: [] },
+        { status: 400 },
+      );
     }
 
     const rawLat = searchParams.get("lat");

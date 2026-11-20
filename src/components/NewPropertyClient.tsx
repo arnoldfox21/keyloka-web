@@ -17,6 +17,12 @@ import {
 } from "lucide-react";
 import { formatRoleLabel, formatRupiah, resolveImageUrl, type Kost, type UserProfile } from "@/lib/types";
 import { compressImageToDataUrl } from "@/lib/image-compress";
+import {
+  normalizeAndValidateIndonesianPhone,
+  validateCityName,
+  validateDistrictName,
+  validateLatLng,
+} from "@/lib/validation";
 import { KostLocationPicker } from "./KostLocationPicker";
 import { FacilityIcon } from "./FacilityIcon";
 
@@ -289,8 +295,20 @@ export function NewPropertyClient({
       if (!description.trim()) return "Deskripsi properti wajib diisi.";
     }
     if (step === 2) {
-      if (!city.trim() || !district.trim() || !address.trim()) {
-        return "Kota, kecamatan, dan alamat lengkap wajib diisi.";
+      const cityCheck = validateCityName(city, { required: true });
+      if (!cityCheck.valid) {
+        return cityCheck.error || "Kota / Kabupaten wajib diisi dengan benar.";
+      }
+      const districtCheck = validateDistrictName(district, { required: true });
+      if (!districtCheck.valid) {
+        return districtCheck.error || "Kecamatan wajib diisi dengan benar.";
+      }
+      if (!address.trim() || address.trim().length < 5) {
+        return "Alamat lengkap wajib diisi (minimal 5 karakter).";
+      }
+      const coordCheck = validateLatLng(latitude, longitude);
+      if (!coordCheck.valid) {
+        return coordCheck.error || "Koordinat peta tidak valid.";
       }
     }
     if (step === 3) {
@@ -514,8 +532,32 @@ export function NewPropertyClient({
       setError("Nama properti wajib diisi.");
       return;
     }
-    if (!city.trim() || !district.trim() || !address.trim()) {
-      setError("Kota, kecamatan, dan alamat lengkap wajib diisi.");
+    const cityCheck = validateCityName(city, { required: true });
+    if (!cityCheck.valid) {
+      setError(cityCheck.error || "Kota / Kabupaten wajib diisi dengan benar.");
+      return;
+    }
+    const districtCheck = validateDistrictName(district, { required: true });
+    if (!districtCheck.valid) {
+      setError(districtCheck.error || "Kecamatan wajib diisi dengan benar.");
+      return;
+    }
+    if (!address.trim() || address.trim().length < 5) {
+      setError("Alamat lengkap wajib diisi (minimal 5 karakter).");
+      return;
+    }
+    const coordCheck = validateLatLng(latitude, longitude);
+    if (!coordCheck.valid) {
+      setError(coordCheck.error || "Koordinat peta tidak valid.");
+      return;
+    }
+    const phoneInput = ownerPhone.trim() || currentUser.phone || "";
+    const phoneCheck = normalizeAndValidateIndonesianPhone(phoneInput, {
+      required: false,
+      label: "Nomor WhatsApp / Telepon",
+    });
+    if (!phoneCheck.valid) {
+      setError(phoneCheck.error || "Nomor WhatsApp tidak valid.");
       return;
     }
     if (!description.trim()) {
@@ -561,8 +603,8 @@ export function NewPropertyClient({
       setError("Jumlah deposit keamanan wajib diisi lebih dari 0 jika diaktifkan.");
       return;
     }
-    const parsedLat = latitude.trim() ? Number(latitude) : undefined;
-    const parsedLng = longitude.trim() ? Number(longitude) : undefined;
+    const parsedLat = coordCheck.lat;
+    const parsedLng = coordCheck.lng;
 
     const rules = rulesText
       .split(",")
@@ -574,8 +616,8 @@ export function NewPropertyClient({
       ...(isDailyStay ? { unitType } : {}),
       name: name.trim(),
       type: isDailyStay || isKontrakan ? "Campur" : type,
-      city: city.trim(),
-      district: district.trim(),
+      city: cityCheck.normalized,
+      district: districtCheck.normalized,
       address: address.trim(),
       nearbyLandmark: nearbyLandmark.trim() || undefined,
       description: description.trim(),
@@ -598,7 +640,7 @@ export function NewPropertyClient({
       publicFacilities,
       rules,
       ownerName: ownerName.trim() || currentUser.name,
-      ownerPhone: ownerPhone.trim() || currentUser.phone,
+      ownerPhone: phoneCheck.normalized || undefined,
       ...(!isEditMode && isStaffOrAdmin && selectedOwnerId
         ? { ownerId: selectedOwnerId }
         : {}),
@@ -1702,9 +1744,10 @@ export function NewPropertyClient({
               </label>
               <input
                 id="prop-owner-phone"
+                type="tel"
                 value={ownerPhone}
                 onChange={(e) => setOwnerPhone(e.target.value)}
-                placeholder="6281234567890"
+                placeholder="08xxxxxxxxxx"
                 className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
               />
             </div>

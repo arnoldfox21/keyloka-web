@@ -8,10 +8,14 @@ import {
   CheckCircle2,
   Home,
   Loader2,
-  MapPin,
   Phone,
   Sparkles,
 } from "lucide-react";
+import { CityAutocompleteInput } from "./CityAutocompleteInput";
+import {
+  normalizeAndValidateIndonesianPhone,
+  validateCityName,
+} from "@/lib/validation";
 import {
   formatRoleLabel,
   getEffectiveUserRoles,
@@ -80,6 +84,19 @@ export function RoleActivationPanel({
 
   async function handleRegisterOwner(e: React.FormEvent) {
     e.preventDefault();
+    const phoneCheck = normalizeAndValidateIndonesianPhone(phone, {
+      required: true,
+    });
+    if (!phoneCheck.valid) {
+      setError(phoneCheck.error || "Nomor WhatsApp tidak valid.");
+      return;
+    }
+    const cityCheck = validateCityName(city, { required: true });
+    if (!cityCheck.valid) {
+      setError(cityCheck.error || "Kota properti/domisili tidak valid.");
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
@@ -88,8 +105,8 @@ export function RoleActivationPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           role: "PEMILIK_KOST",
-          phone: phone.trim(),
-          city: city.trim(),
+          phone: phoneCheck.normalized,
+          city: cityCheck.normalized,
           switchNow: true,
         }),
       });
@@ -209,17 +226,13 @@ export function RoleActivationPanel({
           <label className="block text-xs font-bold text-gray-700 mb-1">
             Kota Properti / Domisili *
           </label>
-          <div className="relative">
-            <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              required
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              placeholder="Contoh: Kota Malang"
-              className="w-full rounded-xl border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-emerald-500"
-            />
-          </div>
+          <CityAutocompleteInput
+            required
+            value={city}
+            onChange={setCity}
+            placeholder="Contoh: Kota Malang"
+            inputClassName="w-full rounded-xl border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-emerald-500"
+          />
         </div>
       </div>
       {error && (

@@ -89,10 +89,15 @@ export default async function RootLayout({
     ? "https://app.midtrans.com/snap/snap.js"
     : "https://app.sandbox.midtrans.com/snap/snap.js";
   const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || "";
-  const gaId = (process.env.NEXT_PUBLIC_GA_ID || "").trim();
+  const rawGaId = (process.env.NEXT_PUBLIC_GA_ID || "").trim();
+  const gaId = /^G-[A-Z0-9-]+$/i.test(rawGaId) ? rawGaId : "";
 
   return (
-    <html lang="id" className={`${geistSans.variable} h-full antialiased`}>
+    <html
+      lang="id"
+      data-scroll-behavior="smooth"
+      className={`${geistSans.variable} h-full antialiased`}
+    >
       <body className="min-h-full flex flex-col bg-[#F6F7F9] text-gray-900">
         {gaId ? (
           <>
