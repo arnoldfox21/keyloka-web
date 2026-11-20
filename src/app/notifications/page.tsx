@@ -25,5 +25,6 @@ export default async function NotificationsPage() {
     }),
   );
 
-  return <NotificationsClient initialData={initialData} />;
+  const clientKey = `${initialData.total}-${initialData.unreadCount}-${initialData.data?.[0]?.id ?? 0}`;
+  return <NotificationsClient key={clientKey} initialData={initialData} />;
 }

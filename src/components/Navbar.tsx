@@ -52,6 +52,10 @@ function getInitials(name?: string | null): string {
 }
 
 export function Navbar({ user }: NavbarProps) {
+  return <NavbarInner key={user?.id ?? "guest"} user={user} />;
+}
+
+function NavbarInner({ user }: NavbarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -275,6 +279,10 @@ export function Navbar({ user }: NavbarProps) {
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
+    setUnreadChatCount(0);
+    setUnreadNotifCount(0);
+    setNotifItems([]);
+    setNotifOpen(false);
     setMobileOpen(false);
     router.push("/");
     router.refresh();

@@ -2003,7 +2003,7 @@ export function DashboardClient({
                         {b.kost?.name || `Properti #${b.kostId}`}
                       </h3>
                       <p className="text-xs text-gray-600">
-                        Penyewa: <span className="font-bold">{b.tenantName}</span> ({b.tenantPhone}) • Mulai {b.startDate}
+                        Penyewa: <span className="font-bold">{b.tenantName}</span> ({b.tenantPhone}) • Mulai {b.surveyDateTime || b.startDate}
                       </p>
                     </div>
                     {b.totalAmount > 0 && (

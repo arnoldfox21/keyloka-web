@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   Calendar,
   CheckCircle2,
+  Clock,
   Edit3,
   ExternalLink,
   Flag,
@@ -133,6 +134,7 @@ export function KostDetailClient({
   const [tenantName, setTenantName] = useState(currentUser?.name || "");
   const [tenantPhone, setTenantPhone] = useState(currentUser?.phone || "");
   const [startDate, setStartDate] = useState(minSurveyDate);
+  const [bookingTime, setBookingTime] = useState("10:00");
   const [durationCount, setDurationCount] = useState(1);
   const [paymentScheme, setPaymentScheme] = useState<"FULL" | "DP">("FULL");
   const [usePoints, setUsePoints] = useState(false);
@@ -293,6 +295,7 @@ export function KostDetailClient({
       return;
     }
     setFeedback(null);
+    setBookingTime(mode === "DIRECT" ? "14:00" : "10:00");
     setModalMode(mode);
   }
 
@@ -405,6 +408,14 @@ export function KostDetailClient({
       });
       return;
     }
+    if (!bookingTime) {
+      setFeedback({
+        type: "error",
+        text: "Harap pilih jam survei.",
+      });
+      return;
+    }
+    const scheduleLabel = `${startDate} ${bookingTime} WIB`;
     setSubmitting(true);
     setFeedback(null);
     try {
@@ -417,7 +428,8 @@ export function KostDetailClient({
           tenantPhone: phoneCheck.normalized,
           startDate,
           bookingType: "SURVEI",
-          surveyDateTime: startDate,
+          surveyTime: bookingTime,
+          surveyDateTime: scheduleLabel,
           notes: notes.trim(),
         }),
       });
@@ -485,6 +497,14 @@ export function KostDetailClient({
       });
       return;
     }
+    if (!bookingTime) {
+      setFeedback({
+        type: "error",
+        text: "Harap pilih perkiraan jam check-in.",
+      });
+      return;
+    }
+    const scheduleLabel = `${startDate} ${bookingTime} WIB`;
     setSubmitting(true);
     setFeedback(null);
     try {
@@ -496,6 +516,8 @@ export function KostDetailClient({
           tenantName: tenantName.trim(),
           tenantPhone: phoneCheck.normalized,
           startDate,
+          checkInTime: bookingTime,
+          surveyDateTime: scheduleLabel,
           durationCount,
           paymentScheme: breakdown.effectiveScheme,
           notes: notes.trim(),
@@ -1369,12 +1391,12 @@ export function KostDetailClient({
                   </div>
                 </div>
 
-                <div className={`grid gap-3 ${modalMode === "DIRECT" ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
                       {modalMode === "DIRECT"
                         ? "Tanggal Mulai Masuk"
-                        : "Rencana Tanggal Masuk / Survei"}
+                        : "Rencana Tanggal Survei"}
                     </label>
                     <div className="relative">
                       <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -1389,41 +1411,59 @@ export function KostDetailClient({
                     </div>
                   </div>
 
-                  {modalMode === "DIRECT" && (
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">
-                        Durasi ({isDaily ? "Hari" : isYearly ? "Tahun" : "Bulan"})
-                      </label>
-                      <div className="flex h-[42px] items-center justify-between rounded-xl border border-gray-200 bg-white px-2">
-                        <button
-                          type="button"
-                          aria-label="Kurangi durasi"
-                          disabled={durationCount <= 1}
-                          onClick={() =>
-                            setDurationCount((d) => Math.max(1, d - 1))
-                          }
-                          className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-base font-bold text-gray-700 transition hover:bg-gray-200 disabled:opacity-40"
-                        >
-                          −
-                        </button>
-                        <span className="text-sm font-bold text-gray-900">
-                          {durationCount} {isDaily ? "Hari" : isYearly ? "Tahun" : "Bulan"}
-                        </span>
-                        <button
-                          type="button"
-                          aria-label="Tambah durasi"
-                          disabled={durationCount >= maxDuration}
-                          onClick={() =>
-                            setDurationCount((d) => Math.min(maxDuration, d + 1))
-                          }
-                          className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-base font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-40"
-                        >
-                          +
-                        </button>
-                      </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      {modalMode === "DIRECT"
+                        ? "Perkiraan Jam Check-In (WIB)"
+                        : "Jam Survei (WIB)"}
+                    </label>
+                    <div className="relative">
+                      <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        type="time"
+                        required
+                        value={bookingTime}
+                        onChange={(e) => setBookingTime(e.target.value)}
+                        className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-3 text-sm focus:border-emerald-500 focus:outline-none"
+                      />
                     </div>
-                  )}
+                  </div>
                 </div>
+
+                {modalMode === "DIRECT" && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Durasi ({isDaily ? "Hari" : isYearly ? "Tahun" : "Bulan"})
+                    </label>
+                    <div className="flex h-[42px] items-center justify-between rounded-xl border border-gray-200 bg-white px-2">
+                      <button
+                        type="button"
+                        aria-label="Kurangi durasi"
+                        disabled={durationCount <= 1}
+                        onClick={() =>
+                          setDurationCount((d) => Math.max(1, d - 1))
+                        }
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-base font-bold text-gray-700 transition hover:bg-gray-200 disabled:opacity-40"
+                      >
+                        −
+                      </button>
+                      <span className="text-sm font-bold text-gray-900">
+                        {durationCount} {isDaily ? "Hari" : isYearly ? "Tahun" : "Bulan"}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label="Tambah durasi"
+                        disabled={durationCount >= maxDuration}
+                        onClick={() =>
+                          setDurationCount((d) => Math.min(maxDuration, d + 1))
+                        }
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-base font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-40"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {modalMode === "DIRECT" && (
                   <>
