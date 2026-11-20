@@ -71,6 +71,21 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
   );
   const [submittingVerify, setSubmittingVerify] = useState(false);
 
+  // Account deletion confirmation modal state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [loadingDeleteSummary, setLoadingDeleteSummary] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteSummary, setDeleteSummary] = useState<{
+    kostCount: number;
+    articleCount: number;
+    postCount: number;
+    bookingCount: number;
+    reviewCount: number;
+    favoriteCount: number;
+    payoutBalance: number;
+    creditBalance: number;
+  } | null>(null);
+
   const role = (user.role || "").toUpperCase();
   const isStaffOrAdmin = role === "STAFF" || role === "ADMINISTRATOR";
   const isOwnerOrAdmin = role === "PEMILIK_KOST" || isStaffOrAdmin;
@@ -243,19 +258,31 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
     }
   }
 
-  async function handleDeleteAccount() {
-    if (
-      !window.confirm(
-        "Apakah Anda yakin ingin menghapus akun secara permanen? Tindakan ini tidak dapat dibatalkan.",
-      )
-    ) {
-      return;
+  async function openDeleteAccountModal() {
+    setDeleteModalOpen(true);
+    setLoadingDeleteSummary(true);
+    setDeleteSummary(null);
+    try {
+      const res = await fetch("/api/proxy/auth/users/me/deletion-summary");
+      if (res.ok) {
+        const data = await res.json();
+        setDeleteSummary(data);
+      }
+    } catch {
+      // Tetap tampilkan modal peringatan meskipun ringkasan gagal dimuat
+    } finally {
+      setLoadingDeleteSummary(false);
     }
+  }
+
+  async function handleConfirmDeleteAccount() {
+    setDeletingAccount(true);
     try {
       const res = await fetch("/api/proxy/auth/users/me", { method: "DELETE" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setMsg({ type: "err", text: data?.message || "Gagal menghapus akun." });
+        setDeleteModalOpen(false);
         return;
       }
       await fetch("/api/auth/logout", { method: "POST" });
@@ -263,6 +290,9 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
       router.refresh();
     } catch {
       setMsg({ type: "err", text: "Gagal terhubung ke server." });
+      setDeleteModalOpen(false);
+    } finally {
+      setDeletingAccount(false);
     }
   }
 
@@ -874,11 +904,11 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
               <h2 className="text-base font-extrabold">Zona Berbahaya</h2>
             </div>
             <p className="text-xs text-red-600">
-              Menghapus akun akan menghapus profil dan akses Anda secara permanen.
+              Menghapus akun akan menghapus profil, foto, dan seluruh data terkait Anda secara permanen.
             </p>
             <button
               type="button"
-              onClick={handleDeleteAccount}
+              onClick={openDeleteAccountModal}
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-red-300 bg-white py-2 text-xs font-bold text-red-600 hover:bg-red-100"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -887,6 +917,104 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
           </div>
         </div>
       </div>
+
+      {deleteModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-account-title"
+        >
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl space-y-4">
+            <div className="flex items-center gap-2.5 text-red-700">
+              <ShieldAlert className="h-6 w-6 shrink-0" />
+              <h3 id="delete-account-title" className="text-lg font-extrabold">
+                Hapus Akun Permanen?
+              </h3>
+            </div>
+            <p className="text-xs leading-relaxed text-gray-600">
+              Tindakan ini <strong>tidak dapat dibatalkan</strong>. Seluruh foto profil, riwayat chat, notifikasi, dan data akun Anda akan dihapus permanen.
+            </p>
+
+            {loadingDeleteSummary ? (
+              <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3.5 text-xs text-gray-500">
+                Memeriksa data terkait akun Anda...
+              </div>
+            ) : deleteSummary &&
+              (deleteSummary.kostCount > 0 ||
+                deleteSummary.articleCount > 0 ||
+                deleteSummary.postCount > 0 ||
+                deleteSummary.bookingCount > 0 ||
+                deleteSummary.reviewCount > 0 ||
+                deleteSummary.payoutBalance > 0 ||
+                deleteSummary.creditBalance > 0) ? (
+              <div className="rounded-2xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-800 space-y-1.5">
+                <p className="font-bold">
+                  Peringatan! Data terkait berikut juga akan ikut terhapus permanen:
+                </p>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  {deleteSummary.kostCount > 0 && (
+                    <li>
+                      <strong>{deleteSummary.kostCount} properti</strong> beserta seluruh foto dan ulasannya
+                    </li>
+                  )}
+                  {deleteSummary.articleCount > 0 && (
+                    <li>
+                      <strong>{deleteSummary.articleCount} artikel</strong> beserta seluruh gambar terkait
+                    </li>
+                  )}
+                  {deleteSummary.postCount > 0 && (
+                    <li>
+                      <strong>{deleteSummary.postCount} postingan</strong> beserta foto &amp; komentarnya
+                    </li>
+                  )}
+                  {deleteSummary.bookingCount > 0 && (
+                    <li>
+                      <strong>{deleteSummary.bookingCount} riwayat booking / survei</strong>
+                    </li>
+                  )}
+                  {deleteSummary.reviewCount > 0 && (
+                    <li>
+                      <strong>{deleteSummary.reviewCount} ulasan</strong> yang pernah Anda tulis
+                    </li>
+                  )}
+                  {deleteSummary.payoutBalance > 0 && (
+                    <li>
+                      Sisa saldo penghasilan{" "}
+                      <strong>{formatRupiah(deleteSummary.payoutBalance)}</strong> (tarik dana terlebih dahulu sebelum menghapus akun!)
+                    </li>
+                  )}
+                  {deleteSummary.creditBalance > 0 && (
+                    <li>
+                      Sisa kredit iklan{" "}
+                      <strong>{formatRupiah(deleteSummary.creditBalance)}</strong>
+                    </li>
+                  )}
+                </ul>
+              </div>
+            ) : null}
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                disabled={deletingAccount}
+                onClick={() => setDeleteModalOpen(false)}
+                className="rounded-xl border border-gray-300 px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={deletingAccount}
+                onClick={handleConfirmDeleteAccount}
+                className="rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deletingAccount ? "Menghapus..." : "Ya, Hapus Akun & Semua Data"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -91,7 +91,8 @@ export function WriterStudioClient({
   const [form, setForm] = useState<ArticleFormState>(EMPTY_FORM);
   const [editorMode, setEditorMode] = useState<"EDIT" | "PREVIEW">("EDIT");
   const [saving, setSaving] = useState(false);
-  const [uploadingCover, setUploadingCover] = useState(false);
+  const [pendingCoverFile, setPendingCoverFile] = useState<File | null>(null);
+  const [pendingCoverPreview, setPendingCoverPreview] = useState("");
   const [feedback, setFeedback] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
   const qLower = searchQuery.trim().toLowerCase();
@@ -105,13 +106,23 @@ export function WriterStudioClient({
       .includes(qLower);
   });
 
+  function clearPendingCover() {
+    if (pendingCoverPreview) {
+      URL.revokeObjectURL(pendingCoverPreview);
+    }
+    setPendingCoverFile(null);
+    setPendingCoverPreview("");
+  }
+
   function startNewArticle() {
+    clearPendingCover();
     setForm(EMPTY_FORM);
     setEditorMode("EDIT");
     setFeedback(null);
   }
 
   function loadArticleIntoForm(article: Article) {
+    clearPendingCover();
     setForm({
       id: article.id,
       title: article.title,
@@ -131,35 +142,17 @@ export function WriterStudioClient({
     setFeedback(null);
   }
 
-  async function handleCoverUpload(file: File | null) {
+  function handleSelectCover(file: File | null) {
     if (!file) return;
-    setUploadingCover(true);
-    setFeedback(null);
-    try {
-      const { dataUrl: base64 } = await compressImageToDataUrl(file, {
-        maxDimension: 1400,
-        quality: 0.82,
-      });
-      const res = await fetch("/api/proxy/articles/upload-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ base64 }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.message || "Gagal mengunggah gambar cover.");
-      }
-      const data = await res.json();
-      setForm((prev) => ({ ...prev, coverImageUrl: data.url }));
-      setFeedback({ type: "ok", text: "Gambar cover berhasil diunggah." });
-    } catch (err) {
-      setFeedback({
-        type: "err",
-        text: err instanceof Error ? err.message : "Gagal mengunggah gambar.",
-      });
-    } finally {
-      setUploadingCover(false);
+    if (pendingCoverPreview) {
+      URL.revokeObjectURL(pendingCoverPreview);
     }
+    setPendingCoverFile(file);
+    setPendingCoverPreview(URL.createObjectURL(file));
+    setFeedback({
+      type: "ok",
+      text: "Gambar cover siap dan akan diunggah saat artikel disimpan.",
+    });
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -172,25 +165,44 @@ export function WriterStudioClient({
     setSaving(true);
     setFeedback(null);
 
-    const payload = {
-      title: form.title.trim(),
-      slug: form.slug.trim() || undefined,
-      excerpt: form.excerpt.trim() || undefined,
-      contentHtml: form.contentHtml,
-      coverImageUrl: form.coverImageUrl.trim() || null,
-      category: form.category,
-      tags: form.tagsText
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean),
-      city: form.city.trim(),
-      metaTitle: form.metaTitle.trim() || undefined,
-      metaDescription: form.metaDescription.trim() || undefined,
-      status: form.status,
-      isFeatured: form.isFeatured,
-    };
-
     try {
+      let resolvedCoverUrl = form.coverImageUrl.trim() || null;
+      if (pendingCoverFile) {
+        const { dataUrl: base64 } = await compressImageToDataUrl(pendingCoverFile, {
+          maxDimension: 1400,
+          quality: 0.82,
+        });
+        const upRes = await fetch("/api/proxy/articles/upload-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ base64 }),
+        });
+        if (!upRes.ok) {
+          const err = await upRes.json().catch(() => ({}));
+          throw new Error(err?.message || "Gagal mengunggah gambar cover.");
+        }
+        const upData = await upRes.json();
+        resolvedCoverUrl = upData.url;
+      }
+
+      const payload = {
+        title: form.title.trim(),
+        slug: form.slug.trim() || undefined,
+        excerpt: form.excerpt.trim() || undefined,
+        contentHtml: form.contentHtml,
+        coverImageUrl: resolvedCoverUrl,
+        category: form.category,
+        tags: form.tagsText
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean),
+        city: form.city.trim(),
+        metaTitle: form.metaTitle.trim() || undefined,
+        metaDescription: form.metaDescription.trim() || undefined,
+        status: form.status,
+        isFeatured: form.isFeatured,
+      };
+
       const isEdit = Boolean(form.id);
       const res = await fetch(
         isEdit ? `/api/proxy/articles/${form.id}` : "/api/proxy/articles",
@@ -602,10 +614,10 @@ export function WriterStudioClient({
                 <h1 className="text-2xl font-extrabold text-gray-900">
                   {form.title || "(Belum ada judul)"}
                 </h1>
-                {form.coverImageUrl && (
+                {(pendingCoverPreview || form.coverImageUrl) && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={resolveImageUrl(form.coverImageUrl)}
+                    src={pendingCoverPreview || resolveImageUrl(form.coverImageUrl)}
                     alt={form.title}
                     className="max-h-72 w-full rounded-2xl object-cover"
                   />
@@ -717,18 +729,30 @@ export function WriterStudioClient({
                     />
                     <label className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100">
                       <ImagePlus className="h-4 w-4" />
-                      {uploadingCover ? "Mengunggah..." : "Upload Cover"}
+                      {pendingCoverFile ? "Ganti Cover" : "Pilih Cover"}
                       <input
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
-                        disabled={uploadingCover}
                         className="hidden"
-                        onChange={(e) =>
-                          handleCoverUpload(e.target.files?.[0] || null)
-                        }
+                        onChange={(e) => {
+                          handleSelectCover(e.target.files?.[0] || null);
+                          e.target.value = "";
+                        }}
                       />
                     </label>
                   </div>
+                  {pendingCoverPreview && (
+                    <div className="mt-2 flex items-center gap-2 text-xs text-emerald-700">
+                      <span>Cover siap diunggah saat artikel disimpan.</span>
+                      <button
+                        type="button"
+                        onClick={clearPendingCover}
+                        className="font-bold text-red-600 hover:underline"
+                      >
+                        Batalkan
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div>

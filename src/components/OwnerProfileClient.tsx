@@ -44,7 +44,8 @@ export function OwnerProfileClient({
   const [showComposer, setShowComposer] = useState(false);
   const [content, setContent] = useState("");
   const [linkedKostId, setLinkedKostId] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
+  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
+  const [pendingImagePreview, setPendingImagePreview] = useState("");
   const [posting, setPosting] = useState(false);
 
   const isSelf = currentUser?.id === owner.id;
@@ -60,22 +61,23 @@ export function OwnerProfileClient({
         ).toFixed(1)
       : "0.0";
 
-  async function handleUploadPostImage(e: React.ChangeEvent<HTMLInputElement>) {
+  function clearPendingImage() {
+    if (pendingImagePreview) {
+      URL.revokeObjectURL(pendingImagePreview);
+    }
+    setPendingImageFile(null);
+    setPendingImagePreview("");
+  }
+
+  function handleSelectPostImage(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
-    const { dataUrl, mimeType } = await compressImageToDataUrl(file);
-    const res = await fetch("/api/proxy/kosts/upload-image", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        base64: dataUrl,
-        filename: file.name,
-        mimeType,
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    const uploadedUrl = data?.url || data?.path;
-    if (res.ok && uploadedUrl) setImageUrl(uploadedUrl);
+    if (pendingImagePreview) {
+      URL.revokeObjectURL(pendingImagePreview);
+    }
+    setPendingImageFile(file);
+    setPendingImagePreview(URL.createObjectURL(file));
   }
 
   async function handleCreatePost(e: React.FormEvent) {
@@ -83,12 +85,31 @@ export function OwnerProfileClient({
     if (!content.trim()) return;
     setPosting(true);
     try {
+      let uploadedImageUrl: string | undefined;
+      if (pendingImageFile) {
+        const { dataUrl, mimeType } = await compressImageToDataUrl(pendingImageFile);
+        const upRes = await fetch("/api/proxy/kosts/upload-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            base64: dataUrl,
+            filename: pendingImageFile.name,
+            mimeType,
+          }),
+        });
+        const upData = await upRes.json().catch(() => ({}));
+        if (!upRes.ok || !(upData?.url || upData?.path)) {
+          return;
+        }
+        uploadedImageUrl = upData.url || upData.path;
+      }
+
       const res = await fetch("/api/proxy/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           content: content.trim(),
-          imageUrl: imageUrl || undefined,
+          imageUrl: uploadedImageUrl,
           kostId: linkedKostId ? Number(linkedKostId) : undefined,
         }),
       });
@@ -96,7 +117,7 @@ export function OwnerProfileClient({
       if (res.ok) {
         setPosts((prev) => [data, ...prev]);
         setContent("");
-        setImageUrl("");
+        clearPendingImage();
         setLinkedKostId("");
         setShowComposer(false);
       }
@@ -281,14 +302,32 @@ export function OwnerProfileClient({
             </select>
 
             <label className="cursor-pointer rounded-xl border border-gray-300 px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50">
-              {imageUrl ? "Foto Terlampir ✓" : "Upload Foto (Opsional)"}
+              {pendingImageFile ? "Foto Dipilih ✓" : "Pilih Foto (Opsional)"}
               <input
                 type="file"
                 accept="image/*"
                 className="hidden"
-                onChange={handleUploadPostImage}
+                onChange={handleSelectPostImage}
               />
             </label>
+
+            {pendingImagePreview && (
+              <div className="flex items-center gap-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={pendingImagePreview}
+                  alt="Preview foto postingan"
+                  className="h-9 w-9 rounded-lg object-cover border border-gray-200"
+                />
+                <button
+                  type="button"
+                  onClick={clearPendingImage}
+                  className="text-xs font-semibold text-red-600 hover:underline"
+                >
+                  Hapus
+                </button>
+              </div>
+            )}
 
             <button
               type="submit"
