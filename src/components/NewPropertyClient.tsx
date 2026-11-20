@@ -15,7 +15,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { formatRupiah, resolveImageUrl, type Kost, type UserProfile } from "@/lib/types";
+import { formatRoleLabel, formatRupiah, resolveImageUrl, type Kost, type UserProfile } from "@/lib/types";
 import { compressImageToDataUrl } from "@/lib/image-compress";
 import { KostLocationPicker } from "./KostLocationPicker";
 import { FacilityIcon } from "./FacilityIcon";
@@ -1665,7 +1665,7 @@ export function NewPropertyClient({
                       <div className="min-w-0">
                         <p className="truncate font-bold text-gray-900">{u.name}</p>
                         <p className="truncate text-[11px] text-gray-500">
-                          {u.email} • {u.role}
+                          {u.email} • {formatRoleLabel(u.role)}
                         </p>
                       </div>
                       <span className="shrink-0 text-[11px] font-bold text-blue-700">

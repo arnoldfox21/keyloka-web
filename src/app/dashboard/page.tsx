@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { DashboardClient } from "@/components/DashboardClient";
+import { RoleActivationPanel } from "@/components/RoleActivationPanel";
 import { privatePageMetadata } from "@/lib/seo";
 import { getServerToken, serverFetch } from "@/lib/server-api";
-import type { Booking, Kost, UserProfile } from "@/lib/types";
+import { getEffectiveUserRoles, type Booking, type Kost, type UserProfile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = privatePageMetadata("Dashboard");
@@ -32,6 +33,16 @@ export default async function DashboardPage({
   const isStaffOrAdmin = role === "STAFF" || role === "ADMINISTRATOR";
   const canAccess = role === "PEMILIK_KOST" || isStaffOrAdmin;
   if (!canAccess) {
+    if (role === "PENYEWA") {
+      const hasOwnerRole = getEffectiveUserRoles(user).includes("PEMILIK_KOST");
+      return (
+        <RoleActivationPanel
+          user={user}
+          variant={hasOwnerRole ? "switch-to-owner-page" : "become-owner-page"}
+          redirectAfterOwner="/dashboard"
+        />
+      );
+    }
     redirect("/bookings");
   }
 

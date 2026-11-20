@@ -34,6 +34,7 @@ import {
   formatCategoryLabel,
   formatRupiah,
   getDisplayPrice,
+  hasDualRoles,
   isKostProperty,
   resolveImageUrl,
   type Kost,
@@ -289,6 +290,38 @@ export function KostDetailClient({
     }
     setFeedback(null);
     setModalMode(mode);
+  }
+
+  const [switchingToTenant, setSwitchingToTenant] = useState(false);
+  const [switchRoleError, setSwitchRoleError] = useState<string | null>(null);
+
+  async function handleEnterTenantMode() {
+    if (!currentUser || switchingToTenant) return;
+    setSwitchingToTenant(true);
+    setSwitchRoleError(null);
+    try {
+      const endpoint = hasDualRoles(currentUser)
+        ? "/api/auth/switch-role"
+        : "/api/auth/register-role";
+      const body = hasDualRoles(currentUser)
+        ? { role: "PENYEWA" }
+        : { role: "PENYEWA", switchNow: true };
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        router.refresh();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setSwitchRoleError(data?.message || "Gagal beralih ke Mode Penyewa.");
+      }
+    } catch {
+      setSwitchRoleError("Gagal terhubung ke server.");
+    } finally {
+      setSwitchingToTenant(false);
+    }
   }
 
   function openPropertyActionModal() {
@@ -1097,8 +1130,27 @@ export function KostDetailClient({
                   Ini adalah properti milik Anda.
                 </div>
               ) : currentUserRole === "PEMILIK_KOST" ? (
-                <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 text-center text-xs font-semibold text-amber-900">
-                  Akun Pemilik Properti tidak dapat melakukan booking atau tanya ketersediaan. Gunakan akun Penyewa untuk memesan hunian.
+                <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 text-center space-y-2.5">
+                  <p className="text-xs font-semibold text-amber-900">
+                    Anda sedang berada di <strong>Mode Pemilik</strong>. Beralih ke Mode Penyewa untuk melakukan booking atau tanya ketersediaan.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={switchingToTenant}
+                    onClick={handleEnterTenantMode}
+                    className="w-full rounded-xl bg-emerald-600 py-2.5 text-xs font-extrabold text-white hover:bg-emerald-700 disabled:opacity-60 transition"
+                  >
+                    {switchingToTenant
+                      ? "Mengaktifkan Mode Penyewa..."
+                      : hasDualRoles(currentUser)
+                        ? "Beralih ke Mode Penyewa"
+                        : "Aktifkan Mode Penyewa untuk Booking"}
+                  </button>
+                  {switchRoleError && (
+                    <p className="text-[11px] font-semibold text-red-600">
+                      {switchRoleError}
+                    </p>
+                  )}
                 </div>
               ) : activeBookingStatus ? (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-center space-y-2">

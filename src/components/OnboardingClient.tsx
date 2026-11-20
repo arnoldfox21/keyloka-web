@@ -12,6 +12,7 @@ import {
   Phone,
   Sparkles,
   UserCheck,
+  Users,
 } from "lucide-react";
 import type { UserProfile } from "@/lib/types";
 
@@ -30,7 +31,7 @@ const CATEGORIES = [
 export function OnboardingClient({ user }: OnboardingClientProps) {
   const router = useRouter();
   const [step, setStep] = useState(1);
-  const [role, setRole] = useState<"PENYEWA" | "PEMILIK_KOST">(
+  const [role, setRole] = useState<"PENYEWA" | "PEMILIK_KOST" | "BOTH">(
     user.role === "PEMILIK_KOST" ? "PEMILIK_KOST" : "PENYEWA",
   );
   const [preferredCategory, setPreferredCategory] = useState(
@@ -70,11 +71,12 @@ export function OnboardingClient({ user }: OnboardingClientProps) {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch("/api/proxy/auth/onboarding", {
+      const res = await fetch("/api/auth/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           role,
+          roles: role === "BOTH" ? ["PENYEWA", "PEMILIK_KOST"] : [role],
           preferredCategory,
           city: city.trim() || undefined,
           phone: phone.trim() || undefined,
@@ -86,7 +88,11 @@ export function OnboardingClient({ user }: OnboardingClientProps) {
         setSaving(false);
         return;
       }
-      router.push(role === "PEMILIK_KOST" ? "/dashboard" : "/");
+      if (role === "BOTH") {
+        router.push("/choose-role");
+      } else {
+        router.push(role === "PEMILIK_KOST" ? "/dashboard" : "/");
+      }
       router.refresh();
     } catch {
       setError("Gagal terhubung ke server.");
@@ -170,6 +176,31 @@ export function OnboardingClient({ user }: OnboardingClientProps) {
                   </p>
                 </div>
                 {role === "PEMILIK_KOST" && (
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setRole("BOTH")}
+                className={`flex items-start gap-3.5 rounded-2xl border p-4 text-left transition ${
+                  role === "BOTH"
+                    ? "border-emerald-600 bg-emerald-50/70 ring-2 ring-emerald-500/20"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <div className="rounded-xl bg-teal-100 p-2.5 text-teal-700">
+                  <Users className="h-5 w-5" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-gray-900">
+                    Keduanya (Penyewa &amp; Pemilik)
+                  </p>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    Daftar di kedua peran sekaligus agar bisa mencari hunian sekaligus memasarkan properti.
+                  </p>
+                </div>
+                {role === "BOTH" && (
                   <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
                 )}
               </button>

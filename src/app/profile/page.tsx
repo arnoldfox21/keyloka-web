@@ -25,5 +25,10 @@ export default async function ProfilePage() {
     redirect("/login");
   }
 
-  return <ProfileClient initialUser={user} />;
+  return (
+    <ProfileClient
+      key={`${user.role}-${(user.roles || []).join(",")}`}
+      initialUser={user}
+    />
+  );
 }

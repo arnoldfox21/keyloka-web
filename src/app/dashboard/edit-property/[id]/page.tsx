@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { privatePageMetadata } from "@/lib/seo";
 import { getServerToken, serverFetch } from "@/lib/server-api";
-import type { Kost, UserProfile } from "@/lib/types";
+import { getEffectiveUserRoles, type Kost, type UserProfile } from "@/lib/types";
 import { NewPropertyClient } from "@/components/NewPropertyClient";
+import { RoleActivationPanel } from "@/components/RoleActivationPanel";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = privatePageMetadata("Edit Properti");
@@ -30,6 +31,16 @@ export default async function EditPropertyPage({
 
   const role = (user.role || "").toUpperCase();
   if (role !== "PEMILIK_KOST" && role !== "STAFF" && role !== "ADMINISTRATOR") {
+    if (role === "PENYEWA") {
+      const hasOwnerRole = getEffectiveUserRoles(user).includes("PEMILIK_KOST");
+      return (
+        <RoleActivationPanel
+          user={user}
+          variant={hasOwnerRole ? "switch-to-owner-page" : "become-owner-page"}
+          redirectAfterOwner={`/dashboard/edit-property/${kostId}`}
+        />
+      );
+    }
     redirect("/");
   }
 

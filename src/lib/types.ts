@@ -77,6 +77,7 @@ export interface UserProfile {
   email: string;
   phone: string;
   role: string;
+  roles?: string[];
   isVerified?: boolean;
   verificationStatus?: string;
   verificationSurveyDate?: string;
@@ -325,7 +326,7 @@ export function formatRupiah(value: number): string {
 
 const ROLE_LABELS: Record<string, string> = {
   PENYEWA: "Penyewa",
-  PEMILIK_KOST: "Pemilik Kost",
+  PEMILIK_KOST: "Pemilik Properti",
   PENULIS: "Penulis",
   STAFF: "Staff",
   ADMINISTRATOR: "Administrator",
@@ -385,6 +386,44 @@ function formatEnumLabel(
 
 export function formatRoleLabel(role?: string | null): string {
   return formatEnumLabel(role, ROLE_LABELS);
+}
+
+export function getEffectiveUserRoles(
+  user?: Pick<UserProfile, "role" | "roles"> | null,
+): string[] {
+  if (!user) return [];
+  const active = (user.role || "PENYEWA").trim().toUpperCase();
+  if (
+    active === "STAFF" ||
+    active === "ADMINISTRATOR" ||
+    active === "PENULIS"
+  ) {
+    return [active];
+  }
+  const set = new Set<string>();
+  if (Array.isArray(user.roles)) {
+    for (const r of user.roles) {
+      const upper = String(r || "").trim().toUpperCase();
+      if (upper === "PENYEWA" || upper === "PEMILIK_KOST") {
+        set.add(upper);
+      }
+    }
+  }
+  if (active === "PENYEWA" || active === "PEMILIK_KOST") {
+    set.add(active);
+  }
+  if (set.size === 0) set.add("PENYEWA");
+  const ordered: string[] = [];
+  if (set.has("PENYEWA")) ordered.push("PENYEWA");
+  if (set.has("PEMILIK_KOST")) ordered.push("PEMILIK_KOST");
+  return ordered;
+}
+
+export function hasDualRoles(
+  user?: Pick<UserProfile, "role" | "roles"> | null,
+): boolean {
+  const roles = getEffectiveUserRoles(user);
+  return roles.includes("PENYEWA") && roles.includes("PEMILIK_KOST");
 }
 
 export function formatCategoryLabel(category?: string | null): string {

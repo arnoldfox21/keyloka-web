@@ -5,6 +5,23 @@ import { useRouter } from "next/navigation";
 import Script from "next/script";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Lock, Mail } from "lucide-react";
+import { hasDualRoles, type UserProfile } from "@/lib/types";
+
+function getPostLoginTarget(data: {
+  isNewUser?: boolean;
+  user?: UserProfile;
+}): string {
+  if (data?.isNewUser || data?.user?.onboardingCompleted === false) {
+    return "/onboarding";
+  }
+  if (hasDualRoles(data?.user)) {
+    return "/choose-role";
+  }
+  if ((data?.user?.role || "").toUpperCase() === "PEMILIK_KOST") {
+    return "/dashboard";
+  }
+  return "/";
+}
 
 declare global {
   interface Window {
@@ -65,11 +82,7 @@ export function LoginClient({ googleClientId }: LoginClientProps) {
           setLoading(false);
           return;
         }
-        if (data?.isNewUser || data?.user?.onboardingCompleted === false) {
-          router.push("/onboarding");
-        } else {
-          router.push("/");
-        }
+        router.push(getPostLoginTarget(data));
         router.refresh();
       } catch {
         setError("Gagal terhubung ke server saat login Google.");
@@ -123,11 +136,7 @@ export function LoginClient({ googleClientId }: LoginClientProps) {
         setLoading(false);
         return;
       }
-      if (data?.user?.onboardingCompleted === false) {
-        router.push("/onboarding");
-      } else {
-        router.push("/");
-      }
+      router.push(getPostLoginTarget(data));
       router.refresh();
     } catch {
       setError("Gagal terhubung ke server. Coba lagi.");

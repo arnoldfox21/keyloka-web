@@ -122,6 +122,7 @@ interface DashboardUserItem {
   email: string;
   phone: string;
   role: string;
+  roles?: string[];
   isBanned?: boolean;
   isVerified?: boolean;
   verificationStatus?: string;
@@ -1210,12 +1211,25 @@ export function DashboardClient({
   async function loadTransferCandidates(query = "") {
     setTransferLoading(true);
     try {
-      const params = new URLSearchParams({ page: "1", limit: "20" });
+      const params = new URLSearchParams({
+        page: "1",
+        limit: "20",
+        role: "PEMILIK_KOST",
+      });
       if (query.trim()) params.set("search", query.trim());
       const res = await fetch(`/api/proxy/auth/users?${params.toString()}`);
       if (res.ok) {
         const list: DashboardUserItem[] = await res.json();
-        setTransferCandidates(Array.isArray(list) ? list : []);
+        const ownerCandidates = (Array.isArray(list) ? list : []).filter(
+          (u) => {
+            const active = (u.role || "").toUpperCase();
+            const roles = Array.isArray(u.roles)
+              ? u.roles.map((r) => String(r || "").toUpperCase())
+              : [];
+            return active === "PEMILIK_KOST" || roles.includes("PEMILIK_KOST");
+          },
+        );
+        setTransferCandidates(ownerCandidates);
       }
     } finally {
       setTransferLoading(false);
@@ -1425,7 +1439,7 @@ export function DashboardClient({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <span className="inline-block rounded-full bg-emerald-100 px-3 py-0.5 text-xs font-extrabold text-emerald-800">
-            Dashboard {role}
+            Dashboard {formatRoleLabel(role)}
           </span>
           <h1 className="mt-1 text-2xl sm:text-3xl font-black text-gray-900">
             Halo, {currentUser.name}
@@ -3239,7 +3253,7 @@ export function DashboardClient({
             >
               <option value="SEMUA">Semua Role</option>
               <option value="PENYEWA">Penyewa</option>
-              <option value="PEMILIK_KOST">Pemilik Kost</option>
+              <option value="PEMILIK_KOST">Pemilik Properti</option>
               <option value="PENULIS">Penulis</option>
               <option value="STAFF">Staff</option>
               <option value="ADMINISTRATOR">Administrator</option>
@@ -3350,7 +3364,7 @@ export function DashboardClient({
                         className="rounded-xl border border-gray-200 px-2.5 py-1.5 text-xs font-bold text-gray-700"
                       >
                         <option value="PENYEWA">Penyewa</option>
-                        <option value="PEMILIK_KOST">Pemilik Kost</option>
+                        <option value="PEMILIK_KOST">Pemilik Properti</option>
                         <option value="PENULIS">Penulis</option>
                         <option value="STAFF">Staff</option>
                         <option value="ADMINISTRATOR">Administrator</option>
@@ -3465,7 +3479,7 @@ export function DashboardClient({
                 </p>
               ) : transferCandidates.length === 0 ? (
                 <p className="p-4 text-center text-xs text-gray-500">
-                  Pengguna tidak ditemukan.
+                  Akun pemilik properti tidak ditemukan.
                 </p>
               ) : (
                 transferCandidates.map((u) => (
@@ -3481,7 +3495,7 @@ export function DashboardClient({
                         {u.name}
                       </p>
                       <p className="truncate text-[11px] text-gray-500">
-                        {u.email} • {formatRoleLabel(u.role)}
+                        {u.email} • Pemilik Properti
                       </p>
                     </div>
                     <span className="shrink-0 rounded-lg bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">

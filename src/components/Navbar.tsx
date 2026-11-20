@@ -4,9 +4,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
+  ArrowLeftRight,
   Award,
   Bell,
   BookOpen,
+  Building2,
   CalendarCheck,
   Compass,
   Heart,
@@ -21,6 +23,7 @@ import {
 } from "lucide-react";
 import {
   formatRoleLabel,
+  hasDualRoles,
   type NotificationItem,
   type NotificationPageResponse,
   type UserProfile,
@@ -58,9 +61,11 @@ export function Navbar({ user }: NavbarProps) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifItems, setNotifItems] = useState<NotificationItem[]>([]);
   const [notifLoading, setNotifLoading] = useState(false);
+  const [switchingMode, setSwitchingMode] = useState(false);
   const notifContainerRef = useRef<HTMLDivElement | null>(null);
 
   const role = (user?.role || "").toUpperCase();
+  const dualRoles = hasDualRoles(user);
   const canAccessDashboard =
     role === "PEMILIK_KOST" || role === "STAFF" || role === "ADMINISTRATOR";
   const isWriter = role === "PENULIS";
@@ -276,6 +281,26 @@ export function Navbar({ user }: NavbarProps) {
     setMobileOpen(false);
     router.push("/");
     router.refresh();
+  }
+
+  async function handleSwitchMode() {
+    if (!user || !dualRoles || switchingMode) return;
+    const targetRole = role === "PEMILIK_KOST" ? "PENYEWA" : "PEMILIK_KOST";
+    setSwitchingMode(true);
+    try {
+      const res = await fetch("/api/auth/switch-role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: targetRole }),
+      });
+      if (res.ok) {
+        setMobileOpen(false);
+        router.push(targetRole === "PEMILIK_KOST" ? "/dashboard" : "/");
+        router.refresh();
+      }
+    } finally {
+      setSwitchingMode(false);
+    }
   }
 
   const navItems: NavItem[] = [
@@ -520,6 +545,25 @@ export function Navbar({ user }: NavbarProps) {
                   </p>
                 </div>
               </Link>
+              {dualRoles && (
+                <button
+                  type="button"
+                  disabled={switchingMode}
+                  onClick={handleSwitchMode}
+                  title={
+                    role === "PEMILIK_KOST"
+                      ? "Beralih ke Mode Penyewa"
+                      : "Beralih ke Mode Pemilik"
+                  }
+                  aria-label="Ganti Mode Peran"
+                  className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50/70 px-2.5 text-[11px] font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50"
+                >
+                  <ArrowLeftRight className="h-3 w-3" />
+                  <span className="hidden xl:inline">
+                    {role === "PEMILIK_KOST" ? "Ke Penyewa" : "Ke Pemilik"}
+                  </span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleLogout}
@@ -649,7 +693,34 @@ export function Navbar({ user }: NavbarProps) {
             </button>
           </div>
 
-          <div className="border-t border-gray-100 pt-3">
+          <div className="border-t border-gray-100 pt-3 space-y-2">
+            {user && dualRoles && (
+              <button
+                type="button"
+                disabled={switchingMode}
+                onClick={handleSwitchMode}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50"
+              >
+                <ArrowLeftRight className="h-4 w-4" />
+                <span>
+                  {switchingMode
+                    ? "Berpindah mode..."
+                    : role === "PEMILIK_KOST"
+                      ? "Beralih ke Mode Penyewa"
+                      : "Beralih ke Mode Pemilik"}
+                </span>
+              </button>
+            )}
+            {user && !dualRoles && role === "PENYEWA" && (
+              <Link
+                href="/gabung-pemilik"
+                onClick={() => setMobileOpen(false)}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100"
+              >
+                <Building2 className="h-4 w-4" />
+                <span>Daftar Sebagai Pemilik</span>
+              </Link>
+            )}
             {user ? (
               <button
                 type="button"

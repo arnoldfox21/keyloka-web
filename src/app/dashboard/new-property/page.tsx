@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { NewPropertyClient } from "@/components/NewPropertyClient";
+import { RoleActivationPanel } from "@/components/RoleActivationPanel";
 import { privatePageMetadata } from "@/lib/seo";
 import { getServerToken, serverFetch } from "@/lib/server-api";
-import type { Kost, UserProfile } from "@/lib/types";
+import { getEffectiveUserRoles, type Kost, type UserProfile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = privatePageMetadata("Tambah Properti");
@@ -23,6 +24,16 @@ export default async function NewPropertyPage() {
   const canAccess =
     role === "PEMILIK_KOST" || role === "STAFF" || role === "ADMINISTRATOR";
   if (!canAccess) {
+    if (role === "PENYEWA") {
+      const hasOwnerRole = getEffectiveUserRoles(user).includes("PEMILIK_KOST");
+      return (
+        <RoleActivationPanel
+          user={user}
+          variant={hasOwnerRole ? "switch-to-owner-page" : "become-owner-page"}
+          redirectAfterOwner="/dashboard/new-property"
+        />
+      );
+    }
     redirect("/bookings");
   }
 

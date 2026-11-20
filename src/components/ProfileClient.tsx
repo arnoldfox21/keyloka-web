@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { compressImageToDataUrl } from "@/lib/image-compress";
 import { formatRoleLabel, formatRupiah, resolveImageUrl, type UserProfile } from "@/lib/types";
+import { RoleActivationPanel } from "./RoleActivationPanel";
 
 interface ProfileClientProps {
   initialUser: UserProfile;
@@ -410,6 +411,21 @@ export function ProfileClient({ initialUser }: ProfileClientProps) {
           <span>{msg.text}</span>
         </div>
       )}
+
+      {/* Peran & Mode Akun */}
+      <RoleActivationPanel
+        user={user}
+        variant="profile"
+        onUpdated={(updated) => {
+          setUser((prev) => ({ ...prev, ...updated }));
+          if (updated.phone) setPhone(updated.phone);
+          if (updated.city) setCity(updated.city);
+          setMsg({
+            type: "ok",
+            text: `Mode akun aktif sekarang: ${formatRoleLabel(updated.role)}.`,
+          });
+        }}
+      />
 
       {/* Verifikasi Pemilik */}
       {role === "PEMILIK_KOST" && !isVerifiedAccount && (
