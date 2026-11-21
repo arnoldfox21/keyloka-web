@@ -50,4 +50,5 @@ Setup di dashboard Cloudflare (Workers & Pages → Create → Import repository 
    - `NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION=false`
    - `NEXT_PUBLIC_MIDTRANS_CLIENT_KEY=<sandbox key>`
    - `NEXT_PUBLIC_GOOGLE_CLIENT_ID=<client id>`
+   - `NEXT_PUBLIC_RECAPTCHA_SITE_KEY=<recaptcha site key>`
 6. Domain `dev.keyloka.com` dibuat otomatis dari `routes` (custom_domain) di `wrangler.jsonc`.
