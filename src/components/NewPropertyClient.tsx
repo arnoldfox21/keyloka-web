@@ -1631,10 +1631,18 @@ export function NewPropertyClient({
                   return (
                     <div
                       key={key}
+                      onClick={() => {
+                        if (!isFeatured) handleSetFeaturedImage(idx);
+                      }}
+                      title={
+                        isFeatured
+                          ? "Foto Utama (Sampul Properti)"
+                          : "Klik untuk jadikan Foto Utama"
+                      }
                       className={`group relative aspect-4/3 overflow-hidden rounded-xl border bg-gray-100 transition ${
                         isFeatured
                           ? "border-2 border-emerald-600 ring-2 ring-emerald-500/20"
-                          : "border-gray-200"
+                          : "cursor-pointer border-gray-200 hover:border-emerald-400"
                       }`}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1651,7 +1659,10 @@ export function NewPropertyClient({
                       ) : (
                         <button
                           type="button"
-                          onClick={() => handleSetFeaturedImage(idx)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSetFeaturedImage(idx);
+                          }}
                           title="Jadikan Foto Utama (Featured Image)"
                           className="absolute bottom-2 left-2 right-2 inline-flex items-center justify-center gap-1 rounded-lg bg-gray-900/80 px-2 py-1.5 text-[10px] font-bold text-white backdrop-blur-xs transition hover:bg-emerald-600"
                         >
@@ -1661,7 +1672,10 @@ export function NewPropertyClient({
                       )}
                       <button
                         type="button"
-                        onClick={() => handleRemoveImage(idx)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveImage(idx);
+                        }}
                         title="Hapus foto"
                         className="absolute right-2 top-2 rounded-lg bg-red-600/90 p-1.5 text-white opacity-90 hover:bg-red-700"
                       >
