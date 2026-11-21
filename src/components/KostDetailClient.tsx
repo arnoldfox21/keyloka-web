@@ -122,6 +122,22 @@ export function KostDetailClient({
     }
   }, [kost]);
 
+  useEffect(() => {
+    if (currentUser?.id === kost.ownerId) return;
+    try {
+      const sessionKey = `keyloka_viewed_${kost.id}`;
+      if (sessionStorage.getItem(sessionKey)) return;
+      sessionStorage.setItem(sessionKey, "1");
+    } catch {
+      // Abaikan jika sessionStorage tidak tersedia
+    }
+    fetch(`/api/proxy/kosts/${kost.id}/track`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "VIEW" }),
+    }).catch(() => {});
+  }, [kost.id, kost.ownerId, currentUser?.id]);
+
   const minSurveyDate = (() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
@@ -1167,6 +1183,15 @@ export function KostDetailClient({
                     href={`https://wa.me/${waNumber}?text=${waText}`}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => {
+                      if (currentUser?.id === kost.ownerId) return;
+                      fetch(`/api/proxy/kosts/${kost.id}/track`, {
+                        method: "POST",
+                        keepalive: true,
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ type: "WA_CLICK" }),
+                      }).catch(() => {});
+                    }}
                     className={
                       kost.isStaffPosted
                         ? "flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-sm font-extrabold text-white shadow-sm hover:bg-emerald-700 transition"

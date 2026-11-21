@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { validateWithdrawAccount } from "@/lib/validation";
 import { AdminPlatformPanel } from "./AdminPlatformPanel";
+import { OwnerStatisticsPanel } from "./OwnerStatisticsPanel";
 
 const INDONESIAN_BANKS = [
   "BCA",
@@ -189,6 +190,7 @@ interface DashboardClientProps {
 
 type TabKey =
   | "PROPERTIES"
+  | "STATISTICS"
   | "DISPUTES"
   | "FINANCE"
   | "WALLET"
@@ -225,7 +227,7 @@ export function DashboardClient({
     ? ["PROPERTIES", "DISPUTES", "APPROVAL", "WITHDRAWALS", "USERS", "ARTICLES", "PLATFORM"]
     : isStaffOrAdmin
       ? ["PROPERTIES", "DISPUTES", "APPROVAL", "WITHDRAWALS", "USERS"]
-      : ["PROPERTIES", "DISPUTES", "FINANCE", "WALLET"];
+      : ["PROPERTIES", "STATISTICS", "DISPUTES", "FINANCE", "WALLET"];
   const normalizedInitialTab = initialTab === "BOOKINGS" ? "DISPUTES" : initialTab;
   const resolvedInitialTab: TabKey =
     normalizedInitialTab && validTabs.includes(normalizedInitialTab as TabKey)
@@ -1445,6 +1447,7 @@ export function DashboardClient({
       ]
     : [
         { key: "PROPERTIES", label: "Properti Saya", badge: kostsTotal },
+        { key: "STATISTICS", label: "Statistik" },
         {
           key: "DISPUTES",
           label: "Sengketa",
@@ -2507,6 +2510,11 @@ export function DashboardClient({
           </div>
         </div>
         </div>
+      )}
+
+      {/* Tab Content: STATISTICS (Pemilik Properti) */}
+      {tab === "STATISTICS" && !isStaffOrAdmin && (
+        <OwnerStatisticsPanel kosts={myKosts} />
       )}
 
       {/* Tab Content: FINANCE (Pemilik Properti) */}
