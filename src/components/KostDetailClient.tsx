@@ -817,6 +817,46 @@ export function KostDetailClient({
                   Buka Lokasi di Google Maps
                 </a>
               )}
+
+              {/* Baris Profil Pemilik / Pengelola */}
+              <Link
+                href={`/owner/${kost.ownerId}`}
+                className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-gray-200/90 bg-gray-50/70 p-3 hover:border-emerald-300 hover:bg-emerald-50/40 transition group"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-sm font-black text-emerald-800 group-hover:bg-emerald-600 group-hover:text-white transition">
+                    {(kost.ownerName || "P").slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold text-gray-500">
+                      Dikelola oleh
+                    </p>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="truncate text-sm font-extrabold text-gray-900 group-hover:text-emerald-700 transition">
+                        {kost.ownerName}
+                      </span>
+                      {kost.isVerified && !kost.isStaffPosted && (
+                        <span
+                          title="Pemilik Properti Terverifikasi"
+                          className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200"
+                        >
+                          <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" />
+                          Terverifikasi
+                        </span>
+                      )}
+                      {kost.isStaffPosted && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-800 border border-emerald-200">
+                          <Sparkles className="h-3 w-3 text-emerald-600" />
+                          Partner Kurasi
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <span className="shrink-0 text-xs font-bold text-emerald-700 group-hover:underline">
+                  Lihat Profil →
+                </span>
+              </Link>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 border-y border-gray-100 py-4 text-center">
@@ -1154,24 +1194,36 @@ export function KostDetailClient({
                   {price.unit}
                 </span>
               </p>
-              <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
-                <span>Pengelola:</span>
-                <Link
-                  href={`/owner/${kost.ownerId}`}
-                  className="font-bold text-emerald-700 hover:underline"
-                >
-                  {kost.ownerName}
-                </Link>
-                {kost.isVerified && !kost.isStaffPosted && (
-                  <span
-                    title="Pemilik Properti Terverifikasi"
-                    className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200/80"
-                  >
-                    <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" />
-                    Terverifikasi
-                  </span>
-                )}
-              </div>
+              <Link
+                href={`/owner/${kost.ownerId}`}
+                className="mt-3 flex items-center justify-between gap-2.5 rounded-2xl border border-gray-200 bg-gray-50/80 p-2.5 hover:border-emerald-300 hover:bg-emerald-50/40 transition group"
+              >
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-xs font-black text-emerald-800 group-hover:bg-emerald-600 group-hover:text-white transition">
+                    {(kost.ownerName || "P").slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                      Pengelola Properti
+                    </p>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="truncate text-xs font-extrabold text-gray-900 group-hover:text-emerald-700">
+                        {kost.ownerName}
+                      </span>
+                      {kost.isVerified && !kost.isStaffPosted && (
+                        <span
+                          title="Pemilik Properti Terverifikasi"
+                          className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200"
+                        >
+                          <BadgeCheck className="h-3 w-3 text-emerald-600" />
+                          Terverifikasi
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <ExternalLink className="h-3.5 w-3.5 shrink-0 text-gray-400 group-hover:text-emerald-600" />
+              </Link>
 
               {currentUser?.id !== kost.ownerId &&
                 (kost.isStaffPosted || currentUserRole !== "PEMILIK_KOST") && (
