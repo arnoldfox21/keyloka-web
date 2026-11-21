@@ -122,6 +122,22 @@ export function KostDetailClient({
     }
   }, [kost]);
 
+  const getOrCreateVisitorId = () => {
+    try {
+      const storageKey = "keyloka_visitor_id";
+      const existing = sessionStorage.getItem(storageKey);
+      if (existing) return existing;
+      const generated =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      sessionStorage.setItem(storageKey, generated);
+      return generated;
+    } catch {
+      return undefined;
+    }
+  };
+
   useEffect(() => {
     if (currentUser?.id === kost.ownerId) return;
     try {
@@ -131,10 +147,11 @@ export function KostDetailClient({
     } catch {
       // Abaikan jika sessionStorage tidak tersedia
     }
+    const visitorId = getOrCreateVisitorId();
     fetch(`/api/proxy/kosts/${kost.id}/track`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "VIEW" }),
+      body: JSON.stringify({ type: "VIEW", visitorId }),
     }).catch(() => {});
   }, [kost.id, kost.ownerId, currentUser?.id]);
 
@@ -1185,11 +1202,12 @@ export function KostDetailClient({
                     rel="noopener noreferrer"
                     onClick={() => {
                       if (currentUser?.id === kost.ownerId) return;
+                      const visitorId = getOrCreateVisitorId();
                       fetch(`/api/proxy/kosts/${kost.id}/track`, {
                         method: "POST",
                         keepalive: true,
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ type: "WA_CLICK" }),
+                        body: JSON.stringify({ type: "WA_CLICK", visitorId }),
                       }).catch(() => {});
                     }}
                     className={

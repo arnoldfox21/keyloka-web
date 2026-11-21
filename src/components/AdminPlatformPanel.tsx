@@ -520,6 +520,22 @@ export function AdminPlatformPanel() {
               />
             </label>
           </div>
+          {config.maintenanceMode && (
+            <div className="md:col-span-2">
+              <label className="block text-xs font-bold text-slate-600 mb-1">
+                Pesan Maintenance (Ditampilkan di Banner Publik)
+              </label>
+              <input
+                type="text"
+                value={config.maintenanceMessage ?? ""}
+                onChange={(e) =>
+                  setConfig({ ...config, maintenanceMessage: e.target.value })
+                }
+                placeholder="Contoh: Sistem sedang dalam pemeliharaan berkala. Beberapa fitur mungkin melambat."
+                className="w-full rounded-xl border border-amber-300 bg-amber-50/40 px-3 py-2 text-sm text-slate-900"
+              />
+            </div>
+          )}
         </form>
       )}
 

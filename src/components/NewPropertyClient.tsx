@@ -34,6 +34,8 @@ interface NewPropertyClientProps {
   };
   existingPropertyCount: number;
   creditBalance: number;
+  freePropertyQuota?: number;
+  extraPropertySlotFee?: number;
   initialKost?: Kost;
 }
 
@@ -53,8 +55,8 @@ const DAILY_UNIT_TYPES = [
   "Kamar Harian",
 ] as const;
 
-const FREE_PROPERTY_QUOTA = 2;
-const EXTRA_PROPERTY_SLOT_FEE = 10000;
+const DEFAULT_FREE_PROPERTY_QUOTA = 2;
+const DEFAULT_EXTRA_PROPERTY_SLOT_FEE = 10000;
 
 const CATEGORY_FACILITY_PRESETS: Record<
   string,
@@ -156,6 +158,8 @@ export function NewPropertyClient({
   masterFacilities,
   existingPropertyCount,
   creditBalance,
+  freePropertyQuota = DEFAULT_FREE_PROPERTY_QUOTA,
+  extraPropertySlotFee = DEFAULT_EXTRA_PROPERTY_SLOT_FEE,
   initialKost,
 }: NewPropertyClientProps) {
   const router = useRouter();
@@ -163,7 +167,7 @@ export function NewPropertyClient({
   const role = (currentUser.role || "").toUpperCase();
   const isStaffOrAdmin = role === "STAFF" || role === "ADMINISTRATOR";
   const isAutoApproved = isStaffOrAdmin || Boolean(currentUser.isVerified);
-  const needsSlotFee = !isEditMode && !isStaffOrAdmin && existingPropertyCount >= FREE_PROPERTY_QUOTA;
+  const needsSlotFee = !isEditMode && !isStaffOrAdmin && existingPropertyCount >= freePropertyQuota;
 
   const [propertyCategory, setPropertyCategory] = useState<string>(
     initialKost?.propertyCategory || "KOST",
@@ -585,9 +589,9 @@ export function NewPropertyClient({
       return;
     }
 
-    if (needsSlotFee && creditBalance < EXTRA_PROPERTY_SLOT_FEE) {
+    if (needsSlotFee && creditBalance < extraPropertySlotFee) {
       setError(
-        `Kuota gratis (${FREE_PROPERTY_QUOTA} properti) sudah penuh. Saldo kredit iklan Anda ${formatRupiah(creditBalance)}, butuh ${formatRupiah(EXTRA_PROPERTY_SLOT_FEE)} untuk slot tambahan.`,
+        `Kuota gratis (${freePropertyQuota} properti) sudah penuh. Saldo kredit iklan Anda ${formatRupiah(creditBalance)}, butuh ${formatRupiah(extraPropertySlotFee)} untuk slot tambahan.`,
       );
       return;
     }
@@ -729,12 +733,12 @@ export function NewPropertyClient({
           <p className="text-emerald-800">
             Properti aktif Anda saat ini:{" "}
             <span className="font-bold">{existingPropertyCount}</span> (Kuota gratis{" "}
-            {FREE_PROPERTY_QUOTA} properti).{" "}
+            {freePropertyQuota} properti).{" "}
             {needsSlotFee ? (
               <>
                 Penambahan properti ini memerlukan biaya aktivasi slot{" "}
                 <span className="font-bold">
-                  {formatRupiah(EXTRA_PROPERTY_SLOT_FEE)}
+                  {formatRupiah(extraPropertySlotFee)}
                 </span>{" "}
                 dari Saldo Kredit Iklan (saldo Anda:{" "}
                 <span className="font-bold">{formatRupiah(creditBalance)}</span>).

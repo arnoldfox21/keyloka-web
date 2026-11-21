@@ -11,7 +11,7 @@ import {
   SITE_NAME,
   getSiteUrl,
 } from "@/lib/seo";
-import { serverFetch, getServerToken } from "@/lib/server-api";
+import { API_BASE_URL, serverFetch, getServerToken } from "@/lib/server-api";
 import type { UserProfile } from "@/lib/types";
 
 const geistSans = Geist({
@@ -78,12 +78,33 @@ async function getCurrentUser(): Promise<UserProfile | null> {
   }
 }
 
+async function getPlatformStatus(): Promise<{
+  maintenanceMode: boolean;
+  maintenanceMessage: string | null;
+} | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/platform/status`, {
+      next: { revalidate: 30 },
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as {
+      maintenanceMode: boolean;
+      maintenanceMessage: string | null;
+    };
+  } catch {
+    return null;
+  }
+}
+
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const user = await getCurrentUser();
+  const [user, platformStatus] = await Promise.all([
+    getCurrentUser(),
+    getPlatformStatus(),
+  ]);
   const isProd = process.env.NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION === "true";
   const snapScriptUrl = isProd
     ? "https://app.midtrans.com/snap/snap.js"
@@ -118,6 +139,15 @@ export default async function RootLayout({
           />
         ) : null}
         <Navbar user={user} />
+        {platformStatus?.maintenanceMode && (
+          <div
+            role="status"
+            className="border-b border-amber-300 bg-amber-50 px-4 py-2.5 text-center text-xs sm:text-sm font-semibold text-amber-900"
+          >
+            {platformStatus.maintenanceMessage?.trim() ||
+              "Sistem sedang dalam pemeliharaan berkala. Beberapa fitur mungkin melambat sementara waktu."}
+          </div>
+        )}
         <main className="flex-1">{children}</main>
         <Footer user={user} />
         <AdSenseScript />

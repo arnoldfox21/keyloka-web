@@ -95,6 +95,10 @@ async function forward(
   if (contentType) {
     headers.set("Content-Type", contentType);
   }
+  const clientIp = getClientIp(req);
+  if (clientIp && clientIp !== "unknown") {
+    headers.set("x-client-ip", clientIp);
+  }
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }

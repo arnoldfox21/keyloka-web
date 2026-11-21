@@ -259,7 +259,9 @@ export function OwnerStatisticsPanel({ kosts }: OwnerStatisticsPanelProps) {
             onChange={(e) => void handleFilterChange(period, e.target.value)}
             className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-bold text-gray-700"
           >
-            <option value="ALL">Semua Properti ({kosts.length})</option>
+            <option value="ALL">
+              Semua Properti ({data?.summary.totalProperties ?? kosts.length})
+            </option>
             {kosts.map((k) => (
               <option key={k.id} value={String(k.id)}>
                 {k.name}
