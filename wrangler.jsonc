@@ -15,6 +15,7 @@
       "service": "keyloka-web"
     }
   ],
+  "previews": {},
   "env": {
     "dev": {
       "name": "keyloka-web-dev",
@@ -22,7 +23,8 @@
       "services": [
         { "binding": "WORKER_SELF_REFERENCE", "service": "keyloka-web-dev" }
       ],
-      "vars": { "API_BASE_URL": "https://api-dev.keyloka.com/api" }
+      "vars": { "API_BASE_URL": "https://api-dev.keyloka.com/api" },
+      "previews": {}
     }
   }
 }
