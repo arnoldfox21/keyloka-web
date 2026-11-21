@@ -27,6 +27,7 @@ interface PlatformConfig {
   boost14dPrice: number;
   allowOwnerRegistration: boolean;
   allowDirectBookingGlobal: boolean;
+  allowWalletTopup: boolean;
   maintenanceMode: boolean;
   maintenanceMessage: string;
   opsNotificationEmail: string;
@@ -179,6 +180,7 @@ export function AdminPlatformPanel() {
           boost14dPrice: Number(config.boost14dPrice),
           allowOwnerRegistration: config.allowOwnerRegistration,
           allowDirectBookingGlobal: config.allowDirectBookingGlobal,
+          allowWalletTopup: config.allowWalletTopup,
           maintenanceMode: config.maintenanceMode,
           maintenanceMessage: config.maintenanceMessage,
           opsNotificationEmail: config.opsNotificationEmail,
@@ -488,6 +490,18 @@ export function AdminPlatformPanel() {
                     ...config,
                     allowDirectBookingGlobal: e.target.checked,
                   })
+                }
+                className="h-4 w-4 accent-emerald-600"
+              />
+            </label>
+
+            <label className="flex items-center justify-between rounded-xl border border-gray-200 p-3 text-xs font-bold text-gray-800 cursor-pointer">
+              <span>Izinkan Top-Up Kredit Iklan</span>
+              <input
+                type="checkbox"
+                checked={config.allowWalletTopup !== false}
+                onChange={(e) =>
+                  setConfig({ ...config, allowWalletTopup: e.target.checked })
                 }
                 className="h-4 w-4 accent-emerald-600"
               />

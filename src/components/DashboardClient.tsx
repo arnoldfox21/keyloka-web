@@ -186,6 +186,7 @@ interface DashboardClientProps {
   initialCreated?: boolean;
   initialUpdated?: boolean;
   initialTab?: string;
+  walletTopupEnabled?: boolean;
 }
 
 type TabKey =
@@ -218,6 +219,7 @@ export function DashboardClient({
   initialCreated = false,
   initialUpdated = false,
   initialTab,
+  walletTopupEnabled = true,
 }: DashboardClientProps) {
   const role = (currentUser.role || "").toUpperCase();
   const isStaffOrAdmin = role === "STAFF" || role === "ADMINISTRATOR";
@@ -2094,6 +2096,30 @@ export function DashboardClient({
       {tab === "WALLET" && (
         <div className="space-y-6">
           {/* Top-Up Saldo Kredit */}
+          {!walletTopupEnabled ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg font-black text-gray-900">
+                  Top-Up Saldo Kredit Iklan &amp; Boost
+                </h2>
+                <span className="rounded-full bg-amber-200 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-amber-900">
+                  Segera Hadir
+                </span>
+              </div>
+              <p className="text-sm font-semibold text-amber-900">
+                Top-up saldo kredit online sedang dalam persiapan dan belum dapat
+                digunakan.
+              </p>
+              <p className="text-xs text-amber-800 leading-relaxed">
+                Kami sedang mengaktifkan gerbang pembayaran resmi agar transaksi
+                Anda aman. Saldo kredit saat ini:{" "}
+                <span className="font-bold">{formatRupiah(creditBalance)}</span>.
+                Fitur lain seperti survei, chat, dan pengelolaan properti tetap
+                dapat digunakan seperti biasa. Terima kasih atas
+                kesabarannya.
+              </p>
+            </div>
+          ) : (
           <form
             onSubmit={handleTopupCredit}
             className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-6 space-y-4"
@@ -2197,6 +2223,7 @@ export function DashboardClient({
               </div>
             )}
           </form>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <form
