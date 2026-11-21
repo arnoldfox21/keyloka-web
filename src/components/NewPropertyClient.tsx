@@ -7,10 +7,13 @@ import {
   ArrowLeft,
   Building2,
   Check,
+  ExternalLink,
   ImagePlus,
   Loader2,
+  Lock,
   MapPin,
   Plus,
+  Settings,
   Sparkles,
   Trash2,
   Upload,
@@ -1724,38 +1727,99 @@ export function NewPropertyClient({
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label
-                htmlFor="prop-owner-name"
-                className="block text-xs font-bold text-gray-700"
-              >
-                Nama Pengelola
-              </label>
-              <input
-                id="prop-owner-name"
-                value={ownerName}
-                onChange={(e) => setOwnerName(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label
-                htmlFor="prop-owner-phone"
-                className="block text-xs font-bold text-gray-700"
-              >
-                Nomor WhatsApp / Telepon
-              </label>
-              <input
-                id="prop-owner-phone"
-                type="tel"
-                value={ownerPhone}
-                onChange={(e) => setOwnerPhone(e.target.value)}
-                placeholder="08xxxxxxxxxx"
-                className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"
-              />
-            </div>
-          </div>
+          {(() => {
+            const isContactLocked = !isStaffOrAdmin || Boolean(selectedOwnerId);
+            return (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="prop-owner-name"
+                      className="flex items-center justify-between text-xs font-bold text-gray-700"
+                    >
+                      <span>Nama Pengelola</span>
+                      {isContactLocked && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-gray-400">
+                          <Lock className="h-3 w-3" />
+                          Dari Profil
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      id="prop-owner-name"
+                      value={ownerName}
+                      readOnly={isContactLocked}
+                      disabled={isContactLocked}
+                      onChange={(e) => {
+                        if (!isContactLocked) setOwnerName(e.target.value);
+                      }}
+                      className={`w-full rounded-xl border px-3.5 py-2.5 text-sm focus:outline-none ${
+                        isContactLocked
+                          ? "cursor-not-allowed border-gray-200 bg-gray-100 font-semibold text-gray-600"
+                          : "border-gray-200 bg-white focus:border-emerald-500"
+                      }`}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="prop-owner-phone"
+                      className="flex items-center justify-between text-xs font-bold text-gray-700"
+                    >
+                      <span>Nomor WhatsApp / Telepon</span>
+                      {isContactLocked && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-gray-400">
+                          <Lock className="h-3 w-3" />
+                          Terkunci
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      id="prop-owner-phone"
+                      type="tel"
+                      value={ownerPhone}
+                      readOnly={isContactLocked}
+                      disabled={isContactLocked}
+                      onChange={(e) => {
+                        if (!isContactLocked) setOwnerPhone(e.target.value);
+                      }}
+                      placeholder={
+                        isContactLocked
+                          ? "Belum diatur di pengaturan profil"
+                          : "08xxxxxxxxxx"
+                      }
+                      className={`w-full rounded-xl border px-3.5 py-2.5 text-sm focus:outline-none ${
+                        isContactLocked
+                          ? "cursor-not-allowed border-gray-200 bg-gray-100 font-semibold text-gray-600"
+                          : "border-gray-200 bg-white focus:border-emerald-500"
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                {!isStaffOrAdmin && (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
+                    <div className="space-y-1 text-xs text-emerald-950">
+                      <p className="font-extrabold flex items-center gap-1.5 text-emerald-900">
+                        <Settings className="h-3.5 w-3.5 text-emerald-600" />
+                        Kontak Mengikuti Pengaturan Profil Akun
+                      </p>
+                      <p className="text-[11px] leading-relaxed text-emerald-800">
+                        Nama pengelola, nomor WhatsApp, serta opsi tampilkan/sembunyikan tombol WhatsApp di halaman properti diatur secara terpusat melalui halaman Pengaturan Profil Anda.
+                      </p>
+                    </div>
+                    <Link
+                      href="/profile"
+                      className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-extrabold text-white shadow-2xs hover:bg-emerald-700 transition"
+                    >
+                      <Settings className="h-3.5 w-3.5" />
+                      <span>Atur di Pengaturan Profil</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </section>
         )}
 

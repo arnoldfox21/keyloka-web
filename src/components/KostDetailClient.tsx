@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
+  BadgeCheck,
   Calendar,
   CheckCircle2,
   Clock,
@@ -721,12 +722,6 @@ export function KostDetailClient({
                 <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
                   {formatCategoryLabel(kost.propertyCategory)} • {kost.type}
                 </span>
-                {kost.isVerified && (
-                  <span className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    Terverifikasi
-                  </span>
-                )}
                 {kost.allowDirectBooking && !kost.isStaffPosted && (
                   <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white">
                     <ShieldCheck className="h-3.5 w-3.5" />
@@ -1159,15 +1154,24 @@ export function KostDetailClient({
                   {price.unit}
                 </span>
               </p>
-              <p className="mt-1 text-xs text-gray-500">
-                Pengelola:{" "}
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
+                <span>Pengelola:</span>
                 <Link
                   href={`/owner/${kost.ownerId}`}
                   className="font-bold text-emerald-700 hover:underline"
                 >
                   {kost.ownerName}
                 </Link>
-              </p>
+                {kost.isVerified && !kost.isStaffPosted && (
+                  <span
+                    title="Pemilik Properti Terverifikasi"
+                    className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200/80"
+                  >
+                    <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" />
+                    Terverifikasi
+                  </span>
+                )}
+              </div>
 
               {currentUser?.id !== kost.ownerId &&
                 (kost.isStaffPosted || currentUserRole !== "PEMILIK_KOST") && (
