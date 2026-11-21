@@ -19,7 +19,10 @@
   "env": {
     "dev": {
       "name": "keyloka-web-dev",
-      "routes": [{ "pattern": "dev.keyloka.com", "custom_domain": true }],
+      "routes": [
+        { "pattern": "dev.keyloka.com", "custom_domain": true },
+        { "pattern": "www.dev.keyloka.com", "custom_domain": true }
+      ],
       "services": [
         { "binding": "WORKER_SELF_REFERENCE", "service": "keyloka-web-dev" }
       ],
