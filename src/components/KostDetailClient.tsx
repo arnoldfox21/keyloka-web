@@ -838,9 +838,9 @@ export function KostDetailClient({
                       {kost.isVerified && !kost.isStaffPosted && (
                         <span
                           title="Pemilik Properti Terverifikasi"
-                          className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200"
+                          className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 px-2.5 py-0.5 text-[11px] font-extrabold text-white shadow-xs ring-2 ring-blue-500/20"
                         >
-                          <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" />
+                          <BadgeCheck className="h-3.5 w-3.5 text-white" />
                           Terverifikasi
                         </span>
                       )}
@@ -1213,9 +1213,9 @@ export function KostDetailClient({
                       {kost.isVerified && !kost.isStaffPosted && (
                         <span
                           title="Pemilik Properti Terverifikasi"
-                          className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200"
+                          className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 px-2 py-0.5 text-[10px] font-extrabold text-white shadow-xs ring-1 ring-blue-500/25"
                         >
-                          <BadgeCheck className="h-3 w-3 text-emerald-600" />
+                          <BadgeCheck className="h-3 w-3 text-white" />
                           Terverifikasi
                         </span>
                       )}

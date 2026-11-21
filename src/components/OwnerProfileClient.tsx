@@ -193,9 +193,9 @@ export function OwnerProfileClient({
                     ) && (
                     <span
                       title="Pemilik Terverifikasi"
-                      className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700"
+                      className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 px-2.5 py-0.5 text-xs font-extrabold text-white shadow-xs ring-2 ring-blue-500/20"
                     >
-                      <BadgeCheck className="h-4 w-4 text-emerald-600" />
+                      <BadgeCheck className="h-4 w-4 text-white" />
                       Terverifikasi
                     </span>
                   )}

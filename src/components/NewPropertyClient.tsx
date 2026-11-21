@@ -15,6 +15,7 @@ import {
   Plus,
   Settings,
   Sparkles,
+  Star,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -36,6 +37,8 @@ interface NewPropertyClientProps {
     publicFacilities: string[];
   };
   existingPropertyCount: number;
+  pendingPropertyCount?: number;
+  maxPendingPropertiesPerOwner?: number;
   creditBalance: number;
   freePropertyQuota?: number;
   extraPropertySlotFee?: number;
@@ -160,6 +163,8 @@ export function NewPropertyClient({
   currentUser,
   masterFacilities,
   existingPropertyCount,
+  pendingPropertyCount = 0,
+  maxPendingPropertiesPerOwner = 10,
   creditBalance,
   freePropertyQuota = DEFAULT_FREE_PROPERTY_QUOTA,
   extraPropertySlotFee = DEFAULT_EXTRA_PROPERTY_SLOT_FEE,
@@ -171,6 +176,10 @@ export function NewPropertyClient({
   const isStaffOrAdmin = role === "STAFF" || role === "ADMINISTRATOR";
   const isAutoApproved = isStaffOrAdmin || Boolean(currentUser.isVerified);
   const needsSlotFee = !isEditMode && !isStaffOrAdmin && existingPropertyCount >= freePropertyQuota;
+  const isPendingLimitReached =
+    !isEditMode &&
+    !isStaffOrAdmin &&
+    pendingPropertyCount >= maxPendingPropertiesPerOwner;
 
   const [propertyCategory, setPropertyCategory] = useState<string>(
     initialKost?.propertyCategory || "KOST",
@@ -514,6 +523,16 @@ export function NewPropertyClient({
     });
   }
 
+  function handleSetFeaturedImage(idx: number) {
+    if (idx <= 0) return;
+    setImages((prev) => {
+      if (idx >= prev.length) return prev;
+      const target = prev[idx];
+      const rest = prev.filter((_, i) => i !== idx);
+      return [target, ...rest];
+    });
+  }
+
   function handleDetectLocation() {
     if (!navigator.geolocation) {
       setError("Browser Anda tidak mendukung deteksi lokasi.");
@@ -595,6 +614,13 @@ export function NewPropertyClient({
     if (needsSlotFee && creditBalance < extraPropertySlotFee) {
       setError(
         `Kuota gratis (${freePropertyQuota} properti) sudah penuh. Saldo kredit iklan Anda ${formatRupiah(creditBalance)}, butuh ${formatRupiah(extraPropertySlotFee)} untuk slot tambahan.`,
+      );
+      return;
+    }
+
+    if (isPendingLimitReached) {
+      setError(
+        `Anda masih memiliki ${pendingPropertyCount} properti yang menunggu persetujuan (Pending Approval). Tunggu hingga tim Keyloka meninjau properti Anda sebelum menambahkan properti baru (maksimal ${maxPendingPropertiesPerOwner} properti pending).`,
       );
       return;
     }
@@ -736,7 +762,11 @@ export function NewPropertyClient({
           <p className="text-emerald-800">
             Properti aktif Anda saat ini:{" "}
             <span className="font-bold">{existingPropertyCount}</span> (Kuota gratis{" "}
-            {freePropertyQuota} properti).{" "}
+            {freePropertyQuota} properti, menunggu persetujuan:{" "}
+            <span className="font-bold">
+              {pendingPropertyCount}/{maxPendingPropertiesPerOwner}
+            </span>
+            ).{" "}
             {needsSlotFee ? (
               <>
                 Penambahan properti ini memerlukan biaya aktivasi slot{" "}
@@ -752,6 +782,13 @@ export function NewPropertyClient({
           </p>
         )}
       </div>
+
+      {isPendingLimitReached && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-900">
+          Anda sudah mencapai batas maksimal {maxPendingPropertiesPerOwner} properti yang masih berstatus{" "}
+          <span className="underline">Menunggu Persetujuan (Pending Approval)</span>. Silakan tunggu tim Keyloka meninjau properti Anda sebelum menambahkan properti baru.
+        </div>
+      )}
 
       {error && (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
@@ -1578,36 +1615,76 @@ export function NewPropertyClient({
           </div>
 
           {images.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-              {images.map((item, idx) => {
-                const src =
-                  item.kind === "local"
-                    ? item.previewUrl
-                    : resolveImageUrl(item.url);
-                const key =
-                  item.kind === "local" ? item.previewUrl : `${item.url}-${idx}`;
-                return (
-                  <div
-                    key={key}
-                    className="group relative aspect-4/3 overflow-hidden rounded-xl border border-gray-200 bg-gray-100"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={src}
-                      alt={`Foto properti ${idx + 1}`}
-                      className="h-full w-full object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveImage(idx)}
-                      title="Hapus foto"
-                      className="absolute right-2 top-2 rounded-lg bg-red-600/90 p-1.5 text-white opacity-90 hover:bg-red-700"
+            <div className="space-y-2.5 pt-1">
+              <p className="text-[11px] text-gray-500">
+                Foto dengan tanda <strong className="text-emerald-700">Foto Utama</strong> akan ditampilkan sebagai sampul (featured image) di kartu properti & halaman detail. Klik tombol <strong>Jadikan Foto Utama</strong> pada foto lain untuk menggantinya.
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {images.map((item, idx) => {
+                  const src =
+                    item.kind === "local"
+                      ? item.previewUrl
+                      : resolveImageUrl(item.url);
+                  const key =
+                    item.kind === "local" ? item.previewUrl : `${item.url}-${idx}`;
+                  const isFeatured = idx === 0;
+                  return (
+                    <div
+                      key={key}
+                      onClick={() => {
+                        if (!isFeatured) handleSetFeaturedImage(idx);
+                      }}
+                      title={
+                        isFeatured
+                          ? "Foto Utama (Sampul Properti)"
+                          : "Klik untuk jadikan Foto Utama"
+                      }
+                      className={`group relative aspect-4/3 overflow-hidden rounded-xl border bg-gray-100 transition ${
+                        isFeatured
+                          ? "border-2 border-emerald-600 ring-2 ring-emerald-500/20"
+                          : "cursor-pointer border-gray-200 hover:border-emerald-400"
+                      }`}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                );
-              })}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={src}
+                        alt={`Foto properti ${idx + 1}`}
+                        className="h-full w-full object-cover"
+                      />
+                      {isFeatured ? (
+                        <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2 py-1 text-[10px] font-extrabold text-white shadow-sm">
+                          <Star className="h-3 w-3 fill-amber-300 text-amber-300" />
+                          Foto Utama
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSetFeaturedImage(idx);
+                          }}
+                          title="Jadikan Foto Utama (Featured Image)"
+                          className="absolute bottom-2 left-2 right-2 inline-flex items-center justify-center gap-1 rounded-lg bg-gray-900/80 px-2 py-1.5 text-[10px] font-bold text-white backdrop-blur-xs transition hover:bg-emerald-600"
+                        >
+                          <Star className="h-3 w-3" />
+                          Jadikan Foto Utama
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveImage(idx);
+                        }}
+                        title="Hapus foto"
+                        className="absolute right-2 top-2 rounded-lg bg-red-600/90 p-1.5 text-white opacity-90 hover:bg-red-700"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </section>

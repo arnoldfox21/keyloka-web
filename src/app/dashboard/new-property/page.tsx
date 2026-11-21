@@ -37,34 +37,47 @@ export default async function NewPropertyPage() {
     redirect("/bookings");
   }
 
-  const [facilitiesRes, myKostsRes, walletRes, pricingRes] = await Promise.all([
-    serverFetch<{ roomFacilities: string[]; publicFacilities: string[] }>(
-      "/kosts/master-facilities",
-    ).catch(() => ({ roomFacilities: [], publicFacilities: [] })),
-    serverFetch<Kost[] | { data: Kost[]; total?: number }>(
-      `/kosts?ownerId=${user.id}&includePending=true&page=1&limit=1`,
-    ).catch(() => ({ data: [], total: 0 })),
-    serverFetch<{ creditBalance: number; payoutBalance: number }>(
-      "/wallet/me",
-    ).catch(() => ({ creditBalance: 0, payoutBalance: 0 })),
-    serverFetch<{
-      freePropertyQuota?: number;
-      extraPropertySlotFee?: number;
-    }>("/wallet/pricing").catch(() => ({
-      freePropertyQuota: 2,
-      extraPropertySlotFee: 10000,
-    })),
-  ]);
+  const [facilitiesRes, myKostsRes, pendingKostsRes, walletRes, pricingRes] =
+    await Promise.all([
+      serverFetch<{ roomFacilities: string[]; publicFacilities: string[] }>(
+        "/kosts/master-facilities",
+      ).catch(() => ({ roomFacilities: [], publicFacilities: [] })),
+      serverFetch<Kost[] | { data: Kost[]; total?: number }>(
+        `/kosts?ownerId=${user.id}&includePending=true&page=1&limit=1`,
+      ).catch(() => ({ data: [], total: 0 })),
+      serverFetch<Kost[] | { data: Kost[]; total?: number }>(
+        `/kosts?ownerId=${user.id}&approvalStatus=PENDING&page=1&limit=1`,
+      ).catch(() => ({ data: [], total: 0 })),
+      serverFetch<{ creditBalance: number; payoutBalance: number }>(
+        "/wallet/me",
+      ).catch(() => ({ creditBalance: 0, payoutBalance: 0 })),
+      serverFetch<{
+        freePropertyQuota?: number;
+        extraPropertySlotFee?: number;
+        maxPendingPropertiesPerOwner?: number;
+      }>("/wallet/pricing").catch(() => ({
+        freePropertyQuota: 2,
+        extraPropertySlotFee: 10000,
+        maxPendingPropertiesPerOwner: 10,
+      })),
+    ]);
 
   const existingPropertyCount = Array.isArray(myKostsRes)
     ? myKostsRes.length
     : Number(myKostsRes.total ?? (myKostsRes.data || []).length);
+  const pendingPropertyCount = Array.isArray(pendingKostsRes)
+    ? pendingKostsRes.length
+    : Number(pendingKostsRes.total ?? (pendingKostsRes.data || []).length);
 
   return (
     <NewPropertyClient
       currentUser={user}
       masterFacilities={facilitiesRes}
       existingPropertyCount={existingPropertyCount}
+      pendingPropertyCount={pendingPropertyCount}
+      maxPendingPropertiesPerOwner={Number(
+        pricingRes.maxPendingPropertiesPerOwner ?? 10,
+      )}
       creditBalance={Number(walletRes.creditBalance ?? 0)}
       freePropertyQuota={Number(pricingRes.freePropertyQuota ?? 2)}
       extraPropertySlotFee={Number(pricingRes.extraPropertySlotFee ?? 10000)}

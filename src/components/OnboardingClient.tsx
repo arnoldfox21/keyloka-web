@@ -11,7 +11,6 @@ import {
   Phone,
   Sparkles,
   UserCheck,
-  Users,
 } from "lucide-react";
 import { CityAutocompleteInput } from "@/components/CityAutocompleteInput";
 import {
@@ -39,7 +38,7 @@ export function OnboardingClient({
 }: OnboardingClientProps) {
   const router = useRouter();
   const [step, setStep] = useState(1);
-  const [role, setRole] = useState<"PENYEWA" | "PEMILIK_KOST" | "BOTH">(
+  const [role, setRole] = useState<"PENYEWA" | "PEMILIK_KOST">(
     allowOwnerRegistration && user.role === "PEMILIK_KOST"
       ? "PEMILIK_KOST"
       : "PENYEWA",
@@ -74,7 +73,7 @@ export function OnboardingClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           role,
-          roles: role === "BOTH" ? ["PENYEWA", "PEMILIK_KOST"] : [role],
+          roles: [role],
           preferredCategory,
           city: cityCheck.normalized || undefined,
           phone: phoneCheck.normalized || undefined,
@@ -86,11 +85,7 @@ export function OnboardingClient({
         setSaving(false);
         return;
       }
-      if (role === "BOTH") {
-        router.push("/choose-role");
-      } else {
-        router.push(role === "PEMILIK_KOST" ? "/dashboard" : "/");
-      }
+      router.push(role === "PEMILIK_KOST" ? "/dashboard" : "/");
       router.refresh();
     } catch {
       setError("Gagal terhubung ke server.");
@@ -187,42 +182,10 @@ export function OnboardingClient({
                   <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
                 )}
               </button>
-
-              <button
-                type="button"
-                disabled={!allowOwnerRegistration}
-                onClick={() => setRole("BOTH")}
-                className={`flex items-start gap-3.5 rounded-2xl border p-4 text-left transition ${
-                  !allowOwnerRegistration
-                    ? "border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed"
-                    : role === "BOTH"
-                      ? "border-emerald-600 bg-emerald-50/70 ring-2 ring-emerald-500/20"
-                      : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                <div className="rounded-xl bg-teal-100 p-2.5 text-teal-700">
-                  <Users className="h-5 w-5" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-bold text-gray-900">
-                      Keduanya (Penyewa &amp; Pemilik)
-                    </p>
-                    {!allowOwnerRegistration && (
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
-                        Ditutup Sementara
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-600 mt-0.5">
-                    Daftar di kedua peran sekaligus agar bisa mencari hunian sekaligus memasarkan properti.
-                  </p>
-                </div>
-                {role === "BOTH" && (
-                  <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
-                )}
-              </button>
             </div>
+            <p className="text-[11px] text-gray-500">
+              Kamu tetap bisa mengaktifkan atau beralih ke peran lainnya kapan saja melalui menu Profil.
+            </p>
           </div>
         )}
 
