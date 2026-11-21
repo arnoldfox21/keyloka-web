@@ -36,6 +36,8 @@ interface NewPropertyClientProps {
     publicFacilities: string[];
   };
   existingPropertyCount: number;
+  pendingPropertyCount?: number;
+  maxPendingPropertiesPerOwner?: number;
   creditBalance: number;
   freePropertyQuota?: number;
   extraPropertySlotFee?: number;
@@ -160,6 +162,8 @@ export function NewPropertyClient({
   currentUser,
   masterFacilities,
   existingPropertyCount,
+  pendingPropertyCount = 0,
+  maxPendingPropertiesPerOwner = 10,
   creditBalance,
   freePropertyQuota = DEFAULT_FREE_PROPERTY_QUOTA,
   extraPropertySlotFee = DEFAULT_EXTRA_PROPERTY_SLOT_FEE,
@@ -171,6 +175,10 @@ export function NewPropertyClient({
   const isStaffOrAdmin = role === "STAFF" || role === "ADMINISTRATOR";
   const isAutoApproved = isStaffOrAdmin || Boolean(currentUser.isVerified);
   const needsSlotFee = !isEditMode && !isStaffOrAdmin && existingPropertyCount >= freePropertyQuota;
+  const isPendingLimitReached =
+    !isEditMode &&
+    !isStaffOrAdmin &&
+    pendingPropertyCount >= maxPendingPropertiesPerOwner;
 
   const [propertyCategory, setPropertyCategory] = useState<string>(
     initialKost?.propertyCategory || "KOST",
@@ -599,6 +607,13 @@ export function NewPropertyClient({
       return;
     }
 
+    if (isPendingLimitReached) {
+      setError(
+        `Anda masih memiliki ${pendingPropertyCount} properti yang menunggu persetujuan (Pending Approval). Tunggu hingga tim Keyloka meninjau properti Anda sebelum menambahkan properti baru (maksimal ${maxPendingPropertiesPerOwner} properti pending).`,
+      );
+      return;
+    }
+
     const parsedRooms = Math.max(0, Math.round(Number(availableRooms) || 1));
     const parsedBedrooms = Math.max(1, Math.round(Number(bedrooms) || 1));
     const parsedBathrooms = Math.max(1, Math.round(Number(bathrooms) || 1));
@@ -736,7 +751,11 @@ export function NewPropertyClient({
           <p className="text-emerald-800">
             Properti aktif Anda saat ini:{" "}
             <span className="font-bold">{existingPropertyCount}</span> (Kuota gratis{" "}
-            {freePropertyQuota} properti).{" "}
+            {freePropertyQuota} properti, menunggu persetujuan:{" "}
+            <span className="font-bold">
+              {pendingPropertyCount}/{maxPendingPropertiesPerOwner}
+            </span>
+            ).{" "}
             {needsSlotFee ? (
               <>
                 Penambahan properti ini memerlukan biaya aktivasi slot{" "}
@@ -752,6 +771,13 @@ export function NewPropertyClient({
           </p>
         )}
       </div>
+
+      {isPendingLimitReached && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-900">
+          Anda sudah mencapai batas maksimal {maxPendingPropertiesPerOwner} properti yang masih berstatus{" "}
+          <span className="underline">Menunggu Persetujuan (Pending Approval)</span>. Silakan tunggu tim Keyloka meninjau properti Anda sebelum menambahkan properti baru.
+        </div>
+      )}
 
       {error && (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">

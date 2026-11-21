@@ -33,6 +33,15 @@ interface PlatformConfig {
   maintenanceMode: boolean;
   maintenanceMessage: string;
   opsNotificationEmail: string;
+  maxPendingPropertiesPerOwner?: number;
+  chatRateLimitPerMin?: number;
+  maxActiveSurveysPerUser?: number;
+  maxDailySurveysPerUser?: number;
+  maxUnpaidBookingsPerUser?: number;
+  maxHourlyDirectBookingsPerUser?: number;
+  maxPendingTopupsPerOwner?: number;
+  postRateLimitPerMin?: number;
+  commentRateLimitPerMin?: number;
   updatedAt?: string;
 }
 
@@ -194,6 +203,23 @@ export function AdminPlatformPanel() {
           maintenanceMode: config.maintenanceMode,
           maintenanceMessage: config.maintenanceMessage,
           opsNotificationEmail: config.opsNotificationEmail,
+          maxPendingPropertiesPerOwner: Number(
+            config.maxPendingPropertiesPerOwner ?? 10,
+          ),
+          chatRateLimitPerMin: Number(config.chatRateLimitPerMin ?? 12),
+          maxActiveSurveysPerUser: Number(config.maxActiveSurveysPerUser ?? 5),
+          maxDailySurveysPerUser: Number(config.maxDailySurveysPerUser ?? 8),
+          maxUnpaidBookingsPerUser: Number(
+            config.maxUnpaidBookingsPerUser ?? 2,
+          ),
+          maxHourlyDirectBookingsPerUser: Number(
+            config.maxHourlyDirectBookingsPerUser ?? 5,
+          ),
+          maxPendingTopupsPerOwner: Number(
+            config.maxPendingTopupsPerOwner ?? 3,
+          ),
+          postRateLimitPerMin: Number(config.postRateLimitPerMin ?? 5),
+          commentRateLimitPerMin: Number(config.commentRateLimitPerMin ?? 6),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -634,6 +660,189 @@ export function AdminPlatformPanel() {
                 placeholder="ops@keyloka.com"
                 className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
               />
+            </div>
+          </div>
+
+          <div className="border-t border-gray-100 pt-4 space-y-3">
+            <div>
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-gray-800">
+                Pengaturan Batas Anti-Spam &amp; Kuota Aktivitas
+              </h3>
+              <p className="text-[11px] text-gray-500">
+                Atur batas pengajuan properti pending, pengiriman pesan chat, survei, transaksi Midtrans, dan komentar.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Maks Properti Pending / Pemilik
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={config.maxPendingPropertiesPerOwner ?? 10}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      maxPendingPropertiesPerOwner: Number(e.target.value),
+                    })
+                  }
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Limit Kirim Chat / Menit
+                </label>
+                <input
+                  type="number"
+                  min={3}
+                  max={120}
+                  value={config.chatRateLimitPerMin ?? 12}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      chatRateLimitPerMin: Number(e.target.value),
+                    })
+                  }
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Maks Survei Aktif / Penyewa
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={config.maxActiveSurveysPerUser ?? 5}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      maxActiveSurveysPerUser: Number(e.target.value),
+                    })
+                  }
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Maks Survei Harian (24 Jam) / Penyewa
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={config.maxDailySurveysPerUser ?? 8}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      maxDailySurveysPerUser: Number(e.target.value),
+                    })
+                  }
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Maks Invoice Booking Unpaid / Penyewa
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={config.maxUnpaidBookingsPerUser ?? 2}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      maxUnpaidBookingsPerUser: Number(e.target.value),
+                    })
+                  }
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Maks Buat Booking Langsung / Jam
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={config.maxHourlyDirectBookingsPerUser ?? 5}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      maxHourlyDirectBookingsPerUser: Number(e.target.value),
+                    })
+                  }
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Maks Tagihan Top-Up Pending / Pemilik
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={config.maxPendingTopupsPerOwner ?? 3}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      maxPendingTopupsPerOwner: Number(e.target.value),
+                    })
+                  }
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Limit Buat Postingan / Menit
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={config.postRateLimitPerMin ?? 5}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      postRateLimitPerMin: Number(e.target.value),
+                    })
+                  }
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Limit Kirim Komentar / Menit
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={config.commentRateLimitPerMin ?? 6}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      commentRateLimitPerMin: Number(e.target.value),
+                    })
+                  }
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                />
+              </div>
             </div>
           </div>
 
