@@ -14,5 +14,15 @@
       "binding": "WORKER_SELF_REFERENCE",
       "service": "keyloka-web"
     }
-  ]
+  ],
+  "env": {
+    "dev": {
+      "name": "keyloka-web-dev",
+      "routes": [{ "pattern": "dev.keyloka.com", "custom_domain": true }],
+      "services": [
+        { "binding": "WORKER_SELF_REFERENCE", "service": "keyloka-web-dev" }
+      ],
+      "vars": { "API_BASE_URL": "https://api-dev.keyloka.com/api" }
+    }
+  }
 }
