@@ -172,6 +172,8 @@ export function KostDetailClient({
   const [paymentScheme, setPaymentScheme] = useState<"FULL" | "DP">("FULL");
   const [usePoints, setUsePoints] = useState(false);
   const [showFeeInfo, setShowFeeInfo] = useState(false);
+  const [showSecurityNotice, setShowSecurityNotice] = useState(false);
+  const [showCuratedNotice, setShowCuratedNotice] = useState(false);
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{
@@ -1160,6 +1162,86 @@ export function KostDetailClient({
                   {kost.ownerName}
                 </Link>
               </p>
+
+              {currentUser?.id !== kost.ownerId &&
+                (kost.isStaffPosted || currentUserRole !== "PEMILIK_KOST") && (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {kost.isStaffPosted && (
+                        <button
+                          type="button"
+                          onClick={() => setShowCuratedNotice((prev) => !prev)}
+                          aria-expanded={showCuratedNotice}
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition ${
+                            showCuratedNotice
+                              ? "border-emerald-300 bg-emerald-100 text-emerald-900"
+                              : "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                          }`}
+                        >
+                          <Sparkles className="h-3 w-3 text-emerald-600" />
+                          <span>Dikurasi Keyloka</span>
+                        </button>
+                      )}
+                      {currentUserRole !== "PEMILIK_KOST" && (
+                        <button
+                          type="button"
+                          onClick={() => setShowSecurityNotice((prev) => !prev)}
+                          aria-expanded={showSecurityNotice}
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition ${
+                            showSecurityNotice
+                              ? "border-amber-300 bg-amber-100 text-amber-950"
+                              : "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                          }`}
+                        >
+                          <ShieldAlert className="h-3.5 w-3.5 text-amber-600" />
+                          <span>Peringatan Keamanan</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {showCuratedNotice && kost.isStaffPosted && (
+                      <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-[11px] leading-relaxed text-gray-600">
+                        <div className="flex items-start justify-between gap-2">
+                          <p>
+                            Listing dikurasi tim Keyloka — hubungi pengelola langsung via WhatsApp. Pemilik properti dapat mengklaim listing ini melalui menu opsi (<span className="font-bold text-gray-800">...</span>) untuk mengaktifkan chat &amp; booking online.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setShowCuratedNotice(false)}
+                            aria-label="Tutup info kurasi"
+                            className="shrink-0 rounded-lg p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-700 transition"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {showSecurityNotice && currentUserRole !== "PEMILIK_KOST" && (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-[11px] leading-relaxed text-amber-950">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="flex items-start gap-2">
+                            <ShieldAlert className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                            <span>
+                              <strong>Peringatan Keamanan:</strong>{" "}
+                              {kost.allowDirectBooking && !kost.isStaffPosted
+                                ? "Dilarang melakukan transfer langsung ke rekening pemilik di luar platform Keyloka. Gunakan pembayaran Escrow resmi agar dana Anda terlindungi."
+                                : "Properti ini belum mengaktifkan pembayaran Escrow. Jangan melakukan transfer DP atau sewa langsung ke pemilik di luar platform sebelum survei di lokasi."}
+                            </span>
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setShowSecurityNotice(false)}
+                            aria-label="Tutup peringatan keamanan"
+                            className="shrink-0 rounded-lg p-0.5 text-amber-700/70 hover:bg-amber-100 hover:text-amber-900 transition"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
             </div>
 
             {kost.allowDirectBooking && !kost.isStaffPosted && (
@@ -1246,11 +1328,7 @@ export function KostDetailClient({
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-3.5 text-center text-xs font-bold text-gray-600">
                   Ini adalah properti milik Anda.
                 </div>
-              ) : kost.isStaffPosted ? (
-                <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-[11px] leading-relaxed text-gray-600">
-                  Listing dikurasi tim Keyloka — hubungi pengelola langsung via WhatsApp. Pemilik properti dapat mengklaim listing ini melalui menu opsi (<span className="font-bold text-gray-800">...</span>) untuk mengaktifkan chat &amp; booking online.
-                </div>
-              ) : currentUserRole === "PEMILIK_KOST" ? (
+              ) : kost.isStaffPosted ? null : currentUserRole === "PEMILIK_KOST" ? (
                 <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 text-center space-y-2.5">
                   <p className="text-xs font-semibold text-amber-900">
                     Anda sedang berada di <strong>Mode Pemilik</strong>. Beralih ke Mode Penyewa untuk melakukan booking atau tanya ketersediaan.
@@ -1321,19 +1399,6 @@ export function KostDetailClient({
                 >
                   Survei &amp; Cek Ketersediaan
                 </button>
-              )}
-              {currentUser?.id !== kost.ownerId && currentUserRole !== "PEMILIK_KOST" && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-[11px] leading-relaxed text-amber-950">
-                  <p className="flex items-start gap-2">
-                    <ShieldAlert className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
-                    <span>
-                      <strong>Peringatan Keamanan:</strong>{" "}
-                      {kost.allowDirectBooking && !kost.isStaffPosted
-                        ? "Dilarang melakukan transfer langsung ke rekening pemilik di luar platform Keyloka. Gunakan pembayaran Escrow resmi agar dana Anda terlindungi."
-                        : "Properti ini belum mengaktifkan pembayaran Escrow. Jangan melakukan transfer DP atau sewa langsung ke pemilik di luar platform sebelum survei di lokasi."}
-                    </span>
-                  </p>
-                </div>
               )}
             </div>
           </div>
