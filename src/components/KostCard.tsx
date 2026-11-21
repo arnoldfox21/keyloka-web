@@ -87,13 +87,16 @@ export function KostCard({ kost, isFavorite, onToggleFavorite }: KostCardProps) 
 
       <div className="flex flex-1 flex-col p-4">
         <div className="flex items-center justify-between gap-2 text-xs text-gray-500">
-          <span className="inline-flex items-center gap-1 truncate font-bold text-emerald-700">
+          <span className="inline-flex items-center gap-1.5 truncate font-bold text-emerald-700">
             {formatCategoryLabel(kost.propertyCategory)}
             {kost.isVerified && (
-              <BadgeCheck
-                className="h-3.5 w-3.5 shrink-0 text-emerald-600"
-                aria-label="Terverifikasi"
-              />
+              <span
+                title="Pemilik Terverifikasi"
+                className="inline-flex items-center gap-0.5 rounded-full bg-blue-600 px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-white shadow-2xs"
+              >
+                <BadgeCheck className="h-3 w-3 shrink-0 text-white" />
+                <span>Verified</span>
+              </span>
             )}
           </span>
           <span className="inline-flex items-center gap-1 font-bold text-gray-700">
