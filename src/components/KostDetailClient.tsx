@@ -1309,12 +1309,12 @@ export function KostDetailClient({
                   </a>
                 );
               })()}
-              {!kost.isStaffPosted && currentUser && isKostProperty(kost.propertyCategory) && (
+              {isKostProperty(kost.propertyCategory) && (
                 <Link
-                  href={`/chat?groupKostId=${kost.id}`}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 py-2.5 text-xs font-bold text-gray-700 hover:bg-gray-100 transition"
+                  href={currentUser ? `/chat?groupKostId=${kost.id}` : "/login"}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200/80 bg-gray-50/70 py-2.5 text-xs font-bold text-gray-500 opacity-75 hover:opacity-100 hover:bg-gray-100 hover:text-gray-700 transition"
                 >
-                  <Users className="h-4 w-4 text-emerald-600" />
+                  <Users className="h-4 w-4 text-emerald-600/75" />
                   Grup Penghuni Kost
                 </Link>
               )}
