@@ -15,6 +15,7 @@ import {
   Plus,
   Settings,
   Sparkles,
+  Star,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -519,6 +520,16 @@ export function NewPropertyClient({
         URL.revokeObjectURL(target.previewUrl);
       }
       return prev.filter((_, i) => i !== idx);
+    });
+  }
+
+  function handleSetFeaturedImage(idx: number) {
+    if (idx <= 0) return;
+    setImages((prev) => {
+      if (idx >= prev.length) return prev;
+      const target = prev[idx];
+      const rest = prev.filter((_, i) => i !== idx);
+      return [target, ...rest];
     });
   }
 
@@ -1604,36 +1615,62 @@ export function NewPropertyClient({
           </div>
 
           {images.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-              {images.map((item, idx) => {
-                const src =
-                  item.kind === "local"
-                    ? item.previewUrl
-                    : resolveImageUrl(item.url);
-                const key =
-                  item.kind === "local" ? item.previewUrl : `${item.url}-${idx}`;
-                return (
-                  <div
-                    key={key}
-                    className="group relative aspect-4/3 overflow-hidden rounded-xl border border-gray-200 bg-gray-100"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={src}
-                      alt={`Foto properti ${idx + 1}`}
-                      className="h-full w-full object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveImage(idx)}
-                      title="Hapus foto"
-                      className="absolute right-2 top-2 rounded-lg bg-red-600/90 p-1.5 text-white opacity-90 hover:bg-red-700"
+            <div className="space-y-2.5 pt-1">
+              <p className="text-[11px] text-gray-500">
+                Foto dengan tanda <strong className="text-emerald-700">Foto Utama</strong> akan ditampilkan sebagai sampul (featured image) di kartu properti & halaman detail. Klik tombol <strong>Jadikan Foto Utama</strong> pada foto lain untuk menggantinya.
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {images.map((item, idx) => {
+                  const src =
+                    item.kind === "local"
+                      ? item.previewUrl
+                      : resolveImageUrl(item.url);
+                  const key =
+                    item.kind === "local" ? item.previewUrl : `${item.url}-${idx}`;
+                  const isFeatured = idx === 0;
+                  return (
+                    <div
+                      key={key}
+                      className={`group relative aspect-4/3 overflow-hidden rounded-xl border bg-gray-100 transition ${
+                        isFeatured
+                          ? "border-2 border-emerald-600 ring-2 ring-emerald-500/20"
+                          : "border-gray-200"
+                      }`}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                );
-              })}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={src}
+                        alt={`Foto properti ${idx + 1}`}
+                        className="h-full w-full object-cover"
+                      />
+                      {isFeatured ? (
+                        <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2 py-1 text-[10px] font-extrabold text-white shadow-sm">
+                          <Star className="h-3 w-3 fill-amber-300 text-amber-300" />
+                          Foto Utama
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleSetFeaturedImage(idx)}
+                          title="Jadikan Foto Utama (Featured Image)"
+                          className="absolute bottom-2 left-2 right-2 inline-flex items-center justify-center gap-1 rounded-lg bg-gray-900/80 px-2 py-1.5 text-[10px] font-bold text-white backdrop-blur-xs transition hover:bg-emerald-600"
+                        >
+                          <Star className="h-3 w-3" />
+                          Jadikan Foto Utama
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveImage(idx)}
+                        title="Hapus foto"
+                        className="absolute right-2 top-2 rounded-lg bg-red-600/90 p-1.5 text-white opacity-90 hover:bg-red-700"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </section>
