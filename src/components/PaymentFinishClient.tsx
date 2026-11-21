@@ -30,8 +30,10 @@ export function PaymentFinishClient({
     normalizedStatus === "expire" ||
     normalizedStatus === "failure";
 
+  const upperOrder = orderId.toUpperCase();
   const isBookingOrder =
-    !isTopupOrder && orderId.toUpperCase().startsWith("HNV-BOOK-");
+    !isTopupOrder &&
+    (upperOrder.startsWith("KYL-BOOK-") || upperOrder.startsWith("HNV-BOOK-"));
   const shouldSync = Boolean(orderId) && (isTopupOrder || isBookingOrder);
 
   const [syncing, setSyncing] = useState(shouldSync);

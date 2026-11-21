@@ -113,6 +113,7 @@ async function forward(
   const clientIp = getClientIp(req);
   if (clientIp && clientIp !== "unknown") {
     headers.set("x-client-ip", clientIp);
+    headers.set("x-forwarded-for", clientIp);
   }
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
