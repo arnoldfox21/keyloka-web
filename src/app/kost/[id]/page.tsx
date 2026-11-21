@@ -206,6 +206,13 @@ export default async function KostDetailPage({
     ],
   };
 
+  // Read dynamically at runtime so Turbopack does not inline an empty build-time NEXT_PUBLIC_* value.
+  const recaptchaSiteKey = (
+    process.env.RECAPTCHA_SITE_KEY ||
+    process.env["NEXT_PUBLIC_" + "RECAPTCHA_SITE_KEY"] ||
+    ""
+  ).trim();
+
   return (
     <>
       <JsonLd data={[lodgingJsonLd, breadcrumbJsonLd]} />
@@ -215,6 +222,7 @@ export default async function KostDetailPage({
         currentUser={currentUser}
         recommendedKosts={recommendedKosts}
         activeBookingStatus={activeBooking?.status || null}
+        recaptchaSiteKey={recaptchaSiteKey}
       />
     </>
   );

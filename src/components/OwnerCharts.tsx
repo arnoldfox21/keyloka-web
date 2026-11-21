@@ -236,20 +236,23 @@ export interface DonutSlice {
   label: string;
   value: number;
   color: string;
+  displayValue?: string;
 }
 
 export function DonutChart({
   slices,
   centerLabel,
   centerValue,
+  size = 152,
+  strokeWidth = 20,
 }: {
   slices: DonutSlice[];
   centerLabel: string;
   centerValue: string;
+  size?: number;
+  strokeWidth?: number;
 }) {
   const total = slices.reduce((sum, s) => sum + Math.max(0, s.value), 0);
-  const size = 152;
-  const strokeWidth = 20;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
 
@@ -323,7 +326,7 @@ export function DonutChart({
                 {s.label}
               </span>
               <span className="font-bold text-gray-900">
-                {s.value}{" "}
+                {s.displayValue ?? s.value}{" "}
                 <span className="text-[11px] font-medium text-gray-400">
                   ({pct}%)
                 </span>

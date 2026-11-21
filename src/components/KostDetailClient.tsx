@@ -84,6 +84,7 @@ interface KostDetailClientProps {
   currentUser: UserProfile | null;
   recommendedKosts?: Kost[];
   activeBookingStatus?: string | null;
+  recaptchaSiteKey?: string;
 }
 
 export function KostDetailClient({
@@ -92,6 +93,7 @@ export function KostDetailClient({
   currentUser,
   recommendedKosts = [],
   activeBookingStatus = null,
+  recaptchaSiteKey: initialRecaptchaSiteKey,
 }: KostDetailClientProps) {
   const router = useRouter();
   const [activePhoto, setActivePhoto] = useState(0);
@@ -192,7 +194,11 @@ export function KostDetailClient({
   const [recaptchaToken, setRecaptchaToken] = useState("");
   const recaptchaContainerRef = useRef<HTMLDivElement | null>(null);
   const recaptchaWidgetIdRef = useRef<number | null>(null);
-  const recaptchaSiteKey = (process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "").trim();
+  const recaptchaSiteKey = (
+    initialRecaptchaSiteKey ||
+    process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY ||
+    ""
+  ).trim();
 
   useEffect(() => {
     if (!reportPropertyOpen || !recaptchaSiteKey) return;

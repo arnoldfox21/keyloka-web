@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+const isDevSite = (process.env.NEXT_PUBLIC_SITE_URL ?? "").includes("dev.");
+
 const nextConfig: NextConfig = {
   output: "standalone",
   images: {
@@ -10,6 +12,9 @@ const nextConfig: NextConfig = {
       {
         source: "/(.*)",
         headers: [
+          ...(isDevSite
+            ? [{ key: "X-Robots-Tag", value: "noindex, nofollow" }]
+            : []),
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           {
