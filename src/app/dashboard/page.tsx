@@ -46,7 +46,7 @@ export default async function DashboardPage({
     redirect("/bookings");
   }
 
-  const [myKostsRes, bookingsRes, walletRes, myPayoutsRes, pendingRes, allPayoutsRes, reviewReportsRes, kostReportsRes] =
+  const [myKostsRes, bookingsRes, walletRes, myPayoutsRes, pendingRes, allPayoutsRes, reviewReportsRes, kostReportsRes, platformStatus] =
     await Promise.all([
       serverFetch<Kost[] | { data: Kost[]; total?: number; hasMore?: boolean }>(
         isStaffOrAdmin
@@ -136,6 +136,9 @@ export default async function DashboardPage({
             createdAt: string;
           }>>("/kosts/reports").catch(() => [])
         : Promise.resolve([]),
+      serverFetch<{ allowWalletTopup?: boolean }>("/platform/status").catch(
+        () => ({ allowWalletTopup: true }),
+      ),
     ]);
 
   const initialMyKosts = Array.isArray(myKostsRes)
@@ -171,6 +174,7 @@ export default async function DashboardPage({
       initialCreated={initialCreated}
       initialUpdated={initialUpdated}
       initialTab={initialTab}
+      walletTopupEnabled={platformStatus.allowWalletTopup !== false}
     />
   );
 }

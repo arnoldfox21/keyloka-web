@@ -121,14 +121,16 @@ test.describe("Tenant & Interactive Public Flows", () => {
     await firstCard.click();
 
     const surveyBtn = page
-      .getByRole("button", { name: "Tanyakan Ketersediaan" })
+      .getByRole("button", {
+        name: /Jadwalkan Survei Dulu|Survei & Cek Ketersediaan/,
+      })
       .first();
+    const hasSurveyBtn = (await surveyBtn.count()) > 0;
+    test.skip(!hasSurveyBtn, "Properti kurasi staff hanya menampilkan kontak WhatsApp.");
     await expect(surveyBtn).toBeVisible();
     await surveyBtn.click();
 
-    await expect(
-      page.getByText("Tanya Ketersediaan & Survei"),
-    ).toBeVisible();
+    await expect(page.getByText("Jadwalkan Survei")).toBeVisible();
     const phoneInput = page
       .locator("form")
       .filter({ hasText: "Nomor HP / WhatsApp" })

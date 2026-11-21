@@ -267,7 +267,12 @@ export function HomeExplorer({
       const rows: Kost[] = Array.isArray(json) ? json : json.data || [];
       const more = Array.isArray(json) ? false : Boolean(json.hasMore);
 
-      setKosts((prev) => (append ? [...prev, ...rows] : rows));
+      setKosts((prev) => {
+        if (!append) return rows;
+        const existingIds = new Set(prev.map((item) => item.id));
+        const uniqueNew = rows.filter((item) => !existingIds.has(item.id));
+        return [...prev, ...uniqueNew];
+      });
       setHasMore(more);
       setPage(nextPage);
 

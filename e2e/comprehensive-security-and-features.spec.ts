@@ -207,10 +207,14 @@ test.describe("Comprehensive Security, Validation, Chat Spam & Feature Tests", (
     test.skip(count === 0, "Butuh minimal 1 data kost.");
 
     await firstCard.click();
-    await page
-      .getByRole("button", { name: "Tanyakan Ketersediaan" })
-      .first()
-      .click();
+    const surveyBtn = page
+      .getByRole("button", {
+        name: /Jadwalkan Survei Dulu|Survei & Cek Ketersediaan/,
+      })
+      .first();
+    const hasSurveyBtn = (await surveyBtn.count()) > 0;
+    test.skip(!hasSurveyBtn, "Properti kurasi staff hanya menampilkan kontak WhatsApp.");
+    await surveyBtn.click();
 
     const phoneInput = page
       .locator("form")

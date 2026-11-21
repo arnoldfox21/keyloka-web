@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
 import { checkRateLimit, getClientIp, verifySameOrigin } from "@/lib/request-security";
 import { API_BASE_URL, getServerToken, SESSION_COOKIE_NAME } from "@/lib/server-api";
 
@@ -13,6 +14,7 @@ const ALLOWED_PREFIXES = new Set([
   "chats",
   "auth",
   "notifications",
+  "admin",
 ]);
 
 // Auth mutations that issue/rotate session cookies must go through /api/auth/*
@@ -83,6 +85,21 @@ async function forward(
       );
     }
   }
+  const isEngagementTrack =
+    req.method === "POST" &&
+    path[0] === "kosts" &&
+    path.length === 3 &&
+    path[2] === "track";
+  if (isEngagementTrack) {
+    const ip = getClientIp(req);
+    const rl = checkRateLimit(`kost-track:${ip}`, 40, 60_000);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { counted: false },
+        { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+      );
+    }
+  }
   const targetPath = path.join("/");
   const search = req.nextUrl.search || "";
   const targetUrl = `${API_BASE_URL}/${targetPath}${search}`;
@@ -92,6 +109,10 @@ async function forward(
   const contentType = req.headers.get("content-type");
   if (contentType) {
     headers.set("Content-Type", contentType);
+  }
+  const clientIp = getClientIp(req);
+  if (clientIp && clientIp !== "unknown") {
+    headers.set("x-client-ip", clientIp);
   }
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
@@ -113,8 +134,25 @@ async function forward(
     init.body = isMultipart ? await req.arrayBuffer() : await req.text();
   }
 
+  const startedAt = Date.now();
   try {
     const res = await fetch(targetUrl, init);
+    const durationMs = Date.now() - startedAt;
+    if (res.status >= 500) {
+      logger.error("ApiProxy", "Upstream API 5xx response", {
+        method: req.method,
+        path: targetPath,
+        status: res.status,
+        durationMs,
+      });
+    } else if (res.status >= 400 && res.status !== 401 && res.status !== 404) {
+      logger.warn("ApiProxy", "Upstream API 4xx response", {
+        method: req.method,
+        path: targetPath,
+        status: res.status,
+        durationMs,
+      });
+    }
     const bodyText = await res.text();
     const response = new NextResponse(bodyText, {
       status: res.status,
@@ -127,12 +165,24 @@ async function forward(
     }
     return response;
   } catch (err) {
+    const durationMs = Date.now() - startedAt;
     if (err instanceof Error && err.name === "TimeoutError") {
+      logger.error("ApiProxy", "Upstream API timeout", {
+        method: req.method,
+        path: targetPath,
+        durationMs,
+      });
       return NextResponse.json(
         { message: "Koneksi ke Keyloka API timeout. Silakan coba lagi." },
         { status: 504 },
       );
     }
+    logger.error("ApiProxy", "Upstream API connection failed", {
+      method: req.method,
+      path: targetPath,
+      durationMs,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return NextResponse.json(
       { message: "Gagal terhubung ke Keyloka API." },
       { status: 502 },

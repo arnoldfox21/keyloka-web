@@ -30,15 +30,15 @@ const FAQ_ITEMS = [
   },
   {
     category: "Untuk Pencari Hunian",
-    question: "Apakah bertanya ketersediaan atau menjadwalkan survei dikenakan biaya?",
+    question: "Apakah menjadwalkan survei atau mengecek ketersediaan dikenakan biaya?",
     answer:
-      "Tidak. Anda dapat menekan tombol Tanyakan Ketersediaan di halaman properti secara gratis untuk memastikan kamar masih kosong dan menyepakati jadwal survei dengan pemilik.",
+      "Tidak. Anda dapat menekan tombol Jadwalkan Survei Dulu / Survei & Cek Ketersediaan di halaman properti secara gratis untuk memastikan kamar masih kosong dan menyepakati jadwal survei dengan pemilik.",
   },
   {
     category: "Untuk Pencari Hunian",
-    question: "Apa perbedaan Tanyakan Ketersediaan dan Booking Sekarang (Escrow)?",
+    question: "Apa perbedaan Jadwalkan Survei dan Booking Sekarang (Escrow)?",
     answer:
-      "Tanyakan Ketersediaan cocok jika Anda ingin memastikan kondisi kamar atau menjadwalkan survei terlebih dahulu tanpa langsung membayar. Booking Sekarang (Escrow) memungkinkan Anda langsung mengunci kamar dengan pembayaran penuh atau DP secara aman.",
+      "Jadwalkan Survei Dulu / Survei & Cek Ketersediaan cocok jika Anda ingin memastikan kondisi kamar atau menjadwalkan survei terlebih dahulu tanpa langsung membayar. Booking Sekarang (Escrow) memungkinkan Anda langsung mengunci kamar dengan pembayaran penuh atau DP secara aman.",
   },
   {
     category: "Untuk Pencari Hunian",

@@ -473,9 +473,9 @@ export function BookingsClient({
                         </p>
                       )}
                       <p className="text-xs text-gray-500">
-                        Mulai: {b.startDate}
+                        {isDirect ? "Mulai:" : "Jadwal:"} {b.surveyDateTime || b.startDate}
                         {isDirect
-                          ? ` • ${b.durationCount} ${b.durationUnit === "DAY" ? "Hari" : "Bulan"}`
+                          ? ` • ${b.durationCount} ${b.durationUnit === "DAY" ? "Hari" : b.durationUnit === "YEAR" ? "Tahun" : "Bulan"}`
                           : ""}
                       </p>
                     </div>

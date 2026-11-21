@@ -585,6 +585,52 @@ export interface NotificationPageResponse {
   hasMore: boolean;
 }
 
+export function formatNotificationTimestamp(dateStr: string): {
+  relative: string;
+  exact: string;
+} {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return { relative: "", exact: "" };
+  const diffMs = Math.max(0, Date.now() - d.getTime());
+  const mins = Math.floor(diffMs / 60000);
+  let relative: string;
+  if (mins < 1) {
+    relative = "Baru saja";
+  } else if (mins < 60) {
+    relative = `${mins} menit lalu`;
+  } else {
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) {
+      relative = `${hours} jam lalu`;
+    } else {
+      const days = Math.floor(hours / 24);
+      if (days < 7) {
+        relative = `${days} hari lalu`;
+      } else {
+        const weeks = Math.floor(days / 7);
+        relative =
+          weeks < 5 ? `${weeks} minggu lalu` : `${Math.floor(days / 30)} bulan lalu`;
+      }
+    }
+  }
+  const datePart = d.toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  const timePart = d
+    .toLocaleTimeString("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+    .replace(".", ":");
+  return {
+    relative,
+    exact: `${datePart}, ${timePart}`,
+  };
+}
+
 export const ARTICLE_CATEGORY_LABELS: Record<string, string> = {
   TIPS_KOST: "Tips Cari Kost",
   PANDUAN_AREA: "Panduan Area & Kampus",

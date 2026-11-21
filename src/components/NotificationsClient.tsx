@@ -13,7 +13,11 @@ import {
   Star,
   Wallet,
 } from "lucide-react";
-import type { NotificationItem, NotificationPageResponse } from "@/lib/types";
+import {
+  formatNotificationTimestamp,
+  type NotificationItem,
+  type NotificationPageResponse,
+} from "@/lib/types";
 
 interface NotificationsClientProps {
   initialData: NotificationPageResponse;
@@ -29,24 +33,6 @@ const FILTER_TABS = [
   { key: "REVIEW", label: "Ulasan" },
   { key: "WALLET", label: "Dompet" },
 ];
-
-function formatRelativeTime(dateStr: string): string {
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return "";
-  const diffMs = Date.now() - d.getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "Baru saja";
-  if (mins < 60) return `${mins} menit lalu`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} jam lalu`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} hari lalu`;
-  return d.toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
 
 function getNotificationIcon(type: string) {
   switch ((type || "").toUpperCase()) {
@@ -261,6 +247,7 @@ export function NotificationsClient({ initialData }: NotificationsClientProps) {
           {items.map((item) => {
             const meta = getNotificationIcon(item.type);
             const Icon = meta.icon;
+            const ts = formatNotificationTimestamp(item.createdAt);
             return (
               <button
                 key={item.id}
@@ -278,14 +265,19 @@ export function NotificationsClient({ initialData }: NotificationsClientProps) {
                   <Icon className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-2">
                     <p className="text-sm font-extrabold text-gray-900">
                       {item.title}
                     </p>
                     <div className="flex shrink-0 items-center gap-2">
-                      <span className="text-[11px] font-medium text-gray-400">
-                        {formatRelativeTime(item.createdAt)}
-                      </span>
+                      {ts.relative && (
+                        <span
+                          suppressHydrationWarning
+                          className="sm:text-right text-[11px] font-medium text-gray-400"
+                        >
+                          {ts.relative} • {ts.exact}
+                        </span>
+                      )}
                       {!item.isRead && (
                         <span
                           aria-label="Belum dibaca"

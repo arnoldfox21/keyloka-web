@@ -28,6 +28,8 @@ import {
   Zap,
 } from "lucide-react";
 import { validateWithdrawAccount } from "@/lib/validation";
+import { AdminPlatformPanel } from "./AdminPlatformPanel";
+import { OwnerStatisticsPanel } from "./OwnerStatisticsPanel";
 
 const INDONESIAN_BANKS = [
   "BCA",
@@ -184,17 +186,20 @@ interface DashboardClientProps {
   initialCreated?: boolean;
   initialUpdated?: boolean;
   initialTab?: string;
+  walletTopupEnabled?: boolean;
 }
 
 type TabKey =
   | "PROPERTIES"
+  | "STATISTICS"
   | "DISPUTES"
   | "FINANCE"
   | "WALLET"
   | "APPROVAL"
   | "WITHDRAWALS"
   | "USERS"
-  | "ARTICLES";
+  | "ARTICLES"
+  | "PLATFORM";
 
 export function DashboardClient({
   currentUser,
@@ -214,16 +219,17 @@ export function DashboardClient({
   initialCreated = false,
   initialUpdated = false,
   initialTab,
+  walletTopupEnabled = true,
 }: DashboardClientProps) {
   const role = (currentUser.role || "").toUpperCase();
   const isStaffOrAdmin = role === "STAFF" || role === "ADMINISTRATOR";
   const isAdmin = role === "ADMINISTRATOR";
 
   const validTabs: TabKey[] = isAdmin
-    ? ["PROPERTIES", "DISPUTES", "APPROVAL", "WITHDRAWALS", "USERS", "ARTICLES"]
+    ? ["PROPERTIES", "DISPUTES", "APPROVAL", "WITHDRAWALS", "USERS", "ARTICLES", "PLATFORM"]
     : isStaffOrAdmin
       ? ["PROPERTIES", "DISPUTES", "APPROVAL", "WITHDRAWALS", "USERS"]
-      : ["PROPERTIES", "DISPUTES", "FINANCE", "WALLET"];
+      : ["PROPERTIES", "STATISTICS", "DISPUTES", "FINANCE", "WALLET"];
   const normalizedInitialTab = initialTab === "BOOKINGS" ? "DISPUTES" : initialTab;
   const resolvedInitialTab: TabKey =
     normalizedInitialTab && validTabs.includes(normalizedInitialTab as TabKey)
@@ -1434,10 +1440,16 @@ export function DashboardClient({
           badge: pendingWithdrawCount,
         },
         { key: "USERS", label: "Kelola Pengguna" },
-        ...(isAdmin ? [{ key: "ARTICLES" as TabKey, label: "Moderasi Artikel" }] : []),
+        ...(isAdmin
+          ? [
+              { key: "ARTICLES" as TabKey, label: "Moderasi Artikel" },
+              { key: "PLATFORM" as TabKey, label: "Konfigurasi & Monitor" },
+            ]
+          : []),
       ]
     : [
         { key: "PROPERTIES", label: "Properti Saya", badge: kostsTotal },
+        { key: "STATISTICS", label: "Statistik" },
         {
           key: "DISPUTES",
           label: "Sengketa",
@@ -2003,7 +2015,7 @@ export function DashboardClient({
                         {b.kost?.name || `Properti #${b.kostId}`}
                       </h3>
                       <p className="text-xs text-gray-600">
-                        Penyewa: <span className="font-bold">{b.tenantName}</span> ({b.tenantPhone}) • Mulai {b.startDate}
+                        Penyewa: <span className="font-bold">{b.tenantName}</span> ({b.tenantPhone}) • Mulai {b.surveyDateTime || b.startDate}
                       </p>
                     </div>
                     {b.totalAmount > 0 && (
@@ -2084,6 +2096,30 @@ export function DashboardClient({
       {tab === "WALLET" && (
         <div className="space-y-6">
           {/* Top-Up Saldo Kredit */}
+          {!walletTopupEnabled ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg font-black text-gray-900">
+                  Top-Up Saldo Kredit Iklan &amp; Boost
+                </h2>
+                <span className="rounded-full bg-amber-200 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-amber-900">
+                  Segera Hadir
+                </span>
+              </div>
+              <p className="text-sm font-semibold text-amber-900">
+                Top-up saldo kredit online sedang dalam persiapan dan belum dapat
+                digunakan.
+              </p>
+              <p className="text-xs text-amber-800 leading-relaxed">
+                Kami sedang mengaktifkan gerbang pembayaran resmi agar transaksi
+                Anda aman. Saldo kredit saat ini:{" "}
+                <span className="font-bold">{formatRupiah(creditBalance)}</span>.
+                Fitur lain seperti survei, chat, dan pengelolaan properti tetap
+                dapat digunakan seperti biasa. Terima kasih atas
+                kesabarannya.
+              </p>
+            </div>
+          ) : (
           <form
             onSubmit={handleTopupCredit}
             className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-6 space-y-4"
@@ -2187,6 +2223,7 @@ export function DashboardClient({
               </div>
             )}
           </form>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <form
@@ -2500,6 +2537,11 @@ export function DashboardClient({
           </div>
         </div>
         </div>
+      )}
+
+      {/* Tab Content: STATISTICS (Pemilik Properti) */}
+      {tab === "STATISTICS" && !isStaffOrAdmin && (
+        <OwnerStatisticsPanel kosts={myKosts} />
       )}
 
       {/* Tab Content: FINANCE (Pemilik Properti) */}
@@ -3578,6 +3620,9 @@ export function DashboardClient({
           </div>
         </div>
       )}
+
+      {/* Tab Content: PLATFORM (Admin Config & Monitor) */}
+      {tab === "PLATFORM" && isAdmin && <AdminPlatformPanel />}
 
       {/* Tab Content: ARTICLES (Admin Moderation) */}
       {tab === "ARTICLES" && isAdmin && (() => {

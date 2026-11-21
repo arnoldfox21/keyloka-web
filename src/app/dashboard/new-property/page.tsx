@@ -37,7 +37,7 @@ export default async function NewPropertyPage() {
     redirect("/bookings");
   }
 
-  const [facilitiesRes, myKostsRes, walletRes] = await Promise.all([
+  const [facilitiesRes, myKostsRes, walletRes, pricingRes] = await Promise.all([
     serverFetch<{ roomFacilities: string[]; publicFacilities: string[] }>(
       "/kosts/master-facilities",
     ).catch(() => ({ roomFacilities: [], publicFacilities: [] })),
@@ -47,6 +47,13 @@ export default async function NewPropertyPage() {
     serverFetch<{ creditBalance: number; payoutBalance: number }>(
       "/wallet/me",
     ).catch(() => ({ creditBalance: 0, payoutBalance: 0 })),
+    serverFetch<{
+      freePropertyQuota?: number;
+      extraPropertySlotFee?: number;
+    }>("/wallet/pricing").catch(() => ({
+      freePropertyQuota: 2,
+      extraPropertySlotFee: 10000,
+    })),
   ]);
 
   const existingPropertyCount = Array.isArray(myKostsRes)
@@ -59,6 +66,8 @@ export default async function NewPropertyPage() {
       masterFacilities={facilitiesRes}
       existingPropertyCount={existingPropertyCount}
       creditBalance={Number(walletRes.creditBalance ?? 0)}
+      freePropertyQuota={Number(pricingRes.freePropertyQuota ?? 2)}
+      extraPropertySlotFee={Number(pricingRes.extraPropertySlotFee ?? 10000)}
     />
   );
 }

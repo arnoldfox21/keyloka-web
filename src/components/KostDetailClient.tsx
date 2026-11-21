@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   Calendar,
   CheckCircle2,
+  Clock,
   Edit3,
   ExternalLink,
   Flag,
@@ -121,6 +122,39 @@ export function KostDetailClient({
     }
   }, [kost]);
 
+  const getOrCreateVisitorId = () => {
+    try {
+      const storageKey = "keyloka_visitor_id";
+      const existing = sessionStorage.getItem(storageKey);
+      if (existing) return existing;
+      const generated =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      sessionStorage.setItem(storageKey, generated);
+      return generated;
+    } catch {
+      return undefined;
+    }
+  };
+
+  useEffect(() => {
+    if (currentUser?.id === kost.ownerId) return;
+    try {
+      const sessionKey = `keyloka_viewed_${kost.id}`;
+      if (sessionStorage.getItem(sessionKey)) return;
+      sessionStorage.setItem(sessionKey, "1");
+    } catch {
+      // Abaikan jika sessionStorage tidak tersedia
+    }
+    const visitorId = getOrCreateVisitorId();
+    fetch(`/api/proxy/kosts/${kost.id}/track`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "VIEW", visitorId }),
+    }).catch(() => {});
+  }, [kost.id, kost.ownerId, currentUser?.id]);
+
   const minSurveyDate = (() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
@@ -133,10 +167,13 @@ export function KostDetailClient({
   const [tenantName, setTenantName] = useState(currentUser?.name || "");
   const [tenantPhone, setTenantPhone] = useState(currentUser?.phone || "");
   const [startDate, setStartDate] = useState(minSurveyDate);
+  const [bookingTime, setBookingTime] = useState("10:00");
   const [durationCount, setDurationCount] = useState(1);
   const [paymentScheme, setPaymentScheme] = useState<"FULL" | "DP">("FULL");
   const [usePoints, setUsePoints] = useState(false);
   const [showFeeInfo, setShowFeeInfo] = useState(false);
+  const [showSecurityNotice, setShowSecurityNotice] = useState(false);
+  const [showCuratedNotice, setShowCuratedNotice] = useState(false);
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{
@@ -293,6 +330,7 @@ export function KostDetailClient({
       return;
     }
     setFeedback(null);
+    setBookingTime(mode === "DIRECT" ? "14:00" : "10:00");
     setModalMode(mode);
   }
 
@@ -405,6 +443,14 @@ export function KostDetailClient({
       });
       return;
     }
+    if (!bookingTime) {
+      setFeedback({
+        type: "error",
+        text: "Harap pilih jam survei.",
+      });
+      return;
+    }
+    const scheduleLabel = `${startDate} ${bookingTime} WIB`;
     setSubmitting(true);
     setFeedback(null);
     try {
@@ -417,7 +463,8 @@ export function KostDetailClient({
           tenantPhone: phoneCheck.normalized,
           startDate,
           bookingType: "SURVEI",
-          surveyDateTime: startDate,
+          surveyTime: bookingTime,
+          surveyDateTime: scheduleLabel,
           notes: notes.trim(),
         }),
       });
@@ -485,6 +532,14 @@ export function KostDetailClient({
       });
       return;
     }
+    if (!bookingTime) {
+      setFeedback({
+        type: "error",
+        text: "Harap pilih perkiraan jam check-in.",
+      });
+      return;
+    }
+    const scheduleLabel = `${startDate} ${bookingTime} WIB`;
     setSubmitting(true);
     setFeedback(null);
     try {
@@ -496,6 +551,8 @@ export function KostDetailClient({
           tenantName: tenantName.trim(),
           tenantPhone: phoneCheck.normalized,
           startDate,
+          checkInTime: bookingTime,
+          surveyDateTime: scheduleLabel,
           durationCount,
           paymentScheme: breakdown.effectiveScheme,
           notes: notes.trim(),
@@ -664,7 +721,7 @@ export function KostDetailClient({
                     Terverifikasi
                   </span>
                 )}
-                {kost.allowDirectBooking && (
+                {kost.allowDirectBooking && !kost.isStaffPosted && (
                   <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white">
                     <ShieldCheck className="h-3.5 w-3.5" />
                     Direct Booking + Escrow
@@ -1105,9 +1162,89 @@ export function KostDetailClient({
                   {kost.ownerName}
                 </Link>
               </p>
+
+              {currentUser?.id !== kost.ownerId &&
+                (kost.isStaffPosted || currentUserRole !== "PEMILIK_KOST") && (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {kost.isStaffPosted && (
+                        <button
+                          type="button"
+                          onClick={() => setShowCuratedNotice((prev) => !prev)}
+                          aria-expanded={showCuratedNotice}
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition ${
+                            showCuratedNotice
+                              ? "border-emerald-300 bg-emerald-100 text-emerald-900"
+                              : "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                          }`}
+                        >
+                          <Sparkles className="h-3 w-3 text-emerald-600" />
+                          <span>Dikurasi Keyloka</span>
+                        </button>
+                      )}
+                      {currentUserRole !== "PEMILIK_KOST" && (
+                        <button
+                          type="button"
+                          onClick={() => setShowSecurityNotice((prev) => !prev)}
+                          aria-expanded={showSecurityNotice}
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition ${
+                            showSecurityNotice
+                              ? "border-amber-300 bg-amber-100 text-amber-950"
+                              : "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                          }`}
+                        >
+                          <ShieldAlert className="h-3.5 w-3.5 text-amber-600" />
+                          <span>Peringatan Keamanan</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {showCuratedNotice && kost.isStaffPosted && (
+                      <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-[11px] leading-relaxed text-gray-600">
+                        <div className="flex items-start justify-between gap-2">
+                          <p>
+                            Listing dikurasi tim Keyloka — hubungi pengelola langsung via WhatsApp. Pemilik properti dapat mengklaim listing ini melalui menu opsi (<span className="font-bold text-gray-800">...</span>) untuk mengaktifkan chat &amp; booking online.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setShowCuratedNotice(false)}
+                            aria-label="Tutup info kurasi"
+                            className="shrink-0 rounded-lg p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-700 transition"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {showSecurityNotice && currentUserRole !== "PEMILIK_KOST" && (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-[11px] leading-relaxed text-amber-950">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="flex items-start gap-2">
+                            <ShieldAlert className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                            <span>
+                              <strong>Peringatan Keamanan:</strong>{" "}
+                              {kost.allowDirectBooking && !kost.isStaffPosted
+                                ? "Dilarang melakukan transfer langsung ke rekening pemilik di luar platform Keyloka. Gunakan pembayaran Escrow resmi agar dana Anda terlindungi."
+                                : "Properti ini belum mengaktifkan pembayaran Escrow. Jangan melakukan transfer DP atau sewa langsung ke pemilik di luar platform sebelum survei di lokasi."}
+                            </span>
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setShowSecurityNotice(false)}
+                            aria-label="Tutup peringatan keamanan"
+                            className="shrink-0 rounded-lg p-0.5 text-amber-700/70 hover:bg-amber-100 hover:text-amber-900 transition"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
             </div>
 
-            {kost.allowDirectBooking && (
+            {kost.allowDirectBooking && !kost.isStaffPosted && (
               <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-3.5 text-xs text-emerald-900">
                 <p className="font-bold flex items-center gap-1.5">
                   <ShieldCheck className="h-4 w-4 text-emerald-600" />
@@ -1120,7 +1257,7 @@ export function KostDetailClient({
             )}
 
             <div className="space-y-2.5">
-              {currentUser?.id !== kost.ownerId && (
+              {!kost.isStaffPosted && currentUser?.id !== kost.ownerId && (
                 <Link
                   href={
                     currentUser
@@ -1133,7 +1270,7 @@ export function KostDetailClient({
                   Tanya Pemilik (Chat)
                 </Link>
               )}
-              {kost.showOwnerWhatsapp && kost.ownerPhone && (() => {
+              {(kost.isStaffPosted || kost.showOwnerWhatsapp) && kost.ownerPhone && (() => {
                 const waNumber = toWhatsappDigits(kost.ownerPhone);
                 if (!waNumber) return null;
                 const kostUrl = `${getSiteUrl()}/kost/${kost.id}`;
@@ -1145,14 +1282,28 @@ export function KostDetailClient({
                     href={`https://wa.me/${waNumber}?text=${waText}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 py-2.5 text-sm font-bold text-emerald-800 hover:bg-emerald-100 transition"
+                    onClick={() => {
+                      if (currentUser?.id === kost.ownerId) return;
+                      const visitorId = getOrCreateVisitorId();
+                      fetch(`/api/proxy/kosts/${kost.id}/track`, {
+                        method: "POST",
+                        keepalive: true,
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ type: "WA_CLICK", visitorId }),
+                      }).catch(() => {});
+                    }}
+                    className={
+                      kost.isStaffPosted
+                        ? "flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-sm font-extrabold text-white shadow-sm hover:bg-emerald-700 transition"
+                        : "flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 py-2.5 text-sm font-bold text-emerald-800 hover:bg-emerald-100 transition"
+                    }
                   >
-                    <Phone className="h-4 w-4 text-emerald-600" />
-                    Chat Pemilik via WhatsApp
+                    <Phone className={kost.isStaffPosted ? "h-4 w-4 text-white" : "h-4 w-4 text-emerald-600"} />
+                    {kost.isStaffPosted ? "Hubungi Pemilik via WhatsApp" : "Chat Pemilik via WhatsApp"}
                   </a>
                 );
               })()}
-              {currentUser && isKostProperty(kost.propertyCategory) && (
+              {!kost.isStaffPosted && currentUser && isKostProperty(kost.propertyCategory) && (
                 <Link
                   href={`/chat?groupKostId=${kost.id}`}
                   className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 py-2.5 text-xs font-bold text-gray-700 hover:bg-gray-100 transition"
@@ -1177,7 +1328,7 @@ export function KostDetailClient({
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-3.5 text-center text-xs font-bold text-gray-600">
                   Ini adalah properti milik Anda.
                 </div>
-              ) : currentUserRole === "PEMILIK_KOST" ? (
+              ) : kost.isStaffPosted ? null : currentUserRole === "PEMILIK_KOST" ? (
                 <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 text-center space-y-2.5">
                   <p className="text-xs font-semibold text-amber-900">
                     Anda sedang berada di <strong>Mode Pemilik</strong>. Beralih ke Mode Penyewa untuk melakukan booking atau tanya ketersediaan.
@@ -1230,7 +1381,7 @@ export function KostDetailClient({
                       onClick={() => openModal("SURVEI")}
                       className="w-full rounded-xl border border-emerald-600 py-3 text-sm font-bold text-emerald-700 hover:bg-emerald-50 transition"
                     >
-                      Tanyakan Ketersediaan
+                      Jadwalkan Survei Dulu
                     </button>
                   </>
                 ) : (
@@ -1246,21 +1397,8 @@ export function KostDetailClient({
                   onClick={() => openModal("SURVEI")}
                   className="w-full rounded-xl bg-emerald-600 py-3.5 text-sm font-extrabold text-white shadow-sm hover:bg-emerald-700 transition"
                 >
-                  Tanyakan Ketersediaan
+                  Survei &amp; Cek Ketersediaan
                 </button>
-              )}
-              {currentUser?.id !== kost.ownerId && currentUserRole !== "PEMILIK_KOST" && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-[11px] leading-relaxed text-amber-950">
-                  <p className="flex items-start gap-2">
-                    <ShieldAlert className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
-                    <span>
-                      <strong>Peringatan Keamanan:</strong>{" "}
-                      {kost.allowDirectBooking
-                        ? "Dilarang melakukan transfer langsung ke rekening pemilik di luar platform Keyloka. Gunakan pembayaran Escrow resmi agar dana Anda terlindungi."
-                        : "Properti ini belum mengaktifkan pembayaran Escrow. Jangan melakukan transfer DP atau sewa langsung ke pemilik di luar platform sebelum survei di lokasi."}
-                    </span>
-                  </p>
-                </div>
               )}
             </div>
           </div>
@@ -1314,7 +1452,7 @@ export function KostDetailClient({
             <div className="shrink-0 flex items-start justify-between gap-3 border-b border-gray-100 px-4 py-3 sm:px-6 sm:py-4 bg-gray-50/70">
               <div className="min-w-0">
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
-                  {modalMode === "DIRECT" ? "Booking Langsung" : "Tanya Ketersediaan & Survei"}
+                  {modalMode === "DIRECT" ? "Booking Langsung" : "Jadwalkan Survei"}
                 </span>
                 <h3 className="mt-1 truncate text-base font-black text-gray-900">
                   {kost.name}
@@ -1369,12 +1507,12 @@ export function KostDetailClient({
                   </div>
                 </div>
 
-                <div className={`grid gap-3 ${modalMode === "DIRECT" ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
                       {modalMode === "DIRECT"
                         ? "Tanggal Mulai Masuk"
-                        : "Rencana Tanggal Masuk / Survei"}
+                        : "Rencana Tanggal Survei"}
                     </label>
                     <div className="relative">
                       <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -1389,41 +1527,59 @@ export function KostDetailClient({
                     </div>
                   </div>
 
-                  {modalMode === "DIRECT" && (
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">
-                        Durasi ({isDaily ? "Hari" : isYearly ? "Tahun" : "Bulan"})
-                      </label>
-                      <div className="flex h-[42px] items-center justify-between rounded-xl border border-gray-200 bg-white px-2">
-                        <button
-                          type="button"
-                          aria-label="Kurangi durasi"
-                          disabled={durationCount <= 1}
-                          onClick={() =>
-                            setDurationCount((d) => Math.max(1, d - 1))
-                          }
-                          className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-base font-bold text-gray-700 transition hover:bg-gray-200 disabled:opacity-40"
-                        >
-                          −
-                        </button>
-                        <span className="text-sm font-bold text-gray-900">
-                          {durationCount} {isDaily ? "Hari" : isYearly ? "Tahun" : "Bulan"}
-                        </span>
-                        <button
-                          type="button"
-                          aria-label="Tambah durasi"
-                          disabled={durationCount >= maxDuration}
-                          onClick={() =>
-                            setDurationCount((d) => Math.min(maxDuration, d + 1))
-                          }
-                          className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-base font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-40"
-                        >
-                          +
-                        </button>
-                      </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      {modalMode === "DIRECT"
+                        ? "Perkiraan Jam Check-In (WIB)"
+                        : "Jam Survei (WIB)"}
+                    </label>
+                    <div className="relative">
+                      <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        type="time"
+                        required
+                        value={bookingTime}
+                        onChange={(e) => setBookingTime(e.target.value)}
+                        className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-3 text-sm focus:border-emerald-500 focus:outline-none"
+                      />
                     </div>
-                  )}
+                  </div>
                 </div>
+
+                {modalMode === "DIRECT" && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Durasi ({isDaily ? "Hari" : isYearly ? "Tahun" : "Bulan"})
+                    </label>
+                    <div className="flex h-[42px] items-center justify-between rounded-xl border border-gray-200 bg-white px-2">
+                      <button
+                        type="button"
+                        aria-label="Kurangi durasi"
+                        disabled={durationCount <= 1}
+                        onClick={() =>
+                          setDurationCount((d) => Math.max(1, d - 1))
+                        }
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-base font-bold text-gray-700 transition hover:bg-gray-200 disabled:opacity-40"
+                      >
+                        −
+                      </button>
+                      <span className="text-sm font-bold text-gray-900">
+                        {durationCount} {isDaily ? "Hari" : isYearly ? "Tahun" : "Bulan"}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label="Tambah durasi"
+                        disabled={durationCount >= maxDuration}
+                        onClick={() =>
+                          setDurationCount((d) => Math.min(maxDuration, d + 1))
+                        }
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-base font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-40"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {modalMode === "DIRECT" && (
                   <>
