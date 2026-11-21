@@ -3345,7 +3345,7 @@ export function DashboardClient({
                       <span className="rounded-lg bg-gray-100 px-2 py-0.5 text-[11px] font-bold text-gray-700">
                         {targetRole}
                       </span>
-                      {(u.isVerified || targetRole === "STAFF" || targetRole === "ADMINISTRATOR") && (
+                      {u.isVerified && targetRole !== "STAFF" && targetRole !== "ADMINISTRATOR" && (
                         <span className="rounded-lg bg-emerald-100 px-2 py-0.5 text-[11px] font-extrabold text-emerald-800">
                           TERVERIFIKASI
                         </span>

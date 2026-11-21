@@ -187,10 +187,10 @@ export function OwnerProfileClient({
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <h1 className="truncate text-xl font-extrabold text-gray-900">{owner.name}</h1>
-                  {(owner.isVerified ||
-                    ["STAFF", "ADMINISTRATOR"].includes(
+                  {owner.isVerified &&
+                    !["STAFF", "ADMINISTRATOR"].includes(
                       (owner.role || "").toUpperCase(),
-                    )) && (
+                    ) && (
                     <span
                       title="Pemilik Terverifikasi"
                       className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700"

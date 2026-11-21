@@ -283,8 +283,12 @@ export interface KostGroupDetail {
   kostName: string;
   kostImage?: string;
   ownerId: number;
+  myRole?: "ADMIN" | "MEMBER" | "NONE";
+  isMember?: boolean;
+  memberCount?: number;
   settings: {
     pinnedAnnouncement?: string | null;
+    pinnedText?: string | null;
     adminOnly?: boolean;
   };
   members: KostGroupMember[];

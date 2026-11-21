@@ -424,18 +424,49 @@ export function ChatClient({
         const res = await fetch(`/api/proxy/chats/groups/${activeGroupKostId}`);
         if (res.ok && active) {
           const data: KostGroupDetail = await res.json();
-          setGroupDetail(data);
-          socketRef.current?.emit("joinGroupChat", {
-            kostId: activeGroupKostId,
-            userId: currentUser.id,
-          });
+          const hasMembership =
+            data.isMember !== undefined
+              ? Boolean(data.isMember)
+              : data.ownerId === currentUser.id ||
+                (Array.isArray(data.members) &&
+                  data.members.some((m) => m.userId === currentUser.id));
+          setGroupDetail({ ...data, isMember: hasMembership });
+          if (hasMembership) {
+            socketRef.current?.emit("joinGroupChat", {
+              kostId: activeGroupKostId,
+              userId: currentUser.id,
+            });
+          }
         } else if (active) {
           const errData = await res.json().catch(() => ({}));
-          setGroupDetail(null);
-          setChatError(
-            errData?.message ||
-              "Grup penghuni hanya tersedia untuk properti Kost atau Anda belum memiliki akses.",
-          );
+          if (res.status === 403) {
+            let fallbackName = `Grup Properti #${activeGroupKostId}`;
+            try {
+              const kRes = await fetch(`/api/proxy/kosts/${activeGroupKostId}`);
+              if (kRes.ok) {
+                const kData = await kRes.json();
+                if (kData?.name) fallbackName = kData.name;
+              }
+            } catch {
+              // ignore
+            }
+            setGroupDetail({
+              kostId: activeGroupKostId!,
+              kostName: fallbackName,
+              ownerId: 0,
+              myRole: "NONE",
+              isMember: false,
+              settings: { adminOnly: false },
+              members: [],
+              messages: [],
+            });
+          } else {
+            setGroupDetail(null);
+            setChatError(
+              errData?.message ||
+                "Grup penghuni hanya tersedia untuk properti Kost atau Anda belum memiliki akses.",
+            );
+          }
         }
       } finally {
         if (active) setLoadingRoom(false);
@@ -759,6 +790,18 @@ export function ChatClient({
     groupDetail &&
     (groupDetail.ownerId === currentUser.id ||
       currentUser.role === "ADMINISTRATOR");
+
+  const isGroupMember = Boolean(
+    groupDetail &&
+      (groupDetail.isMember !== undefined
+        ? groupDetail.isMember
+        : isGroupOwner ||
+          (Array.isArray(groupDetail.members) &&
+            groupDetail.members.some((m) => m.userId === currentUser.id))),
+  );
+  const isGroupLocked = Boolean(
+    activeGroupKostId && !loadingRoom && (!groupDetail || !isGroupMember),
+  );
 
   const isTenantView =
     (currentUser.role || "").toUpperCase() === "PENYEWA" &&
@@ -1093,7 +1136,7 @@ export function ChatClient({
                     </button>
                   )}
 
-                {activeGroupKostId && groupDetail && (
+                {activeGroupKostId && groupDetail && isGroupMember && (
                   <button
                     type="button"
                     onClick={() => setShowMembers((v) => !v)}
@@ -1102,6 +1145,12 @@ export function ChatClient({
                     <Users className="h-3.5 w-3.5" />
                     <span>Anggota ({groupDetail.members?.length || 0})</span>
                   </button>
+                )}
+                {activeGroupKostId && isGroupLocked && (
+                  <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-[11px] font-extrabold text-amber-800">
+                    <Lock className="h-3.5 w-3.5 text-amber-600" />
+                    Terkunci
+                  </span>
                 )}
               </div>
 
@@ -1201,7 +1250,52 @@ export function ChatClient({
               )}
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-gray-50/40">
+              <div className="relative flex-1 overflow-y-auto p-5 space-y-3 bg-gray-50/40">
+                {isGroupLocked && (
+                  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-gray-900/55 backdrop-blur-xs p-6 text-center">
+                    <div className="max-w-sm rounded-3xl border border-white/20 bg-white/95 p-6 shadow-xl space-y-3">
+                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 shadow-inner">
+                        <Lock className="h-6 w-6" />
+                      </div>
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider text-amber-800">
+                        <Lock className="h-3 w-3 text-amber-600" />
+                        Grup Terkunci
+                      </span>
+                      <h3 className="text-sm sm:text-base font-extrabold text-gray-900">
+                        Khusus Anggota Grup Penghuni Kost
+                      </h3>
+                      <p className="text-xs leading-relaxed text-gray-600">
+                        Anda belum tergabung sebagai anggota di grup{" "}
+                        <span className="font-bold text-gray-800">
+                          {groupDetail?.kostName || `Properti #${activeGroupKostId}`}
+                        </span>
+                        . Hubungi pemilik kost melalui chat pribadi agar akun Anda ditambahkan ke grup penghuni.
+                      </p>
+                      {groupDetail?.ownerId && groupDetail.ownerId > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const targetKostId = activeGroupKostId!;
+                            const targetOwnerId = groupDetail.ownerId;
+                            const targetKostName = groupDetail.kostName;
+                            setActiveGroupKostId(null);
+                            setActiveDirect({
+                              kostId: targetKostId,
+                              peerId: targetOwnerId,
+                              peerName: null,
+                              kostName: targetKostName,
+                              propertyCategory: "KOST",
+                            });
+                          }}
+                          className="mt-1 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-extrabold text-white shadow-xs hover:bg-emerald-700 transition"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                          Chat Pribadi Pemilik Kost
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
                 {loadingRoom ? (
                   <p className="text-center text-xs text-gray-400 py-8">
                     Memuat pesan...
@@ -1587,7 +1681,28 @@ export function ChatClient({
               )}
 
               {/* Input */}
-              {activeGroupKostId &&
+              {activeGroupKostId && isGroupLocked ? (
+                <div className="flex items-center gap-2 border-t border-gray-200 bg-gray-100 p-2.5 sm:p-3.5">
+                  <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-gray-200/70 text-gray-400">
+                    <Lock className="h-4 w-4" />
+                  </div>
+                  <input
+                    type="text"
+                    disabled
+                    value=""
+                    placeholder="Grup terkunci — Anda bukan anggota grup penghuni ini"
+                    className="min-w-0 flex-1 cursor-not-allowed rounded-xl border border-gray-200 bg-gray-200/60 px-3.5 py-2.5 text-xs sm:text-sm font-medium text-gray-500 outline-none"
+                  />
+                  <button
+                    type="button"
+                    disabled
+                    className="inline-flex h-10 shrink-0 cursor-not-allowed items-center gap-1.5 rounded-xl bg-gray-300 px-3.5 sm:px-4 text-xs font-bold text-gray-500"
+                  >
+                    <Lock className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Terkunci</span>
+                  </button>
+                </div>
+              ) : activeGroupKostId &&
               groupDetail?.settings?.adminOnly &&
               !isGroupOwner ? (
                 <div className="flex items-center justify-center gap-2 border-t border-gray-200 bg-gray-50 p-3.5 text-xs font-semibold text-gray-500">
