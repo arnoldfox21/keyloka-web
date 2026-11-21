@@ -26,6 +26,56 @@ interface KostLocationPickerProps {
   onLocationResolved?: (resolved: ResolvedLocationAddress) => void;
 }
 
+function parseDirectCoordinates(raw: string): { lat: number; lng: number } | null {
+  const cleaned = raw.trim().replace(/^\((.*)\)$/, "$1").trim();
+
+  // Decimal format: "-7.9526, 112.6143" or "112.6143, -7.9526"
+  const decMatch = cleaned.match(
+    /^([+-]?\d{1,3}(?:\.\d+)?)\s*[,;\s]\s*([+-]?\d{1,3}(?:\.\d+)?)$/,
+  );
+  if (decMatch) {
+    const a = Number(decMatch[1]);
+    const b = Number(decMatch[2]);
+    if (a >= -90 && a <= 90 && b >= -180 && b <= 180) {
+      return { lat: a, lng: b };
+    }
+    if (b >= -90 && b <= 90 && a >= -180 && a <= 180) {
+      return { lat: b, lng: a };
+    }
+  }
+
+  // DMS format: e.g. 7°57'09.4"S 112°36'51.5"E
+  const dmsRegex =
+    /(\d{1,3})\s*°\s*(\d{1,2})\s*['′]\s*(\d{1,2}(?:\.\d+)?)\s*["″]?\s*([NSEW])/gi;
+  const matches = [...cleaned.matchAll(dmsRegex)];
+  if (matches.length === 2) {
+    let lat: number | null = null;
+    let lng: number | null = null;
+    for (const m of matches) {
+      const deg = Number(m[1]);
+      const min = Number(m[2]);
+      const sec = Number(m[3]);
+      const dir = m[4].toUpperCase();
+      let val = deg + min / 60 + sec / 3600;
+      if (dir === "S" || dir === "W") val = -val;
+      if (dir === "N" || dir === "S") lat = val;
+      if (dir === "E" || dir === "W") lng = val;
+    }
+    if (
+      lat !== null &&
+      lng !== null &&
+      lat >= -90 &&
+      lat <= 90 &&
+      lng >= -180 &&
+      lng <= 180
+    ) {
+      return { lat, lng };
+    }
+  }
+
+  return null;
+}
+
 export function KostLocationPicker({
   latitude,
   longitude,
@@ -90,6 +140,21 @@ export function KostLocationPicker({
     }, 350);
   }, []);
 
+  const applyCoordinates = useCallback(
+    (lat: number, lng: number) => {
+      const latStr = lat.toFixed(6);
+      const lngStr = lng.toFixed(6);
+      setSearchQuery(`${latStr}, ${lngStr}`);
+      setSearchResults([]);
+      setHasSearched(false);
+      setSearching(false);
+      onChangeRef.current(latStr, lngStr);
+      mapRef.current?.setView([lat, lng], 16, { animate: true });
+      triggerReverseGeocode(lat, lng);
+    },
+    [triggerReverseGeocode],
+  );
+
   const handleSelectSearchResult = useCallback(
     (item: SearchResultItem) => {
       const latStr = item.lat.toFixed(6);
@@ -123,6 +188,13 @@ export function KostLocationPicker({
         setSearching(false);
         return;
       }
+
+      const directCoords = parseDirectCoordinates(q);
+      if (directCoords) {
+        applyCoordinates(directCoords.lat, directCoords.lng);
+        return;
+      }
+
       setSearching(true);
       try {
         const qs = new URLSearchParams({ mode: "search", q });
@@ -152,7 +224,7 @@ export function KostLocationPicker({
         setSearching(false);
       }
     },
-    [handleSelectSearchResult, hasCoords, parsedLat, parsedLng],
+    [applyCoordinates, handleSelectSearchResult, hasCoords, parsedLat, parsedLng],
   );
 
   function handleSearchInput(val: string) {
@@ -162,6 +234,11 @@ export function KostLocationPicker({
       setSearchResults([]);
       setHasSearched(false);
       setSearching(false);
+      return;
+    }
+    const directCoords = parseDirectCoordinates(val);
+    if (directCoords) {
+      applyCoordinates(directCoords.lat, directCoords.lng);
       return;
     }
     searchTimerRef.current = setTimeout(() => {
@@ -316,7 +393,7 @@ export function KostLocationPicker({
               performSearch(searchQuery);
             }
           }}
-          placeholder="Cari jalan, area, atau tempel link Google Maps / koordinat..."
+          placeholder="Cari jalan, area, atau tempel koordinat (contoh: -7.9526, 112.6143)..."
           className="w-full rounded-xl border border-gray-200 bg-white pl-9 pr-16 py-2 text-xs font-medium text-gray-900 focus:border-emerald-500 focus:outline-none"
         />
         <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -343,8 +420,8 @@ export function KostLocationPicker({
           <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
             {searchResults.length === 0 ? (
               <p className="px-3.5 py-2.5 text-xs text-gray-500 leading-relaxed">
-                Lokasi tidak ditemukan. Coba ketik nama jalan/kecamatan, atau buka Google Maps →{" "}
-                <strong>Bagikan</strong> → <strong>Salin Link</strong> lalu tempel di kolom ini.
+                Lokasi tidak ditemukan. Coba ketik nama jalan/kecamatan, atau salin koordinat{" "}
+                <strong>latitude, longitude</strong> dari Google Maps lalu tempel di kolom ini.
               </p>
             ) : (
               searchResults.map((item, idx) => (
@@ -371,7 +448,7 @@ export function KostLocationPicker({
       </div>
 
       <p className="text-[11px] text-gray-500">
-        Tips: Jika nama properti tidak muncul, buka Google Maps → <strong>Bagikan</strong> → <strong>Salin Link</strong> lalu tempel di kolom pencarian di atas.
+        Tips: Klik kanan (atau tekan tahan di HP) titik lokasi di Google Maps untuk menyalin koordinat (contoh: <strong>-7.9526, 112.6143</strong>) lalu tempel di kolom pencarian di atas.
       </p>
 
       <div

@@ -6,17 +6,6 @@ const NOMINATIM_HEADERS = {
   Accept: "application/json",
 };
 
-const ALLOWED_GMAPS_HOSTS = new Set([
-  "maps.app.goo.gl",
-  "goo.gl",
-  "g.co",
-  "maps.google.com",
-  "www.google.com",
-  "google.com",
-]);
-
-const SHORT_GMAPS_HOSTS = new Set(["maps.app.goo.gl", "goo.gl", "g.co"]);
-
 const OLC_ALPHABET = "23456789CFGHJMPQRVWX";
 
 function normalizeStreetQuery(raw: string): string {
@@ -72,105 +61,41 @@ function isValidLatLng(lat: number, lng: number): boolean {
 function extractCoordsFromText(
   text: string,
 ): { lat: number; lng: number } | null {
-  const trimmed = text.trim();
+  const cleaned = text.trim().replace(/^\((.*)\)$/, "$1").trim();
 
-  // Direct coordinate input: "-7.9526, 112.6143" or "-7.9526 112.6143"
-  const directMatch = trimmed.match(
-    /^(-?\d{1,2}(?:\.\d+)?)\s*[,;\s]\s*(-?\d{1,3}(?:\.\d+)?)$/,
+  // Direct coordinate input: "-7.9526, 112.6143", "-7.9526 112.6143", or "112.6143, -7.9526"
+  const directMatch = cleaned.match(
+    /^([+-]?\d{1,3}(?:\.\d+)?)\s*[,;\s]\s*([+-]?\d{1,3}(?:\.\d+)?)$/,
   );
   if (directMatch) {
-    const lat = Number(directMatch[1]);
-    const lng = Number(directMatch[2]);
-    if (isValidLatLng(lat, lng)) return { lat, lng };
+    const a = Number(directMatch[1]);
+    const b = Number(directMatch[2]);
+    if (isValidLatLng(a, b)) return { lat: a, lng: b };
+    if (isValidLatLng(b, a)) return { lat: b, lng: a };
   }
 
-  // Google Maps URL patterns: !3dLAT!4dLNG, @LAT,LNG, /maps/place|search/LAT,LNG, or ?q=LAT,LNG / ll=LAT,LNG
-  const patterns = [
-    /!3d(-?\d{1,2}(?:\.\d+)?)!4d(-?\d{1,3}(?:\.\d+)?)/,
-    /@(-?\d{1,2}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)/,
-    /\/maps\/(?:search|place)\/(-?\d{1,2}(?:\.\d+)?)(?:%2C|,)\s*\+?(-?\d{1,3}(?:\.\d+)?)/i,
-    /[?&](?:q|ll|center)=(-?\d{1,2}(?:\.\d+)?)(?:%2C|,)\s*\+?(-?\d{1,3}(?:\.\d+)?)/i,
-  ];
-  for (const regex of patterns) {
-    const m = trimmed.match(regex);
-    if (m) {
-      const lat = Number(m[1]);
-      const lng = Number(m[2]);
-      if (isValidLatLng(lat, lng)) return { lat, lng };
+  // DMS format: e.g. 7°57'09.4"S 112°36'51.5"E
+  const dmsRegex =
+    /(\d{1,3})\s*°\s*(\d{1,2})\s*['′]\s*(\d{1,2}(?:\.\d+)?)\s*["″]?\s*([NSEW])/gi;
+  const matches = [...cleaned.matchAll(dmsRegex)];
+  if (matches.length === 2) {
+    let lat: number | null = null;
+    let lng: number | null = null;
+    for (const m of matches) {
+      const deg = Number(m[1]);
+      const min = Number(m[2]);
+      const sec = Number(m[3]);
+      const dir = m[4].toUpperCase();
+      let val = deg + min / 60 + sec / 3600;
+      if (dir === "S" || dir === "W") val = -val;
+      if (dir === "N" || dir === "S") lat = val;
+      if (dir === "E" || dir === "W") lng = val;
+    }
+    if (lat !== null && lng !== null && isValidLatLng(lat, lng)) {
+      return { lat, lng };
     }
   }
 
-  return null;
-}
-
-function unwrapConsentUrl(urlStr: string): string {
-  try {
-    const u = new URL(urlStr);
-    if (u.hostname.toLowerCase() === "consent.google.com") {
-      const cont = u.searchParams.get("continue");
-      if (cont) return cont;
-    }
-  } catch {
-    // Ignore invalid URL
-  }
-  return urlStr;
-}
-
-async function resolveGoogleMapsUrl(raw: string): Promise<string> {
-  const urlMatch = raw.match(/https?:\/\/[^\s]+/i);
-  if (!urlMatch) return raw;
-
-  try {
-    let current = unwrapConsentUrl(urlMatch[0]);
-    const parsed = new URL(current);
-    if (!ALLOWED_GMAPS_HOSTS.has(parsed.hostname.toLowerCase())) {
-      return raw;
-    }
-
-    if (SHORT_GMAPS_HOSTS.has(parsed.hostname.toLowerCase())) {
-      // Follow redirect Location headers manually so we don't download full Maps HTML
-      for (let hop = 0; hop < 5; hop++) {
-        const res = await fetch(current, {
-          method: "GET",
-          redirect: "manual",
-          signal: AbortSignal.timeout(5000),
-        });
-        const location = res.headers.get("location");
-        if (res.status >= 300 && res.status < 400 && location) {
-          const nextUrl = unwrapConsentUrl(new URL(location, current).toString());
-          current = nextUrl;
-          const nextHost = new URL(current).hostname.toLowerCase();
-          if (!SHORT_GMAPS_HOSTS.has(nextHost)) {
-            return current;
-          }
-          continue;
-        }
-        return unwrapConsentUrl(res.url || current);
-      }
-    }
-    return current;
-  } catch {
-    return raw;
-  }
-}
-
-function extractPlaceNameFromGmapsUrl(urlStr: string): string | null {
-  try {
-    const u = new URL(urlStr);
-    const placeMatch = u.pathname.match(/\/maps\/(?:place|search)\/([^/]+)/i);
-    if (placeMatch?.[1]) {
-      const decoded = decodeURIComponent(placeMatch[1].replace(/\+/g, " ")).trim();
-      if (decoded && !extractCoordsFromText(decoded)) {
-        return decoded;
-      }
-    }
-    const qParam = u.searchParams.get("q") || u.searchParams.get("query");
-    if (qParam && !extractCoordsFromText(qParam)) {
-      return qParam.trim();
-    }
-  } catch {
-    // Ignore invalid URL
-  }
   return null;
 }
 
@@ -580,24 +505,14 @@ export async function GET(request: NextRequest) {
     const lng =
       rawLng !== null && rawLng.trim() !== "" ? Number(rawLng) : Number.NaN;
 
-    // 1. Check direct coordinates or Google Maps URL (including short links)
-    let resolvedInput = rawQ;
-    if (/https?:\/\//i.test(rawQ)) {
-      resolvedInput = await resolveGoogleMapsUrl(rawQ);
-    }
-
-    const directCoords = extractCoordsFromText(resolvedInput);
+    // 1. Check direct coordinates (latitude, longitude or longitude, latitude)
+    const directCoords = extractCoordsFromText(rawQ);
     if (directCoords) {
       return buildAutoSelectResponse(directCoords.lat, directCoords.lng);
     }
 
-    const placeFromUrl = /https?:\/\//i.test(resolvedInput)
-      ? extractPlaceNameFromGmapsUrl(resolvedInput)
-      : null;
-    const effectiveQuery = placeFromUrl || rawQ;
-
     // 2. Check Google Plus Code (e.g. "3HJW+J97 ZikZak Kost, Jl. Notojoyo, ... Malang")
-    const plusCodeInfo = extractPlusCode(effectiveQuery);
+    const plusCodeInfo = extractPlusCode(rawQ);
     if (plusCodeInfo) {
       let decoded: { lat: number; lng: number } | null = null;
       if (plusCodeInfo.isFull) {
@@ -638,7 +553,7 @@ export async function GET(request: NextRequest) {
     }
 
     const candidates = buildAddressCandidates(
-      plusCodeInfo?.restText || effectiveQuery,
+      plusCodeInfo?.restText || rawQ,
     );
     if (candidates.length === 0) {
       return NextResponse.json({ results: [] });
