@@ -34,3 +34,20 @@ Buka [http://localhost:3000](http://localhost:3000) di browser.
 - `npm run lint` — Menjalankan ESLint
 - `npm run cf:build` / `npm run cf:preview` / `npm run cf:deploy` — Build, preview, dan deploy ke Cloudflare Workers
 - `npm run test:e2e` — Menjalankan Playwright end-to-end tests
+
+## Deploy DEV (Cloudflare Workers Builds)
+
+Branch `dev` → Worker `keyloka-web-dev` → https://dev.keyloka.com (API: https://api-dev.keyloka.com/api).
+
+Setup di dashboard Cloudflare (Workers & Pages → Create → Import repository `keyloka-web`):
+1. Project/Worker name: `keyloka-web-dev` (harus sama dengan `env.dev.name` di `wrangler.jsonc`).
+2. Production branch: `dev`.
+3. Build command: `npx opennextjs-cloudflare build`
+4. Deploy command: `npx opennextjs-cloudflare deploy -- --env dev`
+5. Build variables:
+   - `NEXT_PUBLIC_SITE_URL=https://dev.keyloka.com`
+   - `NEXT_PUBLIC_API_URL=https://api-dev.keyloka.com/api`
+   - `NEXT_PUBLIC_MIDTRANS_IS_PRODUCTION=false`
+   - `NEXT_PUBLIC_MIDTRANS_CLIENT_KEY=<sandbox key>`
+   - `NEXT_PUBLIC_GOOGLE_CLIENT_ID=<client id>`
+6. Domain `dev.keyloka.com` dibuat otomatis dari `routes` (custom_domain) di `wrangler.jsonc`.
