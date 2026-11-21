@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Cpu,
   Database,
+  Disc,
   HardDrive,
   RefreshCw,
   Save,
@@ -15,6 +16,7 @@ import {
   Settings,
 } from "lucide-react";
 import { formatNotificationTimestamp, formatRupiah } from "@/lib/types";
+import { DonutChart } from "@/components/OwnerCharts";
 
 interface PlatformConfig {
   id: number;
@@ -51,9 +53,17 @@ interface SystemHealth {
     cpuCores: number;
     loadAvg1m: number;
     loadAvg5m: number;
+    loadAvg15m?: number;
+    cpuUsagePercent?: number;
     usedMemMb: number;
     freeMemMb: number;
     totalMemMb: number;
+  };
+  diskMetrics?: {
+    totalGb: number;
+    usedGb: number;
+    freeGb: number;
+    usagePercent: number;
   };
   logsSummary: {
     errorsLast24h: number;
@@ -221,6 +231,32 @@ export function AdminPlatformPanel() {
         )
       : 0;
 
+  const cpuPct = health
+    ? health.hostMetrics.cpuUsagePercent ??
+      Math.min(
+        100,
+        Math.max(
+          0,
+          Math.round(
+            (health.hostMetrics.loadAvg1m /
+              Math.max(1, health.hostMetrics.cpuCores)) *
+              100,
+          ),
+        ),
+      )
+    : 0;
+
+  const apiMemMb = health ? Math.min(health.processMemoryMb.rss, health.hostMetrics.usedMemMb) : 0;
+  const otherMemMb = health ? Math.max(0, health.hostMetrics.usedMemMb - apiMemMb) : 0;
+  const freeMemMb = health ? Math.max(0, health.hostMetrics.freeMemMb) : 0;
+
+  const diskTotalGb = health?.diskMetrics?.totalGb ?? 0;
+  const diskUsedGb = health?.diskMetrics?.usedGb ?? 0;
+  const diskFreeGb = health?.diskMetrics?.freeGb ?? 0;
+  const diskPct =
+    health?.diskMetrics?.usagePercent ??
+    (diskTotalGb > 0 ? Math.round((diskUsedGb / diskTotalGb) * 100) : 0);
+
   return (
     <div className="space-y-6">
       {feedback && (
@@ -259,7 +295,7 @@ export function AdminPlatformPanel() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-3.5">
               <p className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500">
                 <Database className="h-3.5 w-3.5 text-emerald-600" />
@@ -284,10 +320,14 @@ export function AdminPlatformPanel() {
                 CPU &amp; Load Average
               </p>
               <p className="mt-1 text-sm font-black text-gray-900">
-                Load {health.hostMetrics.loadAvg1m} / {health.hostMetrics.cpuCores} core
+                Load {health.hostMetrics.loadAvg1m} / {health.hostMetrics.cpuCores} core ({cpuPct}%)
               </p>
               <p className="mt-0.5 text-[11px] text-gray-500">
-                5 menit: {health.hostMetrics.loadAvg5m} • {health.nodeVersion}
+                5m: {health.hostMetrics.loadAvg5m}
+                {health.hostMetrics.loadAvg15m !== undefined
+                  ? ` • 15m: ${health.hostMetrics.loadAvg15m}`
+                  : ""}{" "}
+                • {health.nodeVersion}
               </p>
             </div>
 
@@ -306,6 +346,19 @@ export function AdminPlatformPanel() {
 
             <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-3.5">
               <p className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500">
+                <Disc className="h-3.5 w-3.5 text-violet-600" />
+                Penyimpanan Disk (VPS)
+              </p>
+              <p className="mt-1 text-sm font-black text-gray-900">
+                {diskUsedGb} / {diskTotalGb} GB ({diskPct}%)
+              </p>
+              <p className="mt-0.5 text-[11px] text-gray-500">
+                Tersedia: {diskFreeGb} GB bebas
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-3.5">
+              <p className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500">
                 <Activity className="h-3.5 w-3.5 text-rose-600" />
                 Integrasi &amp; Event 24 Jam
               </p>
@@ -316,6 +369,111 @@ export function AdminPlatformPanel() {
                 Mail: {health.integrations.mailProvider.toUpperCase()} •{" "}
                 {health.integrations.midtransProduction ? "Midtrans Prod" : "Midtrans Sandbox"}
               </p>
+            </div>
+          </div>
+
+          {/* Resource Usage Pie/Donut Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 pt-1">
+            <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="flex items-center gap-1.5 text-xs font-extrabold text-gray-800">
+                  <Cpu className="h-3.5 w-3.5 text-blue-600" />
+                  Distribusi Beban CPU
+                </p>
+                <span className="rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+                  {health.hostMetrics.cpuCores} Core
+                </span>
+              </div>
+              <DonutChart
+                size={128}
+                strokeWidth={18}
+                centerValue={`${cpuPct}%`}
+                centerLabel="Beban CPU"
+                slices={[
+                  {
+                    label: "Beban Aktif (1m)",
+                    value: cpuPct,
+                    displayValue: `Load ${health.hostMetrics.loadAvg1m}`,
+                    color: cpuPct >= 85 ? "#dc2626" : cpuPct >= 65 ? "#d97706" : "#2563eb",
+                  },
+                  {
+                    label: "Kapasitas Tersedia",
+                    value: Math.max(0, 100 - cpuPct),
+                    displayValue: `${Math.max(0, 100 - cpuPct)}% Idle`,
+                    color: "#e2e8f0",
+                  },
+                ]}
+              />
+            </div>
+
+            <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="flex items-center gap-1.5 text-xs font-extrabold text-gray-800">
+                  <HardDrive className="h-3.5 w-3.5 text-amber-600" />
+                  Proporsi Memori Host &amp; API
+                </p>
+                <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                  Total {health.hostMetrics.totalMemMb} MB
+                </span>
+              </div>
+              <DonutChart
+                size={128}
+                strokeWidth={18}
+                centerValue={`${memPct}%`}
+                centerLabel="RAM Terpakai"
+                slices={[
+                  {
+                    label: "Node API (RSS)",
+                    value: apiMemMb,
+                    displayValue: `${apiMemMb} MB`,
+                    color: "#059669",
+                  },
+                  {
+                    label: "OS & Proses Lain",
+                    value: otherMemMb,
+                    displayValue: `${otherMemMb} MB`,
+                    color: "#d97706",
+                  },
+                  {
+                    label: "Memori Bebas",
+                    value: freeMemMb,
+                    displayValue: `${freeMemMb} MB`,
+                    color: "#e2e8f0",
+                  },
+                ]}
+              />
+            </div>
+
+            <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="flex items-center gap-1.5 text-xs font-extrabold text-gray-800">
+                  <Disc className="h-3.5 w-3.5 text-violet-600" />
+                  Penggunaan Disk (Storage)
+                </p>
+                <span className="rounded-md bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700">
+                  Total {diskTotalGb} GB
+                </span>
+              </div>
+              <DonutChart
+                size={128}
+                strokeWidth={18}
+                centerValue={`${diskPct}%`}
+                centerLabel="Disk Terpakai"
+                slices={[
+                  {
+                    label: "Disk Terpakai",
+                    value: diskUsedGb,
+                    displayValue: `${diskUsedGb} GB`,
+                    color: diskPct >= 85 ? "#dc2626" : diskPct >= 70 ? "#d97706" : "#7c3aed",
+                  },
+                  {
+                    label: "Ruang Tersedia",
+                    value: Math.max(0.1, diskFreeGb),
+                    displayValue: `${diskFreeGb} GB`,
+                    color: "#e2e8f0",
+                  },
+                ]}
+              />
             </div>
           </div>
         </section>
