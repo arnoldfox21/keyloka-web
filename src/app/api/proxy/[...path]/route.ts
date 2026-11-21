@@ -85,6 +85,21 @@ async function forward(
       );
     }
   }
+  const isEngagementTrack =
+    req.method === "POST" &&
+    path[0] === "kosts" &&
+    path.length === 3 &&
+    path[2] === "track";
+  if (isEngagementTrack) {
+    const ip = getClientIp(req);
+    const rl = checkRateLimit(`kost-track:${ip}`, 40, 60_000);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { counted: false },
+        { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+      );
+    }
+  }
   const targetPath = path.join("/");
   const search = req.nextUrl.search || "";
   const targetUrl = `${API_BASE_URL}/${targetPath}${search}`;

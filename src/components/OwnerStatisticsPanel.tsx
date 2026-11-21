@@ -97,6 +97,9 @@ export function OwnerStatisticsPanel({ kosts }: OwnerStatisticsPanelProps) {
     "REVENUE",
   );
   const [data, setData] = useState<OwnerStatisticsResponse | null>(null);
+  const [totalAllProperties, setTotalAllProperties] = useState<number>(
+    kosts.length,
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -125,7 +128,10 @@ export function OwnerStatisticsPanel({ kosts }: OwnerStatisticsPanelProps) {
           throw new Error("Gagal memuat statistik properti.");
         }
         const json = (await res.json()) as OwnerStatisticsResponse;
-        if (active) setData(json);
+        if (active) {
+          setData(json);
+          setTotalAllProperties(json.summary.totalProperties);
+        }
       } catch (err) {
         if (active) {
           setError(
@@ -153,7 +159,11 @@ export function OwnerStatisticsPanel({ kosts }: OwnerStatisticsPanelProps) {
     setLoading(true);
     setError(null);
     try {
-      setData(await fetchStats(nextPeriod, nextKost));
+      const nextData = await fetchStats(nextPeriod, nextKost);
+      setData(nextData);
+      if (nextKost === "ALL") {
+        setTotalAllProperties(nextData.summary.totalProperties);
+      }
     } catch (err) {
       setError(
         err instanceof Error
@@ -260,7 +270,7 @@ export function OwnerStatisticsPanel({ kosts }: OwnerStatisticsPanelProps) {
             className="rounded-xl border border-gray-200 px-3 py-2 text-xs font-bold text-gray-700"
           >
             <option value="ALL">
-              Semua Properti ({data?.summary.totalProperties ?? kosts.length})
+              Semua Properti ({totalAllProperties})
             </option>
             {kosts.map((k) => (
               <option key={k.id} value={String(k.id)}>
