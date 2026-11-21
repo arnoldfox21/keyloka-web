@@ -14,12 +14,14 @@ import {
   History,
   LayoutGrid,
   Map as MapIcon,
+  MapPin,
   MessageCircle,
   RotateCcw,
   Search,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
+  X,
 } from "lucide-react";
 import type { Kost, KostFilters, MapPoint } from "@/lib/types";
 import { CompareModal } from "./CompareModal";
@@ -35,6 +37,8 @@ interface HomeExplorerProps {
   initialDailySub?: string;
   initialCategory?: string;
   initialCity?: string;
+  personalizedCity?: string | null;
+  unavailableUserCity?: string | null;
 }
 
 const LONG_TERM_CATEGORIES = [
@@ -80,11 +84,14 @@ export function HomeExplorer({
   initialDailySub = "ALL_DAILY",
   initialCategory = "SEMUA",
   initialCity = "Semua Kota",
+  personalizedCity = null,
+  unavailableUserCity = null,
 }: HomeExplorerProps) {
   const router = useRouter();
   const [kosts, setKosts] = useState<Kost[]>(initialKosts);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [page, setPage] = useState(1);
+  const [dismissedCityBanner, setDismissedCityBanner] = useState(false);
 
   const [stayMode, setStayMode] = useState<"LONG_TERM" | "HUNIAN_HARIAN">(initialStayMode);
   const [dailySub, setDailySub] = useState(initialDailySub);
@@ -789,6 +796,63 @@ export function HomeExplorer({
 
       {/* Main Results */}
       <section className="mt-6 space-y-4">
+        {unavailableUserCity && !dismissedCityBanner && city === "Semua Kota" && (
+          <div className="flex items-start justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-xs text-amber-900 shadow-2xs">
+            <div className="flex items-start gap-2.5">
+              <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                <MapPin className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="font-extrabold text-amber-950">
+                  Hunian di {unavailableUserCity} akan segera hadir!
+                </p>
+                <p className="mt-0.5 text-amber-800 leading-relaxed">
+                  Sementara kami menyiapkan listing terverifikasi di{" "}
+                  <span className="font-semibold">{unavailableUserCity}</span>,
+                  berikut adalah rekomendasi hunian terbaik dari kota yang sudah
+                  tersedia.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDismissedCityBanner(true)}
+              aria-label="Tutup pemberitahuan"
+              className="rounded-lg p-1 text-amber-700 hover:bg-amber-100"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
+        {personalizedCity &&
+          city.toLowerCase() === personalizedCity.toLowerCase() && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-emerald-200/80 bg-emerald-50/70 px-4 py-2.5 text-xs text-emerald-900">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span>
+                  Menampilkan hunian di{" "}
+                  <strong className="font-extrabold">{city}</strong> sesuai kota
+                  pilihanmu.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setCity("Semua Kota");
+                  setDistrict("Semua Area");
+                  fetchList(1, false, {
+                    city: "Semua Kota",
+                    district: "Semua Area",
+                  });
+                }}
+                className="font-bold text-emerald-700 underline-offset-2 hover:underline"
+              >
+                Lihat Semua Kota
+              </button>
+            </div>
+          )}
+
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1">
             <button
